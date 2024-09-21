@@ -1,5 +1,8 @@
-import UserDashboard from '../../components/UserDashboard';
+import { withAuth } from '@clerk/nextjs'
+import UserDashboard from '../../components/UserDashboard'
 
-export default function UserDashboardPage() {
-  return <UserDashboard />;
+function UserDashboardPage() {
+  return <UserDashboard />
 }
+
+export default withAuth(UserDashboardPage)

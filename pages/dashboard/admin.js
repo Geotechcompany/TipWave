@@ -1,5 +1,8 @@
-import AdminDashboard from '../../components/AdminDashboard';
+import { withAuth } from '@clerk/nextjs'
+import AdminDashboard from '../../components/AdminDashboard'
 
-export default function AdminDashboardPage() {
-  return <AdminDashboard />;
+function AdminDashboardPage() {
+  return <AdminDashboard />
 }
+
+export default withAuth(AdminDashboardPage)

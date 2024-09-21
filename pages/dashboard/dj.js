@@ -1,5 +1,8 @@
-import DJDashboard from '../../components/DJDashboard';
+import { withAuth } from '@clerk/nextjs'
+import DJDashboard from '../../components/DJDashboard'
 
-export default function DJDashboardPage() {
-  return <DJDashboard />;
+function DJDashboardPage() {
+  return <DJDashboard />
 }
+
+export default withAuth(DJDashboardPage)
