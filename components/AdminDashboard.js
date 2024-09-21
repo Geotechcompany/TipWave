@@ -1,15 +1,20 @@
-import { useState, useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
-import { motion } from 'framer-motion'
-import { Users, DollarSign, Settings } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { motion } from "framer-motion";
+import { Users, DollarSign, Settings } from "lucide-react";
 
-import CurrencySwitcher from './CurrencySwitcher'
+import CurrencySwitcher from "./switchers/currencySwitcher";
 
 export default function AdminDashboard() {
-  const { isLoaded, isSignedIn, user } = useUser()
-  const [selectedCurrency, setSelectedCurrency] = useState('USD')
-  const [commission, setCommission] = useState(10)
-  const [stats, setStats] = useState({ users: 0, djs: 0, totalBids: 0, totalRevenue: 0 })
+  const { isLoaded, isSignedIn, user } = useUser();
+  const [selectedCurrency, setSelectedCurrency] = useState("USD");
+  const [commission, setCommission] = useState(10);
+  const [stats, setStats] = useState({
+    users: 0,
+    djs: 0,
+    totalBids: 0,
+    totalRevenue: 0,
+  });
 
   useEffect(() => {
     // Fetch stats
@@ -19,22 +24,25 @@ export default function AdminDashboard() {
       djs: 50,
       totalBids: 5000,
       totalRevenue: 10000,
-    })
-  }, [])
+    });
+  }, []);
 
   if (!isLoaded) {
-    return <div>Loading...</div>
+    return <div>Loading...</div>;
   }
 
   if (!isSignedIn) {
-    return <div>Access Denied</div>
+    return <div>Access Denied</div>;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-neon-blue">Admin Dashboard</h1>
-        <CurrencySwitcher selectedCurrency={selectedCurrency} onCurrencyChange={setSelectedCurrency} />
+        <CurrencySwitcher
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+        />
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -100,5 +108,5 @@ export default function AdminDashboard() {
         </motion.div>
       </div>
     </div>
-  )
+  );
 }

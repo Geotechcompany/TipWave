@@ -3,7 +3,7 @@ import { useUser } from '@clerk/nextjs'
 import { motion } from 'framer-motion'
 import { Search, Music, DollarSign } from 'lucide-react'
 
-import CurrencySwitcher from './CurrencySwitcher'
+import CurrencySwitcher from './switchers/currencySwitcher';
 import SongSearch from './SongSearch'
 import SongQueue from './SongQueue'
 import BidModal from './BidModal'

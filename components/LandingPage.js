@@ -1,26 +1,26 @@
-import { useState, useEffect } from 'react'
-import { useUser, SignInButton, SignOutButton } from '@clerk/nextjs'
-import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowDown, Music, Users, DollarSign } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useUser, SignInButton, SignOutButton } from "@clerk/nextjs";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { ArrowDown, Music, Users, DollarSign } from "lucide-react";
 
 export default function LandingPage() {
-  const { isSignedIn, user, isLoaded } = useUser()
-  const [stats, setStats] = useState({ users: 0, bids: 0, djs: 0 })
-  const { scrollYProgress } = useScroll()
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0])
-  const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8])
+  const { isSignedIn, user, isLoaded } = useUser();
+  const [stats, setStats] = useState({ users: 0, bids: 0, djs: 0 });
+  const { scrollYProgress } = useScroll();
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
 
   useEffect(() => {
     // Simulating fetching stats
-    setStats({ users: 10000, bids: 50000, djs: 500 })
-  }, [])
+    setStats({ users: 10000, bids: 50000, djs: 500 });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
       <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-6">
         <h1 className="text-3xl font-bold text-neon-blue">DJ Tipping App</h1>
-        {isLoaded && (
-          isSignedIn ? (
+        {isLoaded &&
+          (isSignedIn ? (
             <SignOutButton>
               <button className="bg-neon-pink hover:bg-neon-pink/80 text-white font-bold py-2 px-4 rounded transition-all duration-300 ease-in-out transform hover:scale-105">
                 Sign Out
@@ -32,8 +32,7 @@ export default function LandingPage() {
                 Sign In
               </button>
             </SignInButton>
-          )
-        )}
+          ))}
       </header>
 
       <motion.section
@@ -41,7 +40,9 @@ export default function LandingPage() {
         className="h-screen flex flex-col justify-center items-center text-center p-6"
       >
         <h2 className="text-6xl font-bold mb-6">Tip Your Favorite DJs</h2>
-        <p className="text-xl mb-8">Request songs, place bids, and support the music you love!</p>
+        <p className="text-xl mb-8">
+          Request songs, place bids, and support the music you love!
+        </p>
         <SignInButton mode="modal">
           <button className="bg-neon-blue hover:bg-neon-blue/80 text-white font-bold py-3 px-6 rounded-lg text-xl transition-all duration-300 ease-in-out transform hover:scale-105">
             Join the Fun!
@@ -67,7 +68,9 @@ export default function LandingPage() {
           >
             <Music className="mx-auto mb-4 text-neon-blue" size={48} />
             <h3 className="text-2xl font-bold mb-2">Request Songs</h3>
-            <p>Search for your favorite tracks and add them to the DJ's queue.</p>
+            <p>
+              Search for your favorite tracks and add them to the DJ's queue.
+            </p>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -77,7 +80,9 @@ export default function LandingPage() {
           >
             <DollarSign className="mx-auto mb-4 text-neon-pink" size={48} />
             <h3 className="text-2xl font-bold mb-2">Place Bids</h3>
-            <p>Increase your chances of hearing your song by placing higher bids.</p>
+            <p>
+              Increase your chances of hearing your song by placing higher bids.
+            </p>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -101,7 +106,9 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
             className="text-center"
           >
-            <h3 className="text-6xl font-bold text-neon-blue mb-2">{stats.users.toLocaleString()}</h3>
+            <h3 className="text-6xl font-bold text-neon-blue mb-2">
+              {stats.users.toLocaleString()}
+            </h3>
             <p className="text-xl">Active Users</p>
           </motion.div>
           <motion.div
@@ -110,7 +117,9 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-center"
           >
-            <h3 className="text-6xl font-bold text-neon-pink mb-2">{stats.bids.toLocaleString()}</h3>
+            <h3 className="text-6xl font-bold text-neon-pink mb-2">
+              {stats.bids.toLocaleString()}
+            </h3>
             <p className="text-xl">Total Bids</p>
           </motion.div>
           <motion.div
@@ -119,11 +128,13 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="text-center"
           >
-            <h3 className="text-6xl font-bold text-neon-green mb-2">{stats.djs.toLocaleString()}</h3>
+            <h3 className="text-6xl font-bold text-neon-green mb-2">
+              {stats.djs.toLocaleString()}
+            </h3>
             <p className="text-xl">Active DJs</p>
           </motion.div>
         </div>
       </section>
     </div>
-  )
+  );
 }

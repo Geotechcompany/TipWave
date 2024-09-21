@@ -3,7 +3,8 @@ import { useUser } from '@clerk/nextjs'
 import { motion } from 'framer-motion'
 import { Music, DollarSign, Users } from 'lucide-react'
 
-import CurrencySwitcher from './CurrencySwitcher'
+import CurrencySwitcher from './switchers/currencySwitcher';
+
 
 export default function DJDashboard() {
   const { isLoaded, isSignedIn, user } = useUser()
