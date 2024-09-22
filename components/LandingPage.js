@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useUser, SignInButton, SignOutButton } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown, Music, Users, DollarSign } from "lucide-react";
+import { SignInButton, SignOutButton } from "@clerk/nextjs";
 
 export default function LandingPage() {
   const { isSignedIn, user, isLoaded } = useUser();
@@ -13,14 +14,21 @@ export default function LandingPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/stats');
+        const response = await fetch("/api/stats");
         const data = await response.json();
         setStats(data);
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error("Error fetching stats:", error);
       }
     };
-    fetchStats();
+
+    fetchStats(); // Fetch stats immediately when component mounts
+
+    // Set up polling every 30 seconds
+    const intervalId = setInterval(fetchStats, 30000);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -115,7 +123,7 @@ export default function LandingPage() {
             className="text-center"
           >
             <h3 className="text-6xl font-bold text-neon-blue mb-2">
-              {stats.users.toLocaleString()}
+              {stats.users ? stats.users.toLocaleString() : "0"}
             </h3>
             <p className="text-xl">Active Users</p>
           </motion.div>
@@ -126,7 +134,7 @@ export default function LandingPage() {
             className="text-center"
           >
             <h3 className="text-6xl font-bold text-neon-pink mb-2">
-              {stats.bids.toLocaleString()}
+              {stats.bids ? stats.bids.toLocaleString() : "0"}
             </h3>
             <p className="text-xl">Total Bids</p>
           </motion.div>
@@ -137,7 +145,7 @@ export default function LandingPage() {
             className="text-center"
           >
             <h3 className="text-6xl font-bold text-neon-green mb-2">
-              {stats.djs.toLocaleString()}
+              {stats.djs ? stats.djs.toLocaleString() : "0"}
             </h3>
             <p className="text-xl">Active DJs</p>
           </motion.div>
