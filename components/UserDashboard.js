@@ -19,9 +19,15 @@ export default function UserDashboard() {
   }
 
   const handleBid = (song) => {
-    setSelectedSong(song)
-    setShowBidModal(true)
-  }
+    setSelectedSong({
+      id: song.id,
+      title: song.name,
+      artist: song.artists[0].name,
+      album: song.album.name,
+      image: song.album.images[0].url
+    });
+    setShowBidModal(true);
+  };
 
   if (!isLoaded) {
     return <div>Loading...</div>

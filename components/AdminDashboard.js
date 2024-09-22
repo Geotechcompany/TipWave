@@ -17,14 +17,16 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    // Fetch stats
-    // This is where you'd typically make API calls
-    setStats({
-      users: 1000,
-      djs: 50,
-      totalBids: 5000,
-      totalRevenue: 10000,
-    });
+    const fetchAdminStats = async () => {
+      try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        setStats(data);
+      } catch (error) {
+        console.error('Error fetching admin stats:', error);
+      }
+    };
+    fetchAdminStats();
   }, []);
 
   if (!isLoaded) {

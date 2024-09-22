@@ -11,8 +11,16 @@ export default function LandingPage() {
   const scale = useTransform(scrollYProgress, [0, 0.5], [1, 0.8]);
 
   useEffect(() => {
-    // Simulating fetching stats
-    setStats({ users: 10000, bids: 50000, djs: 500 });
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        setStats(data);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+    };
+    fetchStats();
   }, []);
 
   return (
