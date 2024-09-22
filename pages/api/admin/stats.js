@@ -1,4 +1,4 @@
-import { requireAuth } from '../../../lib/auth';
+import { requireAuth } from '../lib/auth';
 import prisma from '../../../lib/prisma';
 
 export default async function handler(req, res) {

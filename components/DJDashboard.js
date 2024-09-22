@@ -93,17 +93,19 @@ export default function DJDashboard() {
             <div>
               <h3 className="font-bold">Top Requested Songs</h3>
               <ul className="list-disc list-inside">
-                {stats.topSongs.map((song, index) => (
-                  <li key={index}>{song}</li>
-                ))}
+                {stats.topSongs &&
+                  stats.topSongs.map((song, index) => (
+                    <li key={index}>{song}</li>
+                  ))}
               </ul>
             </div>
             <div>
               <h3 className="font-bold">Most Frequent Users</h3>
               <ul className="list-disc list-inside">
-                {stats.frequentUsers.map((user, index) => (
-                  <li key={index}>{user}</li>
-                ))}
+                {stats.frequentUsers &&
+                  stats.frequentUsers.map((user, index) => (
+                    <li key={index}>{user}</li>
+                  ))}
               </ul>
             </div>
           </div>

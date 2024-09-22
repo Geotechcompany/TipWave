@@ -1,5 +1,5 @@
-import { requireAuth } from '../../lib/auth';
-import { searchSpotify } from '../../lib/spotify';
+import { requireAuth } from '../../../lib/auth';
+import { searchSpotify } from '../../../lib/spotify';
 
 export default async function handler(req, res) {
   if (!(await requireAuth(req))) {
