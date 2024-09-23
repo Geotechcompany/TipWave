@@ -1,15 +1,17 @@
-import React, { useState } from "react";
-import Image from "next/image";
+import React, { useState } from 'react';
+import Image from 'next/image';
+import { useAlert } from "../contexts/AlertContext";
 
 const InviteFriendsCard = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); // Add this line
+  const { addAlert } = useAlert();
 
   const handleInvite = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage("");
+    setMessage(""); // Clear any previous message
 
     try {
       const response = await fetch("/api/invite-friend", {
@@ -19,13 +21,16 @@ const InviteFriendsCard = () => {
       });
 
       if (response.ok) {
-        setMessage("Invite sent successfully!");
+        addAlert("Invite sent successfully!", "success");
         setEmail("");
+        setMessage("Invite sent successfully!"); // Set success message
       } else {
-        setMessage("Failed to send invite. Please try again.");
+        addAlert("Failed to send invite. Please try again.", "error");
+        setMessage("Failed to send invite. Please try again."); // Set error message
       }
     } catch (error) {
-      setMessage("An error occurred. Please try again.");
+      addAlert("An error occurred. Please try again.", "error");
+      setMessage("An error occurred. Please try again."); // Set error message
     }
 
     setIsLoading(false);

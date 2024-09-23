@@ -1,35 +1,26 @@
-// import { DefaultSeo } from 'next-seo';
-// import SEO from '../next-seo.config';
-// import '../styles/globals.css';
-
-// function MyApp({ Component, pageProps }) {
-//   return (
-//     <>
-//       <DefaultSeo {...SEO} />
-//       <Component {...pageProps} />
-//     </>
-//   );
-// }
-
-// export default MyApp;
-
-// import '../styles/globals.css';
-
-// function MyApp({ Component, pageProps }) {
-//   return <Component {...pageProps} />;
-// }
-
-// export default MyApp;
-
-import { ClerkProvider } from '@clerk/nextjs'
-import '../styles/globals.css'
+import { ClerkProvider } from "@clerk/nextjs";
+import { AlertProvider } from "../contexts/AlertContext.js";
+import { useState, useEffect } from 'react';
+import { AppLoader } from '../components/AppLoader';
+import "../styles/globals.css";
 
 function MyApp({ Component, pageProps }) {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate loading time (remove this in production)
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <ClerkProvider>
-      <Component {...pageProps} />
+    <ClerkProvider {...pageProps}>
+      <AlertProvider>
+        {isLoading && <AppLoader />}
+        <Component {...pageProps} />
+      </AlertProvider>
     </ClerkProvider>
-  )
+  );
 }
 
-export default MyApp
+export default MyApp;
