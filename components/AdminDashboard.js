@@ -1,113 +1,154 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { Users, DollarSign, Settings } from "lucide-react";
-
-import CurrencySwitcher from "./switchers/currencySwitcher";
+import {
+  LayoutDashboard,
+  Music,
+  Users,
+  BarChartIcon,
+  Settings,
+  DollarSign,
+  Bell,
+} from "lucide-react";
+import Image from "next/image";
+import { useClerk } from "@clerk/clerk-react";
+import { StatCard } from './StatCard';
 
 export default function AdminDashboard() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
-  const [commission, setCommission] = useState(10);
-  const [stats, setStats] = useState({
-    users: 0,
-    djs: 0,
-    totalBids: 0,
-    totalRevenue: 0,
-  });
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  useEffect(() => {
-    const fetchAdminStats = async () => {
-      try {
-        const response = await fetch('/api/stats');
-        const data = await response.json();
-        setStats(data);
-      } catch (error) {
-        console.error('Error fetching admin stats:', error);
-      }
-    };
-    fetchAdminStats();
-  }, []);
+  const navigationItems = [
+    { tab: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
+    { tab: "users", label: "Users", icon: <Users className="w-5 h-5" /> },
+    { tab: "songs", label: "Songs", icon: <Music className="w-5 h-5" /> },
+    { tab: "bids", label: "Bids", icon: <DollarSign className="w-5 h-5" /> },
+    { tab: "analytics", label: "Analytics", icon: <BarChartIcon className="w-5 h-5" /> },
+    { tab: "settings", label: "Settings", icon: <Settings className="w-5 h-5" /> },
+  ];
 
-  if (!isLoaded) {
-    return <div>Loading...</div>;
-  }
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Admin Stats Cards */}
+            <StatCard
+              title="Total Users"
+              value="1,234"
+              icon={<Users className="w-6 h-6" />}
+              trend="+12%"
+            />
+            <StatCard
+              title="Total Bids"
+              value="5,678"
+              icon={<DollarSign className="w-6 h-6" />}
+              trend="+8%"
+            />
+            <StatCard
+              title="Active Songs"
+              value="890"
+              icon={<Music className="w-6 h-6" />}
+              trend="+15%"
+            />
+          </div>
+        );
+      case "users":
+        return <div>Users Management</div>;
+      case "songs":
+        return <div>Songs Management</div>;
+      case "bids":
+        return <div>Bids Management</div>;
+      case "analytics":
+        return <div>Analytics Dashboard</div>;
+      case "settings":
+        return <div>Admin Settings</div>;
+      default:
+        return <div>Dashboard</div>;
+    }
+  };
 
-  if (!isSignedIn) {
-    return <div>Access Denied</div>;
-  }
+  const profileImageUrl = user?.imageUrl || "https://via.placeholder.com/64";
+  const userEmail = user?.emailAddresses[0]?.emailAddress || "admin@example.com";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-6">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-neon-blue">Admin Dashboard</h1>
-        <CurrencySwitcher
-          selectedCurrency={selectedCurrency}
-          onCurrencyChange={setSelectedCurrency}
-        />
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-dark-gray p-6 rounded-lg"
-        >
-          <h2 className="text-2xl font-bold mb-4 flex items-center">
-            <Users className="mr-2" /> Platform Stats
-          </h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-bold">Total Users</h3>
-              <p className="text-2xl text-neon-pink">{stats.users}</p>
-            </div>
-            <div>
-              <h3 className="font-bold">Total DJs</h3>
-              <p className="text-2xl text-neon-pink">{stats.djs}</p>
-            </div>
-            <div>
-              <h3 className="font-bold">Total Bids</h3>
-              <p className="text-2xl text-neon-pink">{stats.totalBids}</p>
-            </div>
-            <div>
-              <h3 className="font-bold">Total Revenue</h3>
-              <p className="text-2xl text-neon-pink">
-                {stats.totalRevenue} {selectedCurrency}
-              </p>
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="flex h-screen">
+        {/* Sidebar */}
+        <div className="w-64 bg-white shadow-lg flex flex-col">
+          {/* Logo */}
+          <div className="p-4 border-b border-gray-200">
+            <h1 className="text-xl font-bold text-gray-900">DJ TipSync Admin</h1>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-dark-gray p-6 rounded-lg"
-        >
-          <h2 className="text-2xl font-bold mb-4 flex items-center">
-            <Settings className="mr-2" /> Platform Settings
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold mb-2">Commission Rate</h3>
-              <div className="flex items-center">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={commission}
-                  onChange={(e) => setCommission(parseInt(e.target.value))}
-                  className="w-full mr-4"
+          {/* Navigation */}
+          <nav className="flex-1 p-4">
+            <div className="space-y-1">
+              {navigationItems.map((item) => (
+                <button
+                  key={item.tab}
+                  onClick={() => setActiveTab(item.tab)}
+                  className={`${
+                    activeTab === item.tab
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  } group flex items-center px-2 py-2 text-sm font-medium rounded-md w-full`}
+                >
+                  {item.icon}
+                  <span className="ml-3">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Admin Profile Section */}
+          <div className="mt-auto p-4 border-t border-gray-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative">
+                <Image
+                  src={profileImageUrl}
+                  alt={user?.fullName || "Admin"}
+                  width={64}
+                  height={64}
+                  className="rounded-full"
                 />
-                <span className="text-2xl text-neon-pink">{commission}%</span>
+                <span className="absolute top-0 right-0 bg-red-400 text-xs text-white px-2 py-0.5 rounded-full">
+                  Admin
+                </span>
               </div>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                {user?.fullName || "Admin User"}
+              </h3>
+              <p className="text-xs text-gray-500">{userEmail}</p>
+              <button
+                onClick={() => signOut()}
+                className="mt-3 w-full bg-gray-900 text-white rounded-md py-2 text-sm hover:bg-gray-700 transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
-            <button className="bg-neon-blue hover:bg-neon-blue/80 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">
-              Save Settings
-            </button>
           </div>
-        </motion.div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">
+              Welcome, {user?.firstName || 'Admin'} 👋
+            </h1>
+            <div className="flex items-center gap-4">
+              <button className="p-2 rounded-full hover:bg-gray-100">
+                <Bell className="w-6 h-6" />
+              </button>
+              <button className="p-2 rounded-full hover:bg-gray-100">
+                <Settings className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+          {renderContent()}
+        </div>
       </div>
     </div>
   );

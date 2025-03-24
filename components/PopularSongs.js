@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Music, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 
+const DEFAULT_ALBUM_ART = 'https://i.scdn.co/image/ab67616d0000b273c5716278e04baa78274ff6cc';
+
 export const PopularSongs = ({ onBidClick }) => {
   const [popularSongs, setPopularSongs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,12 +49,12 @@ export const PopularSongs = ({ onBidClick }) => {
             <div className="flex items-center gap-3">
               <div className="relative w-12 h-12">
                 <Image
-                  src={song.albumArt || 'https://res.cloudinary.com/dgvnuwspr/image/upload/v1711276561/default-album_kqfkc3.png'}
+                  src={song.albumArt || DEFAULT_ALBUM_ART}
                   alt={song.album?.name || 'Album Art'}
                   fill
                   className="rounded-md object-cover"
                   onError={(e) => {
-                    e.target.src = 'https://res.cloudinary.com/dgvnuwspr/image/upload/v1711276561/default-album_kqfkc3.png';
+                    e.target.src = DEFAULT_ALBUM_ART;
                   }}
                 />
               </div>

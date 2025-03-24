@@ -3,28 +3,27 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 import AdminDashboard from "../../components/AdminDashboard";
 
-function AdminDashboardPage() {
+function AdminPage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/sign-in");
+      return;
     }
-  }, [isLoaded, isSignedIn, router]);
+
+    if (isLoaded && isSignedIn && user?.publicMetadata?.role !== 'admin') {
+      router.push("/dashboard/user");
+      return;
+    }
+  }, [isLoaded, isSignedIn, router, user]);
 
   if (!isLoaded || !isSignedIn) {
-    return null; // or a loading spinner
+    return null;
   }
-
-  // You might want to add an additional check here to ensure the user is an admin
-  // For example:
-  // if (user.publicMetadata.role !== 'admin') {
-  //   router.push('/dashboard/user');
-  //   return null;
-  // }
 
   return <AdminDashboard />;
 }
 
-export default AdminDashboardPage;
+export default AdminPage;
