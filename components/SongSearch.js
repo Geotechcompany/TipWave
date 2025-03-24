@@ -2,14 +2,20 @@ import React, { useState } from "react";
 import { Search, Music, Clock, DollarSign } from "lucide-react";
 import BidModal from "./BidModal";
 import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
+import toast from 'react-hot-toast';
 
-const SongSearch = () => {
+const SongSearch = ({ onBidPlaced }) => {
+  const { user } = useUser();
   const [query, setQuery] = useState("");
   const [songs, setSongs] = useState([]);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSearch = async () => {
+    if (!query.trim()) return;
+    
     try {
       const response = await fetch(
         `/api/songs/search?query=${encodeURIComponent(query)}`
@@ -32,10 +38,57 @@ const SongSearch = () => {
     setIsBidModalOpen(true);
   };
 
-  const handleBidSubmit = (bidAmount) => {
-    // Here you would typically send the bid to your backend
-    console.log(`Bid of ${bidAmount} placed for song: ${selectedSong.name}`);
-    setIsBidModalOpen(false);
+  const fetchActiveBids = async () => {
+    try {
+      const response = await fetch("/api/user/stats");
+      if (response.ok) {
+        const data = await response.json();
+        return data.activeBids;
+      }
+    } catch (error) {
+      console.error("Error fetching active bids:", error);
+    }
+  };
+
+  const handleBidSubmit = async (bidAmount) => {
+    if (!user || !selectedSong) return;
+    
+    const bidPromise = new Promise(async (resolve, reject) => {
+      setIsSubmitting(true);
+      try {
+        const response = await fetch("/api/bids/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount: bidAmount,
+            song: selectedSong
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to place bid");
+        }
+
+        setIsBidModalOpen(false);
+        if (onBidPlaced) {
+          await onBidPlaced();
+        }
+        resolve("Bid placed successfully!");
+      } catch (error) {
+        console.error("Error placing bid:", error);
+        reject(new Error("Failed to place bid. Please try again."));
+      } finally {
+        setIsSubmitting(false);
+      }
+    });
+
+    toast.promise(bidPromise, {
+      loading: 'Placing your bid...',
+      success: 'Bid placed successfully! 🎵',
+      error: 'Failed to place bid 😟'
+    });
   };
 
   return (
@@ -45,6 +98,7 @@ const SongSearch = () => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           placeholder="Search for a song..."
           className="flex-grow p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
         />
@@ -122,6 +176,7 @@ const SongSearch = () => {
                     <button
                       onClick={() => handleBidClick(song)}
                       className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-200"
+                      disabled={isSubmitting}
                     >
                       <DollarSign size={20} />
                     </button>
@@ -133,13 +188,15 @@ const SongSearch = () => {
         </div>
       )}
 
-      <BidModal
-        isOpen={isBidModalOpen}
-        onClose={() => setIsBidModalOpen(false)}
-        onSubmit={handleBidSubmit}
-        currentBid={0}
-        selectedSong={selectedSong}
-      />
+      {isBidModalOpen && (
+        <BidModal
+          isOpen={isBidModalOpen}
+          onClose={() => setIsBidModalOpen(false)}
+          onSubmit={handleBidSubmit}
+          song={selectedSong}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };

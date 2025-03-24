@@ -1,35 +1,41 @@
 import React from 'react';
 import { format } from 'date-fns';
 
-const ActiveBids = ({ activeBids }) => {
+const ActiveBids = ({ activeBids = [] }) => {
+  if (!activeBids.length) {
+    return <div className="text-center p-4">No active bids to display</div>;
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full bg-white">
         <thead>
-          <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+          <tr className="bg-gray-100">
             <th className="py-3 px-6 text-left">Song</th>
             <th className="py-3 px-6 text-left">Artist</th>
-            <th className="py-3 px-6 text-center">Bid Amount</th>
+            <th className="py-3 px-6 text-center">Amount</th>
             <th className="py-3 px-6 text-center">Status</th>
             <th className="py-3 px-6 text-center">Date</th>
           </tr>
         </thead>
-        <tbody className="text-gray-600 text-sm font-light">
+        <tbody>
           {activeBids.map((bid) => (
-            <tr key={bid.id} className="border-b border-gray-200 hover:bg-gray-100">
-              <td className="py-3 px-6 text-left whitespace-nowrap">{bid.song.title}</td>
-              <td className="py-3 px-6 text-left">{bid.song.artist}</td>
-              <td className="py-3 px-6 text-center">${bid.amount.toFixed(2)}</td>
+            <tr key={bid.id} className="border-b hover:bg-gray-50">
+              <td className="py-3 px-6 text-left">{bid.song?.title || 'Unknown Song'}</td>
+              <td className="py-3 px-6 text-left">{bid.song?.artist || 'Unknown Artist'}</td>
+              <td className="py-3 px-6 text-center">${bid.amount?.toFixed(2)}</td>
               <td className="py-3 px-6 text-center">
-                <span className={`${
-                  bid.status === 'ACCEPTED' ? 'bg-green-200 text-green-600' :
-                  bid.status === 'REJECTED' ? 'bg-red-200 text-red-600' :
-                  'bg-yellow-200 text-yellow-600'
-                } py-1 px-3 rounded-full text-xs`}>
+                <span className={`px-2 py-1 rounded ${
+                  bid.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                  bid.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
                   {bid.status}
                 </span>
               </td>
-              <td className="py-3 px-6 text-center">{format(new Date(bid.createdAt), 'MMM d, yyyy')}</td>
+              <td className="py-3 px-6 text-center">
+                {format(new Date(bid.createdAt), 'MMM d, yyyy')}
+              </td>
             </tr>
           ))}
         </tbody>

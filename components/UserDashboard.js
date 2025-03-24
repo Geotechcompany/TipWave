@@ -27,6 +27,8 @@ import FavoriteDJs from "./FavoriteDJs";
 import StatCard from "./StatCard";
 import ChartCard from "./ChartCard";
 import BarChart from "./BarChart";
+import { toast } from "react-hot-toast";
+import PopularSongs from './PopularSongs';
 
 export default function UserDashboard() {
   const { user } = useUser();
@@ -39,22 +41,24 @@ export default function UserDashboard() {
     totalSpent: 0,
     activeBids: [],
   });
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
+
+  const fetchUserStats = async () => {
+    try {
+      const response = await fetch("/api/user/stats");
+      if (response.ok) {
+        const data = await response.json();
+        setUserStats(data);
+      } else {
+        console.error("Failed to fetch user stats");
+      }
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+    }
+  };
 
   useEffect(() => {
-    const fetchUserStats = async () => {
-      try {
-        const response = await fetch("/api/user/stats");
-        if (response.ok) {
-          const data = await response.json();
-          setUserStats(data);
-        } else {
-          console.error("Failed to fetch user stats");
-        }
-      } catch (error) {
-        console.error("Error fetching user stats:", error);
-      }
-    };
-
     fetchUserStats();
   }, []);
 
@@ -78,6 +82,94 @@ export default function UserDashboard() {
       tab: "activeBids",
     },
   ];
+
+  const handleBidClick = (song) => {
+    setSelectedSong(song);
+    setIsBidModalOpen(true);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "search":
+        return (
+          <div className="space-y-8">
+            <SongSearch onBidPlaced={fetchUserStats} />
+            <PopularSongs onBidClick={handleBidClick} />
+          </div>
+        );
+      case "queue":
+        return <SongQueue />;
+      case "favorites":
+        return <FavoriteDJs />;
+      case "activeBids":
+        return (
+          <div className="space-y-6">
+            <ChartCard
+              title="Active Bids Overview"
+              chart={<ActiveBidsChart activeBids={userStats.activeBids} />}
+            />
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-4">Active Bids</h2>
+              <ActiveBids activeBids={userStats.activeBids} />
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <StatCard
+                title="Total Bids"
+                value={userStats.totalBids.toString()}
+                icon={<DollarSign />}
+                color="bg-blue-100"
+              />
+              <StatCard
+                title="Won Bids"
+                value={userStats.wonBids.toString()}
+                icon={<Users />}
+                color="bg-purple-100"
+              />
+              <StatCard
+                title="Total Spent"
+                value={`$${userStats.totalSpent.toFixed(2)}`}
+                icon={<Music />}
+                color="bg-yellow-100"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ChartCard
+                title="Active Bids"
+                chart={<ActiveBidsChart activeBids={userStats.activeBids} />}
+              />
+              <InviteFriendsCard onInvite={handleInviteFriend} />
+            </div>
+          </>
+        );
+    }
+  };
+
+  const handleInviteFriend = async (email) => {
+    try {
+      const response = await fetch('/api/invite-friend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send invite');
+      }
+      
+      toast.success('Invitation sent successfully!');
+    } catch (error) {
+      console.error('Error sending invite:', error);
+      toast.error('Failed to send invitation');
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
@@ -204,45 +296,7 @@ export default function UserDashboard() {
           <h1 className="text-3xl font-bold mb-8">
             Hi, Welcome back {user?.firstName}! 👋
           </h1>
-          {activeTab === "dashboard" && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard
-                  title="Total Bids"
-                  value={userStats.totalBids.toString()}
-                  icon={<DollarSign />}
-                  color="bg-blue-100"
-                />
-                <StatCard
-                  title="Won Bids"
-                  value={userStats.wonBids.toString()}
-                  icon={<Users />}
-                  color="bg-purple-100"
-                />
-                <StatCard
-                  title="Total Spent"
-                  value={`$${userStats.totalSpent.toFixed(2)}`}
-                  icon={<Music />}
-                  color="bg-yellow-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <ChartCard
-                  title="Active Bids"
-                  chart={<ActiveBidsChart activeBids={userStats.activeBids} />}
-                />
-                <InviteFriendsCard />
-              </div>
-            </>
-          )}
-
-          {activeTab === "search" && <SongSearch />}
-          {activeTab === "queue" && <SongQueue />}
-          {activeTab === "favorites" && <FavoriteDJs />}
-          {activeTab === "activeBids" && (
-            <ActiveBids activeBids={userStats.activeBids} />
-          )}
+          {renderContent()}
         </div>
       </div>
     </div>

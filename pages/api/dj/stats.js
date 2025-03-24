@@ -1,54 +1,46 @@
 import { getAuth } from "@clerk/nextjs/server";
-import prisma from '../../../lib/prisma';
+import { getCollection } from '../../../lib/db';
 
 export default async function handler(req, res) {
-  const { userId } = getAuth(req);
+  const { userId: clerkId } = getAuth(req);
 
-  if (!userId) {
+  if (!clerkId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
   if (req.method === 'GET') {
     try {
-      const earnings = await prisma.bid.aggregate({
-        where: { djId: userId },
-        _sum: {
-          amount: true
-        }
-      });
+      const bids = await getCollection('bids');
+      
+      const earnings = await bids.aggregate([
+        { $match: { djId: clerkId } },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+      ]).toArray();
 
-      const topSongs = await prisma.bid.groupBy({
-        by: ['songId'],
-        where: { djId: userId },
-        _count: {
-          songId: true
-        },
-        orderBy: {
-          _count: {
-            songId: 'desc'
-          }
-        },
-        take: 3
-      });
+      const topSongs = await bids.aggregate([
+        { $match: { djId: clerkId } },
+        { $group: { 
+          _id: "$songId",
+          count: { $sum: 1 }
+        }},
+        { $sort: { count: -1 } },
+        { $limit: 3 }
+      ]).toArray();
 
-      const frequentUsers = await prisma.bid.groupBy({
-        by: ['userId'],
-        where: { djId: userId },
-        _count: {
-          userId: true
-        },
-        orderBy: {
-          _count: {
-            userId: 'desc'
-          }
-        },
-        take: 3
-      });
+      const frequentUsers = await bids.aggregate([
+        { $match: { djId: clerkId } },
+        { $group: { 
+          _id: "$clerkId",
+          count: { $sum: 1 }
+        }},
+        { $sort: { count: -1 } },
+        { $limit: 3 }
+      ]).toArray();
 
       res.status(200).json({
-        earnings: earnings._sum.amount || 0,
-        topSongs: topSongs.map(s => s.songId),
-        frequentUsers: frequentUsers.map(u => u.userId)
+        earnings: earnings[0]?.total || 0,
+        topSongs: topSongs.map(s => s._id),
+        frequentUsers: frequentUsers.map(u => u._id)
       });
     } catch (error) {
       console.error('Error fetching DJ stats:', error);

@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
   const { userId } = getAuth(req);
   if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { email } = req.body;
@@ -17,33 +17,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Create a test account if you don't have a real email service
-    // let testAccount = await nodemailer.createTestAccount();
-
-    // Create a transporter using your email service credentials
-    let transporter = nodemailer.createTransport({
-      host: "smtp.yourservice.com",
-      port: 587,
-      secure: false, // true for 465, false for other ports
+    // Use environment variables for email configuration
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: process.env.SMTP_SECURE === 'true',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
       },
     });
 
-    // Send the invite email
-    let info = await transporter.sendMail({
-      from: '"TipWave" <noreply@yourapp.com>',
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
       to: email,
-      subject: "You've been invited to join Our App!",
-      text: `Your friend has invited you to join Our App! Sign up now and get a free bid: https://yourapp.com/signup?ref=${userId}`,
-      html: `<p>Your friend has invited you to join Our App!</p><p><a href="https://yourapp.com/signup?ref=${userId}">Sign up now and get a free bid!</a></p>`,
+      subject: 'Join DJ TipSync!',
+      html: `
+        <h1>You've been invited to DJ TipSync!</h1>
+        <p>Your friend has invited you to join DJ TipSync, the best way to request songs and support your favorite DJs.</p>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/signup">Join Now</a>
+      `,
     });
 
-    console.log("Message sent: %s", info.messageId);
-    res.status(200).json({ message: 'Invite sent successfully' });
+    res.status(200).json({ message: 'Invitation sent successfully' });
   } catch (error) {
     console.error('Error sending invite:', error);
-    res.status(500).json({ error: 'Failed to send invite' });
+    res.status(500).json({ error: 'Failed to send invitation' });
   }
 }

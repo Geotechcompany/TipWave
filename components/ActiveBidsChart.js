@@ -4,13 +4,13 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const ActiveBidsChart = ({ activeBids }) => {
+const ActiveBidsChart = ({ activeBids = [] }) => {
   const data = {
-    labels: activeBids.map(bid => bid.song.title),
+    labels: activeBids.map(bid => bid.song?.title || 'Unknown Song'),
     datasets: [
       {
         label: 'Bid Amount',
-        data: activeBids.map(bid => bid.amount),
+        data: activeBids.map(bid => bid.amount || 0),
         fill: false,
         backgroundColor: 'rgb(75, 192, 192)',
         borderColor: 'rgba(75, 192, 192, 0.2)',
@@ -29,7 +29,20 @@ const ActiveBidsChart = ({ activeBids }) => {
         text: 'Active Bids',
       },
     },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Bid Amount ($)'
+        }
+      }
+    }
   };
+
+  if (!activeBids.length) {
+    return <div className="text-center p-4">No active bids to display</div>;
+  }
 
   return <Line data={data} options={options} />;
 };
