@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useAlert } from "../contexts/AlertContext";
 
-const InviteFriendsCard = () => {
+export function InviteFriendsCard({ onInvite }) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState(""); // Add this line
@@ -72,6 +72,4 @@ const InviteFriendsCard = () => {
       {message && <p className="mt-2 text-sm">{message}</p>}
     </div>
   );
-};
-
-export default InviteFriendsCard;
+}

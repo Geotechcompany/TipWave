@@ -1,7 +1,7 @@
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
-import UserDashboard from '../../components/UserDashboard';
+import { UserDashboard } from '../../components/UserDashboard';
 
 function UserDashboardPage() {
   const { isLoaded, isSignedIn, user } = useUser();

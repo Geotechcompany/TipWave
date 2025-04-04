@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import toast from 'react-hot-toast';
 
-const SongSearch = ({ onBidPlaced }) => {
+export function SongSearch({ onBidPlaced }) {
   const { user } = useUser();
   const [query, setQuery] = useState("");
   const [songs, setSongs] = useState([]);
@@ -199,6 +199,4 @@ const SongSearch = ({ onBidPlaced }) => {
       )}
     </div>
   );
-};
-
-export default SongSearch;
+}

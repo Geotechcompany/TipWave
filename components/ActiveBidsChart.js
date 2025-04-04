@@ -4,7 +4,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-const ActiveBidsChart = ({ activeBids = [] }) => {
+export function ActiveBidsChart({ activeBids = [] }) {
   const data = {
     labels: activeBids.map(bid => bid.song?.title || 'Unknown Song'),
     datasets: [
@@ -45,6 +45,4 @@ const ActiveBidsChart = ({ activeBids = [] }) => {
   }
 
   return <Line data={data} options={options} />;
-};
-
-export default ActiveBidsChart;
+}

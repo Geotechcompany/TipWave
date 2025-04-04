@@ -17,20 +17,19 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useClerk } from "@clerk/clerk-react";
-import ActiveBidsChart from "./ActiveBidsChart";
-import ActiveBids from "./ActiveBids";
-import InviteFriendsCard from "./InviteFriendsCard";
-
-import SongSearch from "./SongSearch";
-import SongQueue from "./SongQueue";
-import FavoriteDJs from "./FavoriteDJs";
-import StatCard from "./StatCard";
-import ChartCard from "./ChartCard";
-import BarChart from "./BarChart";
+import { ActiveBidsChart } from "./ActiveBidsChart";
+import { ActiveBids } from "./ActiveBids";
+import { InviteFriendsCard } from "./InviteFriendsCard";
+import { SongSearch } from "./SongSearch";
+import { SongQueue } from "./SongQueue";
+import { FavoriteDJs } from "./FavoriteDJs";
+import { StatCard } from "./StatCard";
+import { ChartCard } from "./ChartCard";
+import { BarChart } from "./BarChart";
 import { toast } from "react-hot-toast";
-import PopularSongs from './PopularSongs';
+import { PopularSongs } from './PopularSongs';
 
-export default function UserDashboard() {
+export function UserDashboard() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const [activeTab, setActiveTab] = useState("dashboard");

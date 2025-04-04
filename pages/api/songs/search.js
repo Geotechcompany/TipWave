@@ -1,21 +1,23 @@
-import { requireAuth } from '../../../lib/auth';
-import { searchSpotify } from '../../../lib/spotify';
+import { getAuth } from "@clerk/nextjs/server";
+import { searchTracks } from '../../../lib/spotify';
 
 export default async function handler(req, res) {
-  if (!(await requireAuth(req))) {
+  const { userId: clerkId } = getAuth(req);
+  const { query } = req.query;
+
+  if (!clerkId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  if (req.method === 'GET') {
-    const { query } = req.query;
-    try {
-      const songs = await searchSpotify(query);
-      res.status(200).json(songs);
-    } catch (error) {
-      console.error('Error searching songs:', error);
-      res.status(500).json({ error: 'Error searching songs' });
-    }
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
+  if (!query) {
+    return res.status(400).json({ error: "Query parameter is required" });
+  }
+
+  try {
+    const tracks = await searchTracks(query);
+    res.status(200).json(tracks);
+  } catch (error) {
+    console.error('Error searching tracks:', error);
+    res.status(500).json({ error: 'Failed to search tracks' });
   }
 }

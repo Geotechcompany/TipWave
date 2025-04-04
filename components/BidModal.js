@@ -37,14 +37,12 @@ export default function BidModal({ isOpen, onClose, onSubmit, song, isSubmitting
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-4">
             <Image
-              src={song?.albumArt || DEFAULT_ALBUM_ART}
+              src={song?.albumArt || '/images/default-album-art.jpg'}
               alt={song?.name || 'Album Art'}
               width={64}
               height={64}
               className="rounded-md"
-              onError={(e) => {
-                e.target.src = DEFAULT_ALBUM_ART;
-              }}
+              priority
             />
             <div>
               <h3 className="font-medium">{song?.name}</h3>

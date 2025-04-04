@@ -27,13 +27,15 @@ export default async function handler(req, res) {
     let songDoc = await songs.findOne({ spotifyId: song.id });
     
     if (!songDoc) {
-      // Create new song
+      // Create new song with Spotify data
       const newSong = {
         spotifyId: song.id,
         title: song.name,
-        artist: song.artist,
+        artist: song.artists.map(a => a.name).join(', '),
         album: song.album.name,
-        albumArt: song.albumArt,
+        albumArt: song.album.images[0]?.url || '/images/default-album-art.jpg',
+        duration_ms: song.duration_ms,
+        explicit: song.explicit || false,
         createdAt: new Date(),
         updatedAt: new Date()
       };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 
-const ActiveBids = ({ activeBids = [] }) => {
+export function ActiveBids({ activeBids = [] }) {
   if (!activeBids.length) {
     return <div className="text-center p-4">No active bids to display</div>;
   }
@@ -42,6 +42,4 @@ const ActiveBids = ({ activeBids = [] }) => {
       </table>
     </div>
   );
-};
-
-export default ActiveBids;
+}

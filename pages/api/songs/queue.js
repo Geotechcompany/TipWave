@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { getCollection } from '../../../lib/db';
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   const { userId: clerkId } = getAuth(req);
@@ -13,44 +14,46 @@ export default async function handler(req, res) {
       const bids = await getCollection('bids');
       const songs = await getCollection('songs');
       
-      // Get popular songs based on bid count
-      const popularSongs = await bids.aggregate([
+      // Get the queue with song details
+      const queue = await bids.aggregate([
         {
-          $group: {
-            _id: '$songId',
-            bidCount: { $sum: 1 },
-            totalAmount: { $sum: '$amount' }
+          $match: {
+            status: { $in: ['PENDING', 'ACCEPTED', 'PLAYING', 'NEXT'] }
           }
         },
-        { $sort: { bidCount: -1, totalAmount: -1 } },
-        { $limit: 6 },
         {
           $lookup: {
             from: 'songs',
-            localField: '_id',
+            localField: 'songId',
             foreignField: '_id',
             as: 'song'
           }
         },
         { $unwind: '$song' },
         {
+          $sort: {
+            bidAmount: -1,
+            createdAt: 1
+          }
+        },
+        {
           $project: {
-            _id: '$song._id',
-            spotifyId: '$song.spotifyId',
+            _id: 1,
             title: '$song.title',
             artist: '$song.artist',
             albumArt: '$song.albumArt',
             duration_ms: '$song.duration_ms',
-            bidCount: 1,
-            totalAmount: 1
+            bidAmount: 1,
+            status: 1,
+            createdAt: 1
           }
         }
       ]).toArray();
 
-      res.status(200).json(popularSongs);
+      res.status(200).json(queue);
     } catch (error) {
-      console.error('Error fetching popular songs:', error);
-      res.status(500).json({ error: 'Failed to fetch popular songs' });
+      console.error('Error fetching song queue:', error);
+      res.status(500).json({ error: 'Failed to fetch song queue' });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });
