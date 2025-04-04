@@ -1,23 +1,12 @@
-import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/router';
-import { useEffect } from 'react';
-import { UserDashboard } from '../../components/UserDashboard';
+import UserDashboard2050 from "../../components/UserDashboard2050";
 
-function UserDashboardPage() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in');
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  if (!isLoaded || !isSignedIn) {
-    return null; // or a loading spinner
-  }
-
-  return <UserDashboard />;
+export default function UserDashboardPage() {
+  return <UserDashboard2050 />;
 }
 
-export default UserDashboardPage;
+// Use getServerSideProps instead of getStaticProps to render on each request
+export async function getServerSideProps() {
+  return {
+    props: {}
+  };
+}

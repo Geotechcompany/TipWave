@@ -7,7 +7,9 @@ const nextConfig = {
       "img.clerk.com", 
       "images.clerk.dev",
       "via.placeholder.com",
-      "res.cloudinary.com"
+      "res.cloudinary.com",
+      'images.unsplash.com',
+      'lh3.googleusercontent.com'
     ],
   },
 };
