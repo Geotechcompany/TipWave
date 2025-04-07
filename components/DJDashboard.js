@@ -1,775 +1,633 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
-import { motion } from "framer-motion";
-import { Music, DollarSign, Users, Clock, Search, LayoutDashboard, ChevronDown, Bell, Settings } from "lucide-react";
 import Image from "next/image";
+import { 
+  LayoutDashboard, Music, Clock, DollarSign, 
+  TrendingUp, Zap, Share2, ChevronRight, 
+  Bell, Settings, Calendar, BarChart2,
+  ChevronDown, Search, Maximize, Users,
+  PlusCircle, Headphones, ListMusic
+} from "lucide-react";
 import toast from "react-hot-toast";
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import Link from "next/link";
-import { useRouter } from "next/router";
-
-// Register Chart.js components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-const DEFAULT_ALBUM_ART = '/images/default-album-art.jpg';
 
 export default function DJDashboard() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
-  const [queue, setQueue] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { user } = useUser();
   const [stats, setStats] = useState({
-    earnings: 0,
-    topSongs: [],
-    frequentUsers: [],
     totalRequests: 0,
-    totalPlayed: 0,
+    completedRequests: 0,
+    earnings: 0,
+    upcomingEvents: [],
+    topSongs: []
   });
-
-  useEffect(() => {
-    const fetchDJData = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch queue and stats in parallel - using the correct API endpoints
-        const [queueResponse, statsResponse] = await Promise.all([
-          fetch("/api/songs/queue"),
-          fetch("/api/user/stats")
-        ]);
-        
-        if (!queueResponse.ok) throw new Error("Failed to fetch queue");
-        if (!statsResponse.ok) throw new Error("Failed to fetch stats");
-        
-        const queueData = await queueResponse.json();
-        const statsData = await statsResponse.json();
-        
-        setQueue(queueData);
-        
-        // Extract user information from active bids for top users
-        const userMap = new Map();
-        
-        // Process each bid to collect user data
-        statsData.activeBids.forEach(bid => {
-          const userId = bid.clerkId || 'anonymous';
-          if (!userMap.has(userId)) {
-            userMap.set(userId, {
-              id: userId,
-              name: bid.userDisplayName || 'Anonymous',
-              email: '',
-              profileImage: '/images/default-avatar.png',
-              totalSpent: 0,
-              requestCount: 0,
-              lastRequest: null
-            });
-          }
-          
-          const userData = userMap.get(userId);
-          userData.totalSpent += bid.amount || 0;
-          userData.requestCount += 1;
-          
-          // Update last request if this bid is more recent
-          const bidDate = new Date(bid.createdAt);
-          if (!userData.lastRequest || bidDate > new Date(userData.lastRequest)) {
-            userData.lastRequest = bid.createdAt;
-          }
-        });
-        
-        // Process queue data to enrich user information
-        queueData.forEach(item => {
-          const userId = item.clerkId || 'anonymous';
-          if (userMap.has(userId)) {
-            const userData = userMap.get(userId);
-            if (item.userDisplayName) userData.name = item.userDisplayName;
-            
-            // Track additional spending from queue items
-            userData.totalSpent += item.bidAmount || 0;
-            userData.requestCount += 1;
-            
-            // Update last request if this queue item is more recent
-            const itemDate = new Date(item.createdAt);
-            if (!userData.lastRequest || itemDate > new Date(userData.lastRequest)) {
-              userData.lastRequest = item.createdAt;
-            }
-          }
-        });
-        
-        // Convert to array and sort by totalSpent (descending)
-        const frequentUsers = Array.from(userMap.values())
-          .sort((a, b) => b.totalSpent - a.totalSpent)
-          .slice(0, 10); // Limit to top 10 users
-        
-        // Map the user stats to DJ stats format
-        setStats({
-          earnings: statsData.totalSpent || 0,
-          topSongs: statsData.activeBids || [],
-          frequentUsers: frequentUsers,
-          totalRequests: statsData.totalBids || 0,
-          totalPlayed: statsData.wonBids || 0,
-        });
-      } catch (error) {
-        console.error("Error fetching DJ data:", error);
-        toast.error("Failed to load dashboard data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (isSignedIn) {
-      fetchDJData();
-    }
-  }, [isSignedIn]);
-
-  const formatDuration = (ms) => {
-    if (!ms) return "0:00";
-    const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return `${minutes}:${seconds.padStart(2, "0")}`;
-  };
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-md text-center">
-          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-          <p>You need to be signed in to view this page.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const profileImageUrl = user?.imageUrl || "/images/default-avatar.png";
-  const userEmail = user?.primaryEmailAddress?.emailAddress || "dj@example.com";
-
-  const sidebarItems = [
-    {
-      icon: <LayoutDashboard size={20} />,
-      label: "Dashboard",
-      tab: "dashboard",
-    },
-    { icon: <Music size={20} />, label: "Song Queue", tab: "queue" },
-    { icon: <DollarSign size={20} />, label: "Earnings", tab: "earnings" },
-    { icon: <Users size={20} />, label: "Top Users", tab: "users" },
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedView, setSelectedView] = useState("overview");
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [activePanel, setActivePanel] = useState(null);
+  
+  // Mock notifications - in a real app these would come from an API
+  const notifications = [
+    { id: 1, type: 'success', message: 'New song request: "Dancing Queen" - $20 bid', time: '2m ago' },
+    { id: 2, type: 'info', message: 'Venue "Pulse Nightclub" has booked you', time: '1h ago' },
+    { id: 3, type: 'alert', message: 'Your profile is getting 45% more views this week', time: '5h ago' }
   ];
 
-  // Chart data for DJ earnings
-  const earningsChartData = {
-    labels: queue.slice(0, 5).map(item => item.title?.substring(0, 10) + "..."),
-    datasets: [
-      {
-        label: 'Bid Amount',
-        data: queue.slice(0, 5).map(item => item.bidAmount || 0),
-        fill: false,
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
+  useEffect(() => {
+    fetchDJStats();
+  }, []);
+
+  const fetchDJStats = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/dj/stats");
+      if (!response.ok) {
+        throw new Error("Failed to fetch DJ stats");
       }
-    ]
-  };
-
-  const renderDashboardContent = () => {
-    return (
-      <>
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Total Requests</p>
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-indigo-600 mr-2" />
-              <h3 className="text-3xl font-bold">{stats.totalRequests || 0}</h3>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Songs Played</p>
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-indigo-600 mr-2" />
-              <h3 className="text-3xl font-bold">{stats.totalPlayed || 0}</h3>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Total Earnings</p>
-            <div className="flex items-center">
-              <Music className="h-8 w-8 text-indigo-600 mr-2" />
-              <h3 className="text-3xl font-bold">${stats.earnings?.toFixed(2) || '0.00'}</h3>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts and Tables Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Active Bids Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Active Bids</h2>
-            <div style={{ height: '300px' }}>
-              <Line 
-                data={earningsChartData} 
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      title: {
-                        display: true,
-                        text: 'Bid Amount ($)'
-                      }
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Song Queue */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Song Queue</h2>
-            {queue.length === 0 ? (
-              <div className="text-center p-6 bg-gray-50 rounded-lg">
-                <Music className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No songs in queue</p>
-              </div>
-            ) : (
-              <div className="overflow-auto max-h-[300px]">
-                {queue.slice(0, 5).map((song) => (
-                  <div
-                    key={song._id}
-                    className="flex items-center p-3 border-b last:border-b-0 hover:bg-gray-50"
-                  >
-                    <div className="relative h-12 w-12 flex-shrink-0 mr-3">
-                      <Image
-                        src={song.albumArt || DEFAULT_ALBUM_ART}
-                        alt={song.title}
-                        fill
-                        className="object-cover rounded-md"
-                        sizes="48px"
-                      />
-                    </div>
-                    <div className="flex-grow min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">
-                        {song.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 truncate">{song.artist}</p>
-                    </div>
-                    <div className="text-green-600 font-medium">
-                      ${song.bidAmount?.toFixed(2) || '0.00'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Top Songs */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Top Requested Songs</h2>
-            {stats.topSongs && stats.topSongs.length > 0 ? (
-              <div className="space-y-3">
-                {stats.topSongs.map((song, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center">
-                      <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-800 rounded-full mr-3">
-                        {index + 1}
-                      </span>
-                      <div>
-                        <p className="font-medium">{song.title}</p>
-                        <p className="text-sm text-gray-500">{song.artist}</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
-                      {song.count} requests
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-6 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">No song requests yet</p>
-              </div>
-            )}
-          </div>
-
-          {/* Frequent Users */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Top Spending Users</h2>
-            {stats.frequentUsers && stats.frequentUsers.length > 0 ? (
-              <div className="space-y-3">
-                {stats.frequentUsers.map((user, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center mr-3">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                      <p className="font-medium">{user.name}</p>
-                    </div>
-                    <span className="text-green-600 font-medium">${user.spent?.toFixed(2) || '0.00'}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-6 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">No users yet</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </>
-    );
-  };
-
-  // Add this renderTopUsersContent function to handle the users tab
-  const renderTopUsersContent = () => {
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-6">Top Users</h2>
-          
-          {stats.frequentUsers && stats.frequentUsers.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      User
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Spent
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Song Requests
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Request
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {stats.frequentUsers.map((user, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 relative">
-                            <Image
-                              src={user.profileImage || DEFAULT_ALBUM_ART}
-                              alt={user.name || "User"}
-                              width={40}
-                              height={40}
-                              className="rounded-full"
-                            />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{user.name || "Anonymous"}</div>
-                            <div className="text-sm text-gray-500">{user.email || ""}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">${user.totalSpent?.toFixed(2) || "0.00"}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.requestCount || 0}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {user.lastRequest ? new Date(user.lastRequest).toLocaleDateString() : "N/A"}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No users found. As users place bids, they will appear here.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Update the renderContent function to use the new renderTopUsersContent
-  const renderContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return renderDashboardContent();
-      case "queue":
-        return (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Song Queue</h2>
-            {queue.length === 0 ? (
-              <div className="text-center p-6 bg-gray-50 rounded-lg">
-                <Music className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No songs in queue</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Song</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bid Amount</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {queue.map((song) => (
-                      <tr key={song._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="relative h-10 w-10 flex-shrink-0">
-                              <Image
-                                src={song.albumArt || DEFAULT_ALBUM_ART}
-                                alt={song.title}
-                                fill
-                                className="object-cover rounded-md"
-                                sizes="40px"
-                              />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{song.title}</div>
-                              <div className="text-sm text-gray-500">{song.artist}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {song.userDisplayName || "Anonymous"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-green-600">${song.bidAmount?.toFixed(2) || '0.00'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${song.status === 'PLAYING' ? 'bg-green-100 text-green-800' : 
-                            song.status === 'NEXT' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-blue-100 text-blue-800'}`}>
-                            {song.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDuration(song.duration_ms)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        );
-      case "earnings":
-        return renderEarningsContent();
-      case "users":
-        return renderTopUsersContent();
-      default:
-        return renderDashboardContent();
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error("Error fetching DJ stats:", error);
+      toast.error("Failed to load your dashboard data");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Replace signOut with router.push to sign-out page
-  const handleSignOut = () => {
-    router.push('/api/auth/signout');
-  };
-
-  // Add this new function to render the earnings content
-  const renderEarningsContent = () => {
-    // Create sample data for earnings over time if not available yet
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
-    const lastSixMonths = Array.from({ length: 6 }, (_, i) => {
-      const monthIndex = (currentMonth - 5 + i + 12) % 12;
-      return months[monthIndex];
-    });
-    
-    // Sample earnings data (replace with real data when available)
-    const earningsData = {
-      labels: lastSixMonths,
-      datasets: [
-        {
-          label: 'Monthly Earnings',
-          data: [120, 190, 230, 275, 310, stats.earnings || 350],
-          fill: false,
-          borderColor: 'rgb(75, 192, 192)',
-          tension: 0.2,
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        }
-      ]
-    };
-
-    const earningsOptions = {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: 'top',
-        },
-        title: {
-          display: true,
-          text: 'Monthly Earnings'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: 'Amount ($)'
-          }
-        }
-      }
-    };
-
-    // Create sample data for top earning songs
-    const topEarningSongs = stats.topSongs.slice(0, 5).map(song => ({
-      ...song,
-      earnings: song.bidAmount || Math.floor(Math.random() * 100) + 10
-    }));
-
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Total Earnings</p>
-            <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-green-600 mr-2" />
-              <h3 className="text-3xl font-bold">${stats.earnings.toFixed(2)}</h3>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Average Per Song</p>
-            <div className="flex items-center">
-              <Music className="h-8 w-8 text-indigo-600 mr-2" />
-              <h3 className="text-3xl font-bold">
-                ${stats.totalRequests > 0 ? (stats.earnings / stats.totalRequests).toFixed(2) : '0.00'}
-              </h3>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-500 mb-1">Pending Earnings</p>
-            <div className="flex items-center">
-              <Clock className="h-8 w-8 text-amber-600 mr-2" />
-              <h3 className="text-3xl font-bold">${(stats.earnings * 0.2).toFixed(2)}</h3>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Earnings Trend</h2>
-          <div className="h-64">
-            <Line data={earningsData} options={earningsOptions} />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Top Earning Songs</h2>
-          {topEarningSongs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Song
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Requester
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Earnings
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {topEarningSongs.map((song, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 relative">
-                            <Image
-                              src={song.albumArt || DEFAULT_ALBUM_ART}
-                              alt={song.title}
-                              layout="fill"
-                              objectFit="cover"
-                              className="rounded"
-                            />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{song.title}</div>
-                            <div className="text-sm text-gray-500">{song.artist}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {song.userDisplayName || "Anonymous"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-green-600">${song.earnings.toFixed(2)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${song.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 
-                          song.status === 'PLAYING' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-yellow-100 text-yellow-800'}`}>
-                          {song.status || 'COMPLETED'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center p-4">
-              <p className="text-gray-500">No earning data available yet.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const handlePanelToggle = (panel) => {
+    setActivePanel(activePanel === panel ? null : panel);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Top Navigation Bar */}
-      <div className="bg-white shadow z-10">
-        <div className="flex items-center justify-between px-4 py-2">
-          <div className="flex items-center">
-            <Image 
-              src="/images/logo.png" 
-              alt="Tip Wave" 
-              width={100} 
-              height={30} 
-              className="mr-8"
-            />
-          </div>
-
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Top navigation bar */}
+      <div className="sticky top-0 z-30 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
+        <div className="flex items-center justify-between px-4 md:px-6 h-16">
           <div className="flex items-center space-x-4">
-            <button className="text-gray-400">
-              <Search size={20} />
-            </button>
-            <button className="text-gray-400">
-              <Bell size={20} />
-            </button>
-            <button className="text-gray-400">
-              <Settings size={20} />
-            </button>
-            
+            <div className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
+              TipWave
+            </div>
+            <span className="px-2 py-1 rounded-md bg-blue-900/30 text-blue-400 text-xs font-medium">
+              DJ Portal
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-4">
             <div className="relative">
               <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-2"
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 rounded-full hover:bg-gray-800 relative"
               >
-                <Image
-                  src={profileImageUrl}
-                  alt={user?.fullName || "DJ"}
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
-                <ChevronDown size={16} className="text-gray-400" />
+                <Bell className="h-5 w-5 text-gray-400" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
               </button>
-              {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
-                  <Link
-                    href="/profile"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Profile
-                  </Link>
-                  <button
-                    onClick={handleSignOut}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Sign out
-                  </button>
+              
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-xl shadow-lg overflow-hidden z-50 border border-gray-700">
+                  <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+                    <h3 className="font-medium">Notifications</h3>
+                    <button className="text-xs text-blue-400 hover:text-blue-300">Mark all as read</button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.map((notification) => (
+                      <div key={notification.id} className="p-3 border-b border-gray-700/50 hover:bg-gray-700/50 transition-colors">
+                        <div className="flex items-start space-x-3">
+                          <div className={`p-1.5 rounded-full ${
+                            notification.type === 'success' ? 'bg-green-500/20 text-green-500' :
+                            notification.type === 'alert' ? 'bg-amber-500/20 text-amber-500' :
+                            'bg-blue-500/20 text-blue-500'
+                          }`}>
+                            {notification.type === 'success' ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : notification.type === 'alert' ? (
+                              <Bell className="h-4 w-4" />
+                            ) : (
+                              <Info className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm">{notification.message}</p>
+                            <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-2 border-t border-gray-700 text-center">
+                    <button className="text-sm text-blue-400 hover:text-blue-300 w-full py-1">
+                      View all notifications
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+            
+            <button className="p-2 rounded-full hover:bg-gray-800">
+              <Settings className="h-5 w-5 text-gray-400" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 p-0.5">
+                <div className="bg-gray-800 w-full h-full rounded-full flex items-center justify-center">
+                  {user?.imageUrl ? (
+                    <Image
+                      src={user.imageUrl}
+                      alt={user.firstName || "DJ"}
+                      width={30}
+                      height={30}
+                      className="rounded-full"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium">
+                      {user?.firstName?.[0] || "D"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm font-medium hidden md:block">
+                {user?.firstName ? `DJ ${user.firstName}` : "DJ Dashboard"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-[calc(100vh-64px)]">
         {/* Sidebar */}
-        <div className="w-64 bg-white shadow-md hidden md:flex flex-col">
-          <nav className="flex-1 mt-5 px-2">
-            <div className="space-y-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.tab}
-                  onClick={() => setActiveTab(item.tab)}
-                  className={`${
-                    activeTab === item.tab
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  } group flex items-center px-2 py-2 text-sm font-medium rounded-md w-full`}
-                >
-                  {item.icon}
-                  <span className="ml-3">{item.label}</span>
-                </button>
-              ))}
+        <div className="w-16 md:w-56 border-r border-gray-800 flex flex-col fixed h-[calc(100vh-64px)] z-20">
+          <div className="p-3">
+            <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
+              Main
             </div>
-          </nav>
-
-          {/* DJ Profile Section */}
-          <div className="mt-auto p-4 border-t border-gray-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="relative">
-                <Image
-                  src={profileImageUrl}
-                  alt={user?.fullName || "DJ"}
-                  width={64}
-                  height={64}
-                  className="rounded-full"
-                />
-                <span className="absolute top-0 right-0 bg-green-400 text-xs text-white px-2 py-0.5 rounded-full">
-                  Pro
-                </span>
+            <ul className="space-y-1">
+              <li>
+                <button
+                  onClick={() => setSelectedView("overview")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "overview"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <LayoutDashboard className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Overview</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("requests")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "requests"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <ListMusic className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Song Requests</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("library")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "library"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <Music className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Music Library</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("earnings")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "earnings"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <DollarSign className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Earnings</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("analytics")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "analytics"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <BarChart2 className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Analytics</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+          
+          <div className="mt-6 p-3">
+            <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
+              Management
+            </div>
+            <ul className="space-y-1">
+              <li>
+                <button
+                  onClick={() => setSelectedView("events")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "events"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <Calendar className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Events</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("fans")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "fans"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Fan Management</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedView("venues")}
+                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                    selectedView === "venues"
+                      ? "bg-blue-900/20 text-blue-400"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`}
+                >
+                  <Share2 className="h-5 w-5 mr-2" />
+                  <span className="hidden md:inline-block">Venues</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+          
+          <div className="mt-auto p-3">
+            <div className="hidden md:flex flex-col bg-gray-800/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-500/20 text-blue-500 rounded-lg">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm">Pro Features</h3>
+                  <p className="text-xs text-gray-400">Upgrade for more</p>
+                </div>
               </div>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                {user?.fullName || "DJ Name"}
-              </h3>
-              <p className="text-xs text-gray-500">{userEmail}</p>
-              <button className="mt-3 w-full bg-gray-900 text-white rounded-md py-2 text-sm hover:bg-gray-700 transition-colors">
-                DJ Settings
+              <button className="w-full py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm rounded-md">
+                Upgrade
               </button>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto p-8">
-          <h1 className="text-3xl font-bold mb-8">
-            Hi, Welcome back {user?.firstName}! 👋
-          </h1>
-          
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : renderContent()}
+        {/* Main content */}
+        <div className="pl-16 md:pl-56 flex-1">
+          <div className="p-6">
+            <AnimatePresence mode="wait">
+              {selectedView === "overview" && (
+                <motion.div
+                  key="overview"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-bold">DJ Dashboard</h1>
+                    <div className="flex items-center space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create Event
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  {isLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="bg-gray-800/50 rounded-xl p-6 animate-pulse h-28">
+                          <div className="h-4 bg-gray-700 rounded w-1/3 mb-2"></div>
+                          <div className="h-6 bg-gray-700 rounded w-1/2"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-400 text-sm">Total Requests</p>
+                            <h3 className="text-2xl font-bold mt-1">{stats.totalRequests}</h3>
+                          </div>
+                          <div className="p-3 bg-blue-500/20 text-blue-500 rounded-lg">
+                            <Music className="h-5 w-5" />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center text-xs text-gray-400">
+                          <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
+                          <span className="text-green-500 font-medium">12%</span>
+                          <span className="ml-1">vs last week</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-400 text-sm">Total Earnings</p>
+                            <h3 className="text-2xl font-bold mt-1">${stats.earnings}</h3>
+                          </div>
+                          <div className="p-3 bg-green-500/20 text-green-500 rounded-lg">
+                            <DollarSign className="h-5 w-5" />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center text-xs text-gray-400">
+                          <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
+                          <span className="text-green-500 font-medium">24%</span>
+                          <span className="ml-1">vs last month</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-400 text-sm">Completion Rate</p>
+                            <h3 className="text-2xl font-bold mt-1">
+                              {stats.totalRequests > 0
+                                ? Math.round((stats.completedRequests / stats.totalRequests) * 100)
+                                : 0}%
+                            </h3>
+                          </div>
+                          <div className="p-3 bg-purple-500/20 text-purple-500 rounded-lg">
+                            <CheckCircle className="h-5 w-5" />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center text-xs text-gray-400">
+                          <div className="w-full bg-gray-700 rounded-full h-1.5">
+                            <div
+                              className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full"
+                              style={{
+                                width: `${
+                                  stats.totalRequests > 0
+                                    ? Math.round((stats.completedRequests / stats.totalRequests) * 100)
+                                    : 0
+                                }%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                          <h3 className="font-medium">Recent Song Requests</h3>
+                          <button className="text-sm text-blue-400 hover:text-blue-300">
+                            View all
+                          </button>
+                        </div>
+                        
+                        <div className="divide-y divide-gray-700/50">
+                          {isLoading ? (
+                            [...Array(5)].map((_, i) => (
+                              <div key={i} className="p-4 animate-pulse">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-gray-700 rounded-lg"></div>
+                                  <div className="flex-1">
+                                    <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                                    <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+                                  </div>
+                                  <div className="h-6 bg-gray-700 rounded w-16"></div>
+                                </div>
+                              </div>
+                            ))
+                          ) : stats.topSongs?.length > 0 ? (
+                            stats.topSongs.map((song, i) => (
+                              <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
+                                    <Music className="h-5 w-5 text-blue-400" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-medium">{song.title}</p>
+                                    <p className="text-sm text-gray-400">{song.artist}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium text-green-500">${song.amount}</p>
+                                    <p className="text-xs text-gray-400">{song.time}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-6 text-center">
+                              <p className="text-gray-400">No song requests yet</p>
+                              <button className="mt-2 text-sm text-blue-400 hover:text-blue-300">
+                                Create your first event
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                          <h3 className="font-medium">Performance Analytics</h3>
+                          <div className="flex items-center space-x-2">
+                            <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
+                              Week
+                            </button>
+                            <button className="text-xs bg-blue-600 px-2 py-1 rounded">
+                              Month
+                            </button>
+                            <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
+                              Year
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 h-64 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-16 h-16 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
+                              <BarChart2 className="h-8 w-8 text-blue-400" />
+                            </div>
+                            <p className="mt-4 text-gray-400">
+                              Analytics visualization will appear here
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                        <div className="p-4 border-b border-gray-700/50">
+                          <h3 className="font-medium">Upcoming Events</h3>
+                        </div>
+                        
+                        <div className="divide-y divide-gray-700/50">
+                          {isLoading ? (
+                            [...Array(3)].map((_, i) => (
+                              <div key={i} className="p-4 animate-pulse">
+                                <div className="flex items-start space-x-3">
+                                  <div className="w-12 h-12 bg-gray-700 rounded-lg"></div>
+                                  <div className="flex-1">
+                                    <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                                    <div className="h-3 bg-gray-700 rounded w-1/2 mb-2"></div>
+                                    <div className="h-3 bg-gray-700 rounded w-1/3"></div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : stats.upcomingEvents?.length > 0 ? (
+                            stats.upcomingEvents.map((event, i) => (
+                              <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
+                                <div className="flex items-start space-x-3">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <Calendar className="h-6 w-6 text-blue-400" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{event.name}</p>
+                                    <p className="text-sm text-blue-400">{event.date}</p>
+                                    <p className="text-xs text-gray-400">{event.venue}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-6 text-center">
+                              <p className="text-gray-400">No upcoming events</p>
+                              <button className="mt-2 text-sm text-blue-400 hover:text-blue-300">
+                                Schedule a new event
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="p-3 border-t border-gray-700/50">
+                          <button className="w-full py-2 text-sm text-blue-400 hover:text-blue-300 rounded-lg hover:bg-gray-700/50 transition-colors">
+                            View calendar
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                        <div className="p-4 border-b border-gray-700/50">
+                          <h3 className="font-medium">Top Genres</h3>
+                        </div>
+                        
+                        <div className="p-4">
+                          {[
+                            { name: "House", percent: 42 },
+                            { name: "Hip Hop", percent: 28 },
+                            { name: "Pop", percent: 15 },
+                            { name: "RnB", percent: 10 },
+                            { name: "Rock", percent: 5 },
+                          ].map((genre, i) => (
+                            <div key={i} className="mb-4 last:mb-0">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-sm">{genre.name}</span>
+                                <span className="text-sm text-gray-400">{genre.percent}%</span>
+                              </div>
+                              <div className="w-full bg-gray-700 rounded-full h-1.5">
+                                <div
+                                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full"
+                                  style={{ width: `${genre.percent}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
+              {selectedView !== "overview" && (
+                <motion.div
+                  key={selectedView}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="min-h-[calc(100vh-140px)] flex items-center justify-center"
+                >
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
+                      {selectedView === "requests" ? (
+                        <ListMusic className="h-10 w-10 text-blue-400" />
+                      ) : selectedView === "library" ? (
+                        <Music className="h-10 w-10 text-blue-400" />
+                      ) : selectedView === "earnings" ? (
+                        <DollarSign className="h-10 w-10 text-blue-400" />
+                      ) : selectedView === "analytics" ? (
+                        <BarChart2 className="h-10 w-10 text-blue-400" />
+                      ) : selectedView === "events" ? (
+                        <Calendar className="h-10 w-10 text-blue-400" />
+                      ) : selectedView === "fans" ? (
+                        <Users className="h-10 w-10 text-blue-400" />
+                      ) : (
+                        <Share2 className="h-10 w-10 text-blue-400" />
+                      )}
+                    </div>
+                    <h2 className="mt-4 text-xl font-medium capitalize">{selectedView}</h2>
+                    <p className="mt-2 text-gray-400 max-w-md">
+                      This {selectedView} section is under development. Check back soon for updates!
+                    </p>
+                    <button
+                      onClick={() => setSelectedView("overview")}
+                      className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm inline-flex items-center"
+                    >
+                      <ChevronRight className="h-4 w-4 mr-1" />
+                      Go back to Overview
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// Helper component for CheckCircle icon
+function CheckCircle({ className }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+  );
+}
+
+// Helper component for Info icon
+function Info({ className }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="16" x2="12" y2="12"></line>
+      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>
   );
 }
