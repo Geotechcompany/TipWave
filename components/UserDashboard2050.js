@@ -7,7 +7,9 @@ import {
   TrendingUp, Zap, Share2, ChevronRight, 
   Bell, Settings, Calendar, Sparkles,
   ChevronDown, Search, Maximize, BarChart2,
-  PlusCircle, UserCheck, History, PartyPopper
+  PlusCircle, UserCheck, History, PartyPopper,
+  Info, User, Shield, Sun, Moon, Globe, Save,
+  CreditCard, Volume2, VolumeX, Monitor, Menu
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { MyRequests } from "./user/MyRequests";
@@ -22,8 +24,10 @@ import { UpgradeCard } from "./user/UpgradeCard";
 import { NewRequestModal } from "./user/NewRequestModal";
 import { ActivityTab } from './user/ActivityTab';
 import { EventsTab } from './user/EventsTab';
+import { SettingsPanel } from './user/SettingsPanel';
 import { DEFAULT_ALBUM_ART } from '@/utils/constants';
 import { useRouter } from "next/router";
+import { MobileSidebar } from "./user/MobileSidebar";
 
 export default function UserDashboard2050() {
   const { user } = useUser();
@@ -45,14 +49,21 @@ export default function UserDashboard2050() {
   const [availableDJs, setAvailableDJs] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState("account");
+  const [settings, setSettings] = useState({
+    darkMode: true,
+    emailNotifications: true,
+    pushNotifications: false,
+    soundEnabled: true,
+    language: "english",
+    displayMode: "system",
+    privacyMode: "balanced"
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
-  // Mock notifications - in a real app these would come from an API
-  const notifications = [
-    { id: 1, type: 'success', message: 'Your bid for "Uptown Funk" was accepted', time: '10m ago' },
-    { id: 2, type: 'info', message: 'New DJ spotlight: DJ Quantum is now live', time: '2h ago' },
-    { id: 3, type: 'alert', message: 'Your payment method will expire soon', time: '1d ago' }
-  ];
-
   const router = useRouter();
 
   useEffect(() => {
@@ -63,7 +74,8 @@ export default function UserDashboard2050() {
           fetchUserStats(),
           fetchAvailableDJs(),
           fetchRecentActivity(),
-          fetchUpcomingEvents()
+          fetchUpcomingEvents(),
+          fetchNotifications()
         ]);
       } catch (error) {
         console.error('Error initializing dashboard:', error);
@@ -132,24 +144,18 @@ export default function UserDashboard2050() {
     }
   };
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        staggerChildren: 0.1,
-        delayChildren: 0.2 
-      } 
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { type: "spring", stiffness: 100 }
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch('/api/user/notifications');
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      const data = await response.json();
+      setNotifications(data || []);
+      setNotificationCount(data.length);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      toast.error('Failed to load notifications');
+      setNotifications([]);
+      setNotificationCount(0);
     }
   };
 
@@ -212,22 +218,16 @@ export default function UserDashboard2050() {
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
     
-    let interval = Math.floor(seconds / 31536000);
-    if (interval >= 1) return `${interval} year${interval === 1 ? '' : 's'} ago`;
-    
-    interval = Math.floor(seconds / 2592000);
-    if (interval >= 1) return `${interval} month${interval === 1 ? '' : 's'} ago`;
-    
-    interval = Math.floor(seconds / 86400);
-    if (interval >= 1) return `${interval} day${interval === 1 ? '' : 's'} ago`;
+    let interval = Math.floor(seconds / 86400);
+    if (interval >= 1) return `${interval}d ago`;
     
     interval = Math.floor(seconds / 3600);
-    if (interval >= 1) return `${interval} hour${interval === 1 ? '' : 's'} ago`;
+    if (interval >= 1) return `${interval}h ago`;
     
     interval = Math.floor(seconds / 60);
-    if (interval >= 1) return `${interval} minute${interval === 1 ? '' : 's'} ago`;
+    if (interval >= 1) return `${interval}m ago`;
     
-    return seconds < 10 ? 'just now' : `${seconds} seconds ago`;
+    return 'just now';
   };
 
   // Navigation handlers for buttons
@@ -243,6 +243,74 @@ export default function UserDashboard2050() {
     router.push('/events/browse');
   };
 
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const response = await fetch('/api/user/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to mark notifications as read');
+      
+      // Refresh notifications after marking as read
+      fetchNotifications();
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+      toast.error('Failed to update notifications');
+    }
+  };
+
+  const handleNotificationClick = async (notificationId) => {
+    try {
+      const response = await fetch(`/api/user/notifications/${notificationId}/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) throw new Error('Failed to mark notification as read');
+      
+      // Remove this notification from the local state
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
+      setNotificationCount(prev => Math.max(0, prev - 1));
+      
+      // Here you could also add navigation logic based on notification type
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast.error('Failed to update notification');
+    }
+  };
+
+  const handleChange = (setting, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [setting]: value
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      // In a real implementation, you would save to an API
+      // const response = await fetch('/api/user/settings', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify(settings),
+      // });
+      // if (!response.ok) throw new Error('Failed to save settings');
+      
+      toast.success("Settings saved successfully");
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white overflow-hidden">
       {/* Ambient background elements */}
@@ -256,6 +324,19 @@ export default function UserDashboard2050() {
       <div className="relative z-10 container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-10">
+          {/* Mobile menu button - Add this first */}
+          <div className="lg:hidden">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-2 rounded-xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 hover:bg-gray-700/50 transition-colors"
+            >
+              <Menu className="h-6 w-6 text-gray-300" />
+            </motion.button>
+          </div>
+
+          {/* Existing user profile section */}
           <div className="flex items-center space-x-3">
             <motion.div 
               initial={{ scale: 0.8, opacity: 0 }} 
@@ -311,63 +392,12 @@ export default function UserDashboard2050() {
             
             <div className="relative">
               <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-full bg-gray-800/50 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-200"
+                className="p-2 rounded-full bg-gray-800/50 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-200"
+                onClick={() => setSelectedView("settings")}
               >
-                <Bell className="h-5 w-5 text-gray-300" />
-                <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                <Settings className="h-5 w-5 text-gray-300" />
               </button>
-              
-              {showNotifications && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className="absolute right-0 mt-2 w-80 bg-gray-800/80 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700 z-50 overflow-hidden"
-                >
-                  <div className="p-4 border-b border-gray-700">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium">Notifications</h3>
-                      <span className="text-xs text-gray-400">Mark all as read</span>
-                    </div>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto py-2">
-                    {notifications.map(notification => (
-                      <div 
-                        key={notification.id} 
-                        className="px-4 py-3 hover:bg-gray-700/50 transition-colors duration-150"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start space-x-3">
-                            <div className={`mt-1.5 w-2 h-2 rounded-full ${
-                              notification.type === 'success' ? 'bg-green-500' : 
-                              notification.type === 'alert' ? 'bg-red-500' : 'bg-blue-500'
-                            }`}></div>
-                            <div>
-                              <p className="text-sm">{notification.message}</p>
-                              <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
-                            </div>
-                          </div>
-                          <button className="text-gray-400 hover:text-white">
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-3 border-t border-gray-700 text-center">
-                    <button className="text-blue-400 text-sm hover:text-blue-300 transition-colors duration-150">
-                      View all notifications
-                    </button>
-                  </div>
-                </motion.div>
-              )}
             </div>
-            
-            <button className="p-2 rounded-full bg-gray-800/50 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-200">
-              <Settings className="h-5 w-5 text-gray-300" />
-            </button>
           </div>
         </div>
         
@@ -457,6 +487,18 @@ export default function UserDashboard2050() {
                       >
                         <BarChart2 className="h-5 w-5" />
                         <span>Analytics</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedView("settings")}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors duration-200 ${
+                          selectedView === "settings"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                        }`}
+                      >
+                        <Settings className="h-5 w-5" />
+                        <span>Settings</span>
                       </button>
                     </nav>
                   </div>
@@ -754,6 +796,280 @@ export default function UserDashboard2050() {
               />
             ) : selectedView === "events" ? (
               <EventsTab events={upcomingEvents} />
+            ) : selectedView === "settings" ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="pb-8"
+              >
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold">Settings</h2>
+                  <p className="text-gray-400">Manage your account and preferences</p>
+                </div>
+
+                <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-xl overflow-hidden">
+                  <div className="flex">
+                    {/* Settings Tabs */}
+                    <div className="w-64 border-r border-gray-700 p-4">
+                      <div className="space-y-1">
+                        <button 
+                          onClick={() => setActiveTab("account")}
+                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
+                            activeTab === "account" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
+                          }`}
+                        >
+                          <User className="h-5 w-5" />
+                          <span>Account</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => setActiveTab("notifications")}
+                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
+                            activeTab === "notifications" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
+                          }`}
+                        >
+                          <Bell className="h-5 w-5" />
+                          <span>Notifications</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => setActiveTab("privacy")}
+                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
+                            activeTab === "privacy" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
+                          }`}
+                        >
+                          <Shield className="h-5 w-5" />
+                          <span>Privacy</span>
+                        </button>
+                        
+                        <button 
+                          onClick={() => setActiveTab("billing")}
+                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
+                            activeTab === "billing" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
+                          }`}
+                        >
+                          <CreditCard className="h-5 w-5" />
+                          <span>Billing & Payments</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Settings Content */}
+                    <div className="flex-1 p-6">
+                      {activeTab === "account" && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium">Account Settings</h3>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-1">Display Name</label>
+                              <input 
+                                type="text" 
+                                defaultValue={user?.firstName + " " + user?.lastName}
+                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                              <input 
+                                type="email" 
+                                defaultValue={user?.emailAddresses?.[0]?.emailAddress}
+                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                disabled
+                              />
+                              <p className="mt-1 text-xs text-gray-400">Email address cannot be changed</p>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-1">Language</label>
+                              <select 
+                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                value={settings.language}
+                                onChange={(e) => handleChange('language', e.target.value)}
+                              >
+                                <option value="english">English</option>
+                                <option value="spanish">Spanish</option>
+                                <option value="french">French</option>
+                                <option value="german">German</option>
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-1">Display Mode</label>
+                              <div className="grid grid-cols-3 gap-3 mt-2">
+                                <button
+                                  onClick={() => handleChange('displayMode', 'light')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.displayMode === 'light'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Sun className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">Light</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleChange('displayMode', 'dark')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.displayMode === 'dark'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Moon className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">Dark</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleChange('displayMode', 'system')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.displayMode === 'system'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Monitor className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">System</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "notifications" && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium">Notification Preferences</h3>
+                          
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium">Email Notifications</h4>
+                                <p className="text-sm text-gray-400">Receive bid updates via email</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={settings.emailNotifications}
+                                  onChange={(e) => handleChange('emailNotifications', e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                              </label>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium">Push Notifications</h4>
+                                <p className="text-sm text-gray-400">Receive real-time alerts on your device</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={settings.pushNotifications}
+                                  onChange={(e) => handleChange('pushNotifications', e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                              </label>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium">Sound Effects</h4>
+                                <p className="text-sm text-gray-400">Play sound when receiving notifications</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={settings.soundEnabled}
+                                  onChange={(e) => handleChange('soundEnabled', e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "privacy" && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium">Privacy Settings</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-300 mb-1">Privacy Mode</label>
+                              <div className="grid grid-cols-3 gap-3 mt-2">
+                                <button
+                                  onClick={() => handleChange('privacyMode', 'public')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.privacyMode === 'public'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Globe className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">Public</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleChange('privacyMode', 'balanced')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.privacyMode === 'balanced'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Shield className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">Balanced</span>
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleChange('privacyMode', 'private')}
+                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
+                                    settings.privacyMode === 'private'
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
+                                  }`}
+                                >
+                                  <Shield className="h-6 w-6 mb-2" />
+                                  <span className="text-sm">Private</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {activeTab === "billing" && (
+                        <div className="space-y-6">
+                          <h3 className="text-lg font-medium">Billing & Payments</h3>
+                          <div className="p-4 border border-gray-700 rounded-lg">
+                            <p className="text-sm text-gray-400">
+                              Manage your subscription and payment methods through our secure payment portal.
+                            </p>
+                            <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">
+                              Manage Subscription
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="border-t border-gray-700 px-6 py-4 flex justify-end">
+                    <button 
+                      onClick={handleSave}
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Save className="h-4 w-4 mr-2 inline-block" />
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
             ) : null}
           </div>
         </div>
@@ -763,6 +1079,12 @@ export default function UserDashboard2050() {
         onClose={() => setIsNewRequestModalOpen(false)}
         onSubmit={handleNewRequest}
         availableDJs={availableDJs}
+      />
+      <MobileSidebar 
+        isOpen={isMobileSidebarOpen} 
+        setIsOpen={setIsMobileSidebarOpen} 
+        selectedView={selectedView} 
+        setSelectedView={setSelectedView} 
       />
     </div>
   );
