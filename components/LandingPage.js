@@ -50,6 +50,7 @@ const LandingPage = () => {
         <HowItWorks />
         <Testimonials />
         <CallToAction />
+        <PricingSection />
         <Footer />
       </div>
     </div>
@@ -731,13 +732,13 @@ const CallToAction = () => {
       
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
         <motion.div
-          style={{ opacity: opacityAnim }}
+       
           className="space-y-8"
         >
           <motion.h2 
             className="text-4xl md:text-5xl font-bold"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            // initial={{ opacity: 0, y: 20 }}
+            // whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
           >
             Ready to <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Transform</span> Your Nightlife?
@@ -835,6 +836,154 @@ const CallToAction = () => {
           </div>
         </motion.div>
       </div>
+    </section>
+  );
+};
+
+const PricingSection = () => {
+  const plans = [
+    {
+      name: "Free",
+      price: "0",
+      description: "Perfect for getting started",
+      features: [
+        "Basic song requests",
+        "View live DJs",
+        "Standard request priority",
+        "Basic analytics"
+      ],
+      cta: "Get Started",
+      highlighted: false
+    },
+    {
+      name: "Pro",
+      price: "19",
+      description: "For serious music lovers",
+      features: [
+        "Priority song requests",
+        "Advanced analytics",
+        "Custom playlists",
+        "Request history",
+        "Premium support",
+        "No ads"
+      ],
+      cta: "Upgrade Now",
+      highlighted: true
+    },
+    {
+      name: "Business",
+      price: "49",
+      description: "For venues and events",
+      features: [
+        "All Pro features",
+        "Multiple venues",
+        "API access",
+        "Custom branding",
+        "24/7 support",
+        "Priority queue"
+      ],
+      cta: "Contact Sales",
+      highlighted: false
+    }
+  ];
+
+  return (
+    <section id="pricing" className="py-20 bg-black relative">
+      <div className="absolute inset-0 bg-gradient-to-b from-gray-900/0 via-gray-900/50 to-black"></div>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="max-w-7xl mx-auto px-6 relative z-10"
+      >
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-200 to-blue-400">
+            Choose Your Plan
+          </h2>
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            Select the perfect plan for your needs. Upgrade or downgrade at any time.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, index) => (
+            <motion.div
+              key={plan.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className={`relative rounded-2xl backdrop-blur-xl border ${
+                plan.highlighted 
+                  ? 'bg-gradient-to-b from-blue-600/20 to-purple-600/20 border-blue-500/30' 
+                  : 'bg-gray-900/50 border-gray-800'
+              } p-8`}
+            >
+              {plan.highlighted && (
+                <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                  <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium px-3 py-1 rounded-full">
+                    Most Popular
+                  </span>
+                </div>
+              )}
+
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-4xl font-bold text-white">${plan.price}</span>
+                  <span className="text-gray-400">/month</span>
+                </div>
+                <p className="text-gray-400 mt-2">{plan.description}</p>
+              </div>
+
+              <ul className="space-y-4 mb-8">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 mr-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              <button 
+                className={`w-full py-3 px-6 rounded-lg font-medium transition-colors duration-200 ${
+                  plan.highlighted
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                    : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                }`}
+              >
+                {plan.cta}
+              </button>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="pt-8 text-white/60 text-sm flex items-center justify-center gap-2">
+          <span className="flex items-center">
+            <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+            </svg>
+            No credit card required
+          </span>
+          <span className="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+          <span className="flex items-center">
+            <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+            </svg>
+            Free tier available
+          </span>
+          <span className="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+          <span className="flex items-center">
+            <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+            </svg>
+            Cancel anytime
+          </span>
+        </div>
+      </motion.div>
     </section>
   );
 };

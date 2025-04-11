@@ -9,7 +9,14 @@ const nextConfig = {
       "via.placeholder.com",
       "res.cloudinary.com",
       'images.unsplash.com',
-      'lh3.googleusercontent.com'
+      'lh3.googleusercontent.com',
+      'placehold.co'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
     ],
   },
 };

@@ -1,92 +1,89 @@
 import { motion } from "framer-motion";
-import { ChevronDown, DollarSign, Music, CheckCircle, Clock } from "lucide-react";
+import { Music, UserCheck, DollarSign, Clock, TrendingUp } from "lucide-react";
 
-export default function UserStats({ stats, isLoading, timeRange, setTimeRange }) {
-  const statCards = [
-    {
-      title: "Total Bids",
-      value: stats.totalBids,
-      icon: <DollarSign className="h-5 w-5" />,
-      color: "bg-blue-500/20 text-blue-500",
+export function UserStats({ stats, isLoading }) {
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        staggerChildren: 0.1,
+        delayChildren: 0.2 
+      } 
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: { type: "spring", stiffness: 100 }
+    }
+  };
+
+  const statsData = [
+    { 
+      title: "Total Requests", 
+      value: stats.totalBids, 
+      icon: <Music className="h-5 w-5 text-blue-400" />,
+      color: "from-blue-500/20 to-blue-600/20",
+      border: "border-blue-500/20",
       change: "+12%"
     },
-    {
-      title: "Won Bids",
-      value: stats.wonBids,
-      icon: <CheckCircle className="h-5 w-5" />,
-      color: "bg-green-500/20 text-green-500",
+    { 
+      title: "Accepted Requests", 
+      value: stats.wonBids, 
+      icon: <UserCheck className="h-5 w-5 text-green-400" />,
+      color: "from-green-500/20 to-green-600/20",
+      border: "border-green-500/20",
+      change: "+5%"
+    },
+    { 
+      title: "Total Spent", 
+      value: `$${stats.totalSpent.toFixed(2)}`, 
+      icon: <DollarSign className="h-5 w-5 text-amber-400" />,
+      color: "from-amber-500/20 to-amber-600/20",
+      border: "border-amber-500/20",
       change: "+8%"
     },
-    {
-      title: "Total Spent",
-      value: `$${stats.totalSpent}`,
-      icon: <DollarSign className="h-5 w-5" />,
-      color: "bg-purple-500/20 text-purple-500",
-      change: "+15%"
+    { 
+      title: "Active Requests", 
+      value: stats.activeBids?.length || 0, 
+      icon: <Clock className="h-5 w-5 text-purple-400" />,
+      color: "from-purple-500/20 to-purple-600/20",
+      border: "border-purple-500/20",
+      change: "0%"
     }
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <div className="relative mt-2 sm:mt-0">
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="day">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50 animate-pulse h-32">
-              <div className="h-4 bg-gray-700 rounded w-1/3 mb-2"></div>
-              <div className="h-6 bg-gray-700 rounded w-1/2 mt-4"></div>
-            </div>
-          ))
-        ) : (
-          statCards.map((stat, index) => (
-            <StatCard key={index} {...stat} index={index} />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon, color, change, index }) {
-  return (
-    <motion.div 
-      className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.1 }}
+    <motion.div variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-400 text-sm">{title}</p>
-          <h3 className="text-2xl font-bold mt-1">{value}</h3>
-        </div>
-        <div className={`p-3 ${color} rounded-lg`}>
-          {icon}
-        </div>
-      </div>
-      <div className="mt-3 flex items-center text-xs text-gray-400">
-        <svg className="h-3 w-3 mr-1 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-        <span className="text-green-500 font-medium">{change}</span>
-        <span className="ml-1">vs last period</span>
-      </div>
+      {statsData.map((stat, index) => (
+        <motion.div
+          key={index}
+          variants={itemVariants}
+          className={`bg-gradient-to-br ${stat.color} backdrop-blur-lg rounded-2xl border ${stat.border} shadow-lg p-5 relative overflow-hidden`}
+        >
+          <div className="absolute -right-4 -top-4 w-20 h-20 bg-gray-100/5 rounded-full blur-2xl"></div>
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-2 bg-gray-800/50 rounded-lg">{stat.icon}</div>
+            <div className="flex items-center space-x-1 bg-gray-900/40 rounded-full px-2 py-0.5 text-xs">
+              <TrendingUp className="h-3 w-3 text-green-400" />
+              <span className="text-green-400">{stat.change}</span>
+            </div>
+          </div>
+          <h3 className="text-gray-400 text-sm font-medium">{stat.title}</h3>
+          <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">
+            {isLoading ? '...' : stat.value}
+          </p>
+        </motion.div>
+      ))}
     </motion.div>
   );
 } 
