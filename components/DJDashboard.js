@@ -7,9 +7,14 @@ import {
   TrendingUp, Zap, Share2, ChevronRight, 
   Bell, Settings, Calendar, BarChart2,
   ChevronDown, Search, Maximize, Users,
-  PlusCircle, Headphones, ListMusic
+  PlusCircle, Headphones, ListMusic, Loader2
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { CreateEventModal } from "./CreateEventModal";
+import { RequestsPanel } from "./RequestsPanel";
+import { LibraryPanel } from "./LibraryPanel";
+import { EarningsPanel } from "./EarningsPanel";
+import { AnalyticsPanel } from "./AnalyticsPanel";
 
 export default function DJDashboard() {
   const { user } = useUser();
@@ -18,12 +23,15 @@ export default function DJDashboard() {
     completedRequests: 0,
     earnings: 0,
     upcomingEvents: [],
-    topSongs: []
+    topSongs: [],
+    completionRate: 0,
+    recentRequests: []
   });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState("overview");
   const [showNotifications, setShowNotifications] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   
   // Mock notifications - in a real app these would come from an API
   const notifications = [
@@ -33,34 +41,87 @@ export default function DJDashboard() {
   ];
 
   useEffect(() => {
-    fetchDJStats();
-  }, []);
+    if (user?.id) {
+      const fetchStats = async () => {
+        try {
+          setIsLoading(true);
+          const response = await fetch(`/api/dj/${user.id}/stats`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch stats');
+          }
+          const data = await response.json();
+          setStats(data);
+        } catch (error) {
+          console.error('Error fetching stats:', error);
+          toast.error('Failed to load dashboard stats');
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-  const fetchDJStats = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/dj/stats");
-      if (!response.ok) {
-        throw new Error("Failed to fetch DJ stats");
-      }
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error("Error fetching DJ stats:", error);
-      toast.error("Failed to load your dashboard data");
-    } finally {
-      setIsLoading(false);
+      fetchStats();
     }
-  };
+  }, [user?.id]);
 
   const handlePanelToggle = (panel) => {
     setActivePanel(activePanel === panel ? null : panel);
   };
 
+  const handleCreateEvent = () => {
+    setIsCreateEventModalOpen(true);
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  const navigation = [
+    {
+      name: "Overview",
+      icon: LayoutDashboard,
+      href: "#",
+      current: selectedView === "overview",
+      onClick: () => setSelectedView("overview")
+    },
+    {
+      name: "Song Requests",
+      icon: Music,
+      href: "#",
+      current: selectedView === "requests",
+      onClick: () => setSelectedView("requests")
+    },
+    {
+      name: "Music Library",
+      icon: ListMusic,
+      href: "#",
+      current: selectedView === "library",
+      onClick: () => setSelectedView("library")
+    },
+    {
+      name: "Earnings",
+      icon: DollarSign,
+      href: "#",
+      current: selectedView === "earnings",
+      onClick: () => setSelectedView("earnings")
+    },
+    {
+      name: "Analytics",
+      icon: BarChart2,
+      href: "#",
+      current: selectedView === "analytics",
+      onClick: () => setSelectedView("analytics")
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Top navigation bar */}
-      <div className="sticky top-0 z-30 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
+      <div className="sticky top-0 z-40 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center justify-between px-4 md:px-6 h-16">
           <div className="flex items-center space-x-4">
             <div className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
@@ -152,78 +213,28 @@ export default function DJDashboard() {
       </div>
 
       <div className="flex min-h-[calc(100vh-64px)]">
-        {/* Sidebar */}
-        <div className="w-16 md:w-56 border-r border-gray-800 flex flex-col fixed h-[calc(100vh-64px)] z-20">
+        {/* Sidebar - keep fixed position but adjust z-index */}
+        <div className="w-16 md:w-56 border-r border-gray-800 flex flex-col fixed h-[calc(100vh-64px)] bg-gray-900 z-30">
           <div className="p-3">
             <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
               Main
             </div>
             <ul className="space-y-1">
-              <li>
-                <button
-                  onClick={() => setSelectedView("overview")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "overview"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <LayoutDashboard className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Overview</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("requests")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "requests"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <ListMusic className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Song Requests</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("library")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "library"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Music className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Music Library</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("earnings")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "earnings"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <DollarSign className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Earnings</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("analytics")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "analytics"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <BarChart2 className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Analytics</span>
-                </button>
-              </li>
+              {navigation.map((item) => (
+                <li key={item.name}>
+                  <button
+                    onClick={item.onClick}
+                    className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                      selectedView === item.name.toLowerCase()
+                        ? "bg-blue-900/20 text-blue-400"
+                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5 mr-2" />
+                    <span className="hidden md:inline-block">{item.name}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
           
@@ -292,17 +303,26 @@ export default function DJDashboard() {
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="pl-16 md:pl-56 flex-1">
-          <div className="p-6">
+        {/* Main content - add proper margin and padding */}
+        <div className="flex-1 ml-16 md:ml-56">
+          <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
             <AnimatePresence mode="wait">
-              {selectedView === "overview" && (
+              {selectedView === "analytics" ? (
+                <AnalyticsPanel />
+              ) : selectedView === "earnings" ? (
+                <EarningsPanel />
+              ) : selectedView === "requests" ? (
+                <RequestsPanel />
+              ) : selectedView === "library" ? (
+                <LibraryPanel />
+              ) : selectedView === "overview" ? (
                 <motion.div
                   key="overview"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
+                  className="space-y-6"
                 >
                   <div className="flex items-center justify-between mb-6">
                     <h1 className="text-2xl font-bold">DJ Dashboard</h1>
@@ -310,6 +330,7 @@ export default function DJDashboard() {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
+                        onClick={handleCreateEvent}
                         className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center"
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
@@ -560,9 +581,7 @@ export default function DJDashboard() {
                     </div>
                   </div>
                 </motion.div>
-              )}
-              
-              {selectedView !== "overview" && (
+              ) : selectedView === "events" ? (
                 <motion.div
                   key={selectedView}
                   initial={{ opacity: 0, y: 10 }}
@@ -573,21 +592,7 @@ export default function DJDashboard() {
                 >
                   <div className="text-center">
                     <div className="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
-                      {selectedView === "requests" ? (
-                        <ListMusic className="h-10 w-10 text-blue-400" />
-                      ) : selectedView === "library" ? (
-                        <Music className="h-10 w-10 text-blue-400" />
-                      ) : selectedView === "earnings" ? (
-                        <DollarSign className="h-10 w-10 text-blue-400" />
-                      ) : selectedView === "analytics" ? (
-                        <BarChart2 className="h-10 w-10 text-blue-400" />
-                      ) : selectedView === "events" ? (
-                        <Calendar className="h-10 w-10 text-blue-400" />
-                      ) : selectedView === "fans" ? (
-                        <Users className="h-10 w-10 text-blue-400" />
-                      ) : (
-                        <Share2 className="h-10 w-10 text-blue-400" />
-                      )}
+                      <Calendar className="h-10 w-10 text-blue-400" />
                     </div>
                     <h2 className="mt-4 text-xl font-medium capitalize">{selectedView}</h2>
                     <p className="mt-2 text-gray-400 max-w-md">
@@ -602,11 +607,41 @@ export default function DJDashboard() {
                     </button>
                   </div>
                 </motion.div>
-              )}
+              ) : selectedView === "fans" ? (
+                <motion.div
+                  key={selectedView}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="min-h-[calc(100vh-140px)] flex items-center justify-center"
+                >
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
+                      <Users className="h-10 w-10 text-blue-400" />
+                    </div>
+                    <h2 className="mt-4 text-xl font-medium capitalize">{selectedView}</h2>
+                    <p className="mt-2 text-gray-400 max-w-md">
+                      This {selectedView} section is under development. Check back soon for updates!
+                    </p>
+                    <button
+                      onClick={() => setSelectedView("overview")}
+                      className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm inline-flex items-center"
+                    >
+                      <ChevronRight className="h-4 w-4 mr-1" />
+                      Go back to Overview
+                    </button>
+                  </div>
+                </motion.div>
+              ) : null}
             </AnimatePresence>
           </div>
         </div>
       </div>
+      <CreateEventModal 
+        isOpen={isCreateEventModalOpen} 
+        onClose={() => setIsCreateEventModalOpen(false)} 
+      />
     </div>
   );
 }
