@@ -21,19 +21,35 @@ export default function BidManagement() {
   const fetchBids = async () => {
     setIsLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockBids = Array.from({ length: 10 }, (_, i) => ({
-        id: `bid-${i}`,
-        songTitle: `Song Title ${i + 1}`,
-        artist: `Artist ${i + 1}`,
-        amount: Math.floor(Math.random() * 100) + 10,
-        user: `User ${i + 1}`,
-        status: ["pending", "completed", "rejected"][i % 3],
-        createdAt: new Date(Date.now() - i * 2 * 60 * 60 * 1000).toISOString()
+      const queryParams = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: search,
+        filter: filter
+      });
+
+      const response = await fetch(`/api/admin/bids?${queryParams}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch bids');
+      }
+
+      const data = await response.json();
+      // Ensure we're getting an array of bids with all required fields
+      const formattedBids = data.bids.map(bid => ({
+        id: bid._id || bid.id,
+        songTitle: bid.song?.title || 'Unknown Song',
+        artist: bid.song?.artist || 'Unknown Artist',
+        user: bid.user?.name || 'Unknown User',
+        amount: bid.amount || 0,
+        status: bid.status || 'pending',
+        createdAt: bid.createdAt || new Date().toISOString()
       }));
-      setBids(mockBids);
-      setPagination(prev => ({ ...prev, total: 50 }));
+      
+      setBids(formattedBids);
+      setPagination(prev => ({ ...prev, total: data.pagination?.total || 0 }));
     } catch (error) {
+      console.error('Error fetching bids:', error);
       toast.error("Failed to fetch bids");
     } finally {
       setIsLoading(false);
@@ -42,12 +58,24 @@ export default function BidManagement() {
 
   const handleStatusChange = async (bidId, newStatus) => {
     try {
-      // Mock API call
+      const response = await fetch(`/api/admin/bids/${bidId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update bid status');
+      }
+
       toast.success(`Bid ${newStatus} successfully`);
       setBids(bids.map(bid => 
         bid.id === bidId ? { ...bid, status: newStatus } : bid
       ));
     } catch (error) {
+      console.error('Error updating bid status:', error);
       toast.error("Failed to update bid status");
     }
   };
@@ -58,33 +86,21 @@ export default function BidManagement() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Bids Management</h1>
-        <button
-          onClick={fetchBids}
-          className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex items-center flex-1 bg-gray-800/50 rounded-lg px-3 py-2">
+          <Search className="h-5 w-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search bids..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-transparent border-none focus:outline-none text-sm ml-2 w-full"
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
         </div>
-        
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Bids</option>
           <option value="pending">Pending</option>
@@ -96,8 +112,8 @@ export default function BidManagement() {
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-700">
+            <thead className="border-b border-gray-700">
+              <tr>
                 <th className="text-left p-4">Song</th>
                 <th className="text-left p-4">User</th>
                 <th className="text-left p-4">Amount</th>
@@ -109,38 +125,42 @@ export default function BidManagement() {
             <tbody className="divide-y divide-gray-700">
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={6} className="p-4">
-                      <div className="animate-pulse flex space-x-4">
-                        <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-                      </div>
-                    </td>
+                  <tr key={i} className="animate-pulse">
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-3/4"></div></td>
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-1/2"></div></td>
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-1/4"></div></td>
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-1/3"></div></td>
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-1/2"></div></td>
+                    <td className="p-4"><div className="h-4 bg-gray-700 rounded w-1/4"></div></td>
                   </tr>
                 ))
+              ) : bids.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center p-4 text-gray-400">
+                    No bids found
+                  </td>
+                </tr>
               ) : (
                 bids.map((bid) => (
                   <tr key={bid.id} className="hover:bg-gray-700/50">
                     <td className="p-4">
-                      <div className="flex items-center">
-                        <DollarSign className="h-5 w-5 text-gray-400 mr-3" />
-                        <div>
-                          <div>{bid.songTitle}</div>
-                          <div className="text-sm text-gray-400">{bid.artist}</div>
-                        </div>
+                      <div>
+                        <p className="font-medium">{bid.songTitle}</p>
+                        <p className="text-sm text-gray-400">{bid.artist}</p>
                       </div>
                     </td>
                     <td className="p-4">{bid.user}</td>
-                    <td className="p-4">${bid.amount}</td>
+                    <td className="p-4">${bid.amount.toLocaleString()}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs ${
-                        bid.status === "completed" ? "bg-green-500/20 text-green-400" :
                         bid.status === "pending" ? "bg-blue-500/20 text-blue-400" :
+                        bid.status === "completed" ? "bg-green-500/20 text-green-400" :
                         "bg-red-500/20 text-red-400"
                       }`}>
                         {bid.status}
                       </span>
                     </td>
-                    <td className="p-4 text-sm text-gray-400">
+                    <td className="p-4 text-gray-400">
                       {new Date(bid.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4">

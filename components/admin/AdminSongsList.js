@@ -16,28 +16,36 @@ export default function AdminSongsList({ stats, isLoading }) {
       </div>
       <div className="px-6 divide-y divide-gray-700">
         {isLoading ? (
-          [...Array(5)].map((_, i) => (
-            <div key={i} className="py-4 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-            </div>
-          ))
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-700 rounded w-1/2 mt-2"></div>
+              </div>
+            ))}
+          </div>
         ) : (
-          stats.topSongs.map((song, i) => (
-            <div key={i} className="py-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{song.title}</p>
-                  <p className="text-sm text-gray-400">{song.artist}</p>
+          <div className="space-y-4">
+            {(stats.topSongs || []).map((song, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{song.title || 'Unknown Title'}</p>
+                    <p className="text-sm text-gray-400">{song.artist || 'Unknown Artist'}</p>
+                  </div>
+                  <div className="text-sm text-blue-400">
+                    ${(song.totalBids || 0).toLocaleString()}
+                  </div>
                 </div>
-                <div className="text-sm text-blue-400">${song.totalBids.toLocaleString()}</div>
+                <div className="mt-2 flex items-center text-xs text-gray-500">
+                  <Music className="h-3 w-3 mr-1" />
+                  <span>{(song.playCount || 0).toLocaleString()} plays</span>
+                  <span className="mx-2">•</span>
+                  <span>{(song.requestCount || 0).toLocaleString()} requests</span>
+                </div>
               </div>
-              <div className="mt-2 flex items-center text-xs text-gray-500">
-                <Music className="h-3 w-3 mr-1" />
-                {song.requestCount} requests
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </motion.div>

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useUser, useClerk } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
-// Import modular components
+// Import admin components
 import AdminHeader from "./admin/AdminHeader";
 import AdminSidebar from "./admin/AdminSidebar";
 import AdminStats from "./admin/AdminStats";
@@ -11,7 +11,7 @@ import AdminRevenueChart from "./admin/AdminRevenueChart";
 import AdminUsersList from "./admin/AdminUsersList";
 import AdminSongsList from "./admin/AdminSongsList";
 import AdminBidStatus from "./admin/AdminBidStatus";
-import UserManagement from "./UserManagement";
+import UserManagement from "./admin/UserManagement";
 import SongManagement from "./admin/SongManagement";
 import BidManagement from "./admin/BidManagement";
 import AnalyticsView from "./admin/AnalyticsView";
@@ -53,58 +53,25 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     setIsLoading(true);
     try {
-      // Simulate endpoint calls since we need to create these admin endpoints
-      const [statsResponse, usersResponse, songsResponse, bidsResponse] = await Promise.all([
-        fetch(`/api/admin/stats?timeRange=${timeRange}`).catch(() => ({ ok: false })),
-        fetch("/api/admin/users").catch(() => ({ ok: false })),
-        fetch("/api/admin/songs").catch(() => ({ ok: false })),
-        fetch("/api/admin/bids").catch(() => ({ ok: false }))
-      ]);
-      
-      // Fallback to sample data if endpoints don't exist yet
-      let statsData = { totalUsers: 1234, totalBids: 5678, totalSongs: 890, totalRevenue: 12345.67, activeDJs: 28 };
-      let usersData = [];
-      let songsData = [];
-      let bidsData = [];
-      
-      if (statsResponse.ok) {
-        statsData = await statsResponse.json();
-      }
-      
-      if (usersResponse.ok) {
-        usersData = await usersResponse.json();
-      }
-      
-      if (songsResponse.ok) {
-        songsData = await songsResponse.json();
-      }
-      
-      if (bidsResponse.ok) {
-        bidsData = await bidsResponse.json();
-      }
-      
-      // Generate sample data if API returns nothing
-      const revenueByDay = statsData.revenueByDay || generateRevenueData();
-      const recentUsers = usersData.length ? usersData.slice(0, 5) : generateMockUsers();
-      const topSongs = songsData.length ? songsData.slice(0, 5) : generateMockSongs();
-      const recentBids = bidsData.length ? bidsData.slice(0, 5) : generateMockBids();
-      const userGrowth = statsData.userGrowth || []; 
-      const bidsByStatus = statsData.bidsByStatus || { pending: 23, completed: 45, rejected: 12 };
-      const notifications = statsData.notifications || [
-        { id: 1, type: 'success', message: 'New DJ registered: DJ Quantum', time: '2m ago' },
-        { id: 2, type: 'info', message: 'System maintenance scheduled for tomorrow', time: '1h ago' },
-        { id: 3, type: 'alert', message: 'Failed payment detected for user #1234', time: '5h ago' }
-      ];
-      
+      // Fetch notifications separately
+      const notificationsResponse = await fetch('/api/admin/notifications');
+      if (!notificationsResponse.ok) throw new Error('Failed to fetch notifications');
+      const notificationsData = await notificationsResponse.json();
+
+      // Fetch other stats
+      const statsResponse = await fetch(`/api/admin/stats?timeRange=${timeRange}`);
+      if (!statsResponse.ok) throw new Error('Failed to fetch stats');
+      const statsData = await statsResponse.json();
+
+      // Update stats with real notifications data
       setStats({
         ...statsData,
-        recentUsers,
-        topSongs,
-        recentBids,
-        revenueByDay,
-        userGrowth,
-        bidsByStatus,
-        notifications
+        notifications: notificationsData.notifications.map(notification => ({
+          id: notification._id,
+          type: notification.type,
+          message: notification.message,
+          time: formatNotificationTime(notification.createdAt)
+        }))
       });
     } catch (error) {
       console.error("Error fetching admin data:", error);
@@ -137,54 +104,22 @@ export default function AdminDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Helper functions for generating mock data
-  function generateRevenueData() {
-    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    return days.map(day => ({
-      day,
-      amount: Math.floor(Math.random() * 1000) + 100
-    }));
-  }
-  
-  function generateMockUsers() {
-    return Array.from({ length: 5 }, (_, i) => ({
-      id: `user-${i}`,
-      name: `User ${i + 1}`,
-      email: `user${i+1}@example.com`,
-      role: i % 3 === 0 ? "DJ" : "USER",
-      createdAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-      status: i % 4 === 0 ? "inactive" : "active"
-    }));
-  }
-  
-  function generateMockSongs() {
-    const songs = [
-      { title: "Blinding Lights", artist: "The Weeknd" },
-      { title: "Dance Monkey", artist: "Tones and I" },
-      { title: "Don't Start Now", artist: "Dua Lipa" },
-      { title: "Watermelon Sugar", artist: "Harry Styles" },
-      { title: "Levitating", artist: "Dua Lipa" }
-    ];
-    
-    return songs.map((song, i) => ({
-      id: `song-${i}`,
-      title: song.title,
-      artist: song.artist,
-      requestCount: Math.floor(Math.random() * 100) + 10,
-      totalBids: Math.floor(Math.random() * 5000) + 1000
-    }));
-  }
-  
-  function generateMockBids() {
-    return Array.from({ length: 5 }, (_, i) => ({
-      id: `bid-${i}`,
-      song: `Song ${i + 1}`,
-      amount: Math.floor(Math.random() * 50) + 10,
-      user: `User ${i + 1}`,
-      status: ["pending", "completed", "rejected"][i % 3],
-      createdAt: new Date(Date.now() - i * 2 * 60 * 60 * 1000).toISOString()
-    }));
-  }
+  // Add helper function for formatting notification time
+  const formatNotificationTime = (timestamp) => {
+    const now = new Date();
+    const notificationDate = new Date(timestamp);
+    const diffInMinutes = Math.floor((now - notificationDate) / (1000 * 60));
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInMinutes < 1440) {
+      const hours = Math.floor(diffInMinutes / 60);
+      return `${hours}h ago`;
+    } else {
+      const days = Math.floor(diffInMinutes / 1440);
+      return `${days}d ago`;
+    }
+  };
 
   return (
     <div className="bg-gray-900 text-white min-h-screen">

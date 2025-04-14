@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Save, Bell, Lock, Globe, CreditCard, Users } from "lucide-react";
+import { Save, Bell, Lock, Globe, CreditCard, Users, Settings } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SettingsView() {

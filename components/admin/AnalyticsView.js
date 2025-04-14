@@ -1,9 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { BarChart2, TrendingUp, Users, DollarSign, Calendar } from "lucide-react";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import toast from "react-hot-toast";
 
 export default function AnalyticsView() {
   const [timeRange, setTimeRange] = useState("week");
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [timeRange]);
+
+  const fetchAnalyticsData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/analytics?timeRange=${timeRange}`);
+      if (!response.ok) throw new Error('Failed to fetch analytics data');
+      const data = await response.json();
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      toast.error('Failed to load analytics data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -32,8 +55,40 @@ export default function AnalyticsView() {
             <h3 className="font-semibold">Revenue Trends</h3>
             <DollarSign className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            Chart Component Coming Soon
+          <div className="h-64">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={analyticsData?.revenue || []}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="date" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.5rem'
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#3B82F6"
+                    fillOpacity={1}
+                    fill="url(#colorRevenue)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -43,8 +98,40 @@ export default function AnalyticsView() {
             <h3 className="font-semibold">User Growth</h3>
             <Users className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            Chart Component Coming Soon
+          <div className="h-64">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={analyticsData?.users || []}>
+                  <defs>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="date" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.5rem'
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#8B5CF6"
+                    fillOpacity={1}
+                    fill="url(#colorUsers)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -54,8 +141,28 @@ export default function AnalyticsView() {
             <h3 className="font-semibold">Popular Request Times</h3>
             <Calendar className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            Chart Component Coming Soon
+          <div className="h-64">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData?.popularTimes || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="hour" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.5rem'
+                    }}
+                  />
+                  <Bar dataKey="requests" fill="#10B981" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -65,8 +172,28 @@ export default function AnalyticsView() {
             <h3 className="font-semibold">Bid Distribution</h3>
             <BarChart2 className="h-5 w-5 text-gray-400" />
           </div>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            Chart Component Coming Soon
+          <div className="h-64">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analyticsData?.bidDistribution || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="range" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.5rem'
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#F59E0B" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>

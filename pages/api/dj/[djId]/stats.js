@@ -15,146 +15,121 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db();
 
-    // Get dates for comparisons
-    const now = new Date();
-    const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    // Get total and completed requests
+    const totalRequests = await db.collection('song_requests')
+      .countDocuments({ djId: userId });
+    
+    const completedRequests = await db.collection('song_requests')
+      .countDocuments({ djId: userId, status: 'completed' });
 
-    const [
-      currentRequests,
-      lastWeekRequests,
-      currentEarnings,
-      lastMonthEarnings,
-      totalRequests,
-      completedRequests,
-      upcomingEvents,
-      topSongs
-    ] = await Promise.all([
-      // Current week requests
-      db.collection('requests').countDocuments({
+    // Calculate total earnings
+    const earnings = await db.collection('song_requests')
+      .aggregate([
+        { $match: { djId: userId, status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]).toArray();
+
+    // Get recent requests
+    const recentRequests = await db.collection('song_requests')
+      .find({ djId: userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+
+    // Get top songs
+    const topSongs = await db.collection('song_requests')
+      .aggregate([
+        { $match: { djId: userId } },
+        { $group: { 
+          _id: '$songId',
+          title: { $first: '$songTitle' },
+          artist: { $first: '$songArtist' },
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }},
+        { $sort: { count: -1 } },
+        { $limit: 5 }
+      ]).toArray();
+
+    // Get upcoming events
+    const upcomingEvents = await db.collection('events')
+      .find({ 
         djId: userId,
-        createdAt: { $gte: lastWeek }
-      }),
+        date: { $gte: new Date() }
+      })
+      .sort({ date: 1 })
+      .limit(3)
+      .toArray();
 
-      // Previous week requests
-      db.collection('requests').countDocuments({
-        djId: userId,
-        createdAt: { 
-          $gte: new Date(lastWeek.getTime() - 7 * 24 * 60 * 60 * 1000),
-          $lt: lastWeek
-        }
-      }),
+    // Calculate weekly trends
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
 
-      // Current month earnings
-      db.collection('requests').aggregate([
+    const weeklyStats = await db.collection('song_requests')
+      .aggregate([
         { 
           $match: { 
-            djId: userId, 
-            status: 'completed',
-            createdAt: { $gte: lastMonth }
+            djId: userId,
+            createdAt: { $gte: lastWeek }
           }
         },
-        { $group: { _id: null, total: { $sum: '$amount' } } }
-      ]).toArray(),
+        {
+          $group: {
+            _id: null,
+            requestCount: { $sum: 1 },
+            earnings: { $sum: '$amount' }
+          }
+        }
+      ]).toArray();
 
-      // Previous month earnings
-      db.collection('requests').aggregate([
+    const previousWeek = new Date(lastWeek);
+    previousWeek.setDate(previousWeek.getDate() - 7);
+
+    const previousWeekStats = await db.collection('song_requests')
+      .aggregate([
         { 
           $match: { 
-            djId: userId, 
-            status: 'completed',
+            djId: userId,
             createdAt: { 
-              $gte: new Date(lastMonth.getTime() - 30 * 24 * 60 * 60 * 1000),
-              $lt: lastMonth
+              $gte: previousWeek,
+              $lt: lastWeek
             }
           }
         },
-        { $group: { _id: null, total: { $sum: '$amount' } } }
-      ]).toArray(),
-
-      // Total requests
-      db.collection('requests').countDocuments({ djId: userId }),
-      
-      // Completed requests
-      db.collection('requests').countDocuments({ 
-        djId: userId, 
-        status: 'completed' 
-      }),
-      
-      // Upcoming events
-      db.collection('events')
-        .find({ 
-          djId: userId,
-          date: { $gte: now }
-        })
-        .sort({ date: 1 })
-        .limit(5)
-        .toArray(),
-      
-      // Top requested songs with song details
-      db.collection('requests').aggregate([
-        { $match: { djId: userId } },
-        {
-          $lookup: {
-            from: 'songs',
-            localField: 'songId',
-            foreignField: '_id',
-            as: 'songDetails'
-          }
-        },
-        { $unwind: '$songDetails' },
         {
           $group: {
-            _id: '$songId',
-            title: { $first: '$songDetails.title' },
-            artist: { $first: '$songDetails.artist' },
-            amount: { $sum: '$amount' },
-            count: { $sum: 1 },
-            lastRequested: { $max: '$createdAt' }
-          }
-        },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
-        {
-          $project: {
-            _id: 1,
-            title: 1,
-            artist: 1,
-            amount: 1,
-            count: 1,
-            time: '$lastRequested'
+            _id: null,
+            requestCount: { $sum: 1 },
+            earnings: { $sum: '$amount' }
           }
         }
-      ]).toArray()
-    ]);
+      ]).toArray();
 
     // Calculate percentage changes
-    const requestsChange = lastWeekRequests > 0 
-      ? Math.round(((currentRequests - lastWeekRequests) / lastWeekRequests) * 100)
+    const requestsTrend = weeklyStats[0] && previousWeekStats[0] 
+      ? ((weeklyStats[0].requestCount - previousWeekStats[0].requestCount) / previousWeekStats[0].requestCount) * 100
       : 0;
 
-    const earningsChange = lastMonthEarnings[0]?.total > 0
-      ? Math.round(((currentEarnings[0]?.total - lastMonthEarnings[0]?.total) / lastMonthEarnings[0]?.total) * 100)
+    const earningsTrend = weeklyStats[0] && previousWeekStats[0]
+      ? ((weeklyStats[0].earnings - previousWeekStats[0].earnings) / previousWeekStats[0].earnings) * 100
       : 0;
 
-    // Calculate completion rate
-    const completionRate = completedRequests > 0 
-      ? Math.round((completedRequests / currentRequests) * 100) 
-      : 0;
-
-    // Format the response
-    res.json({
-      totalRequests: currentRequests,
-      requestsChange,
+    res.status(200).json({
+      totalRequests,
       completedRequests,
-      earnings: currentEarnings[0]?.total || 0,
-      earningsChange,
-      upcomingEvents,
+      earnings: earnings[0]?.total || 0,
+      completionRate: totalRequests > 0 ? (completedRequests / totalRequests) * 100 : 0,
+      recentRequests,
       topSongs,
-      completionRate
+      upcomingEvents,
+      trends: {
+        requests: Math.round(requestsTrend),
+        earnings: Math.round(earningsTrend)
+      }
     });
+
   } catch (error) {
     console.error('Error fetching DJ stats:', error);
-    res.status(500).json({ error: 'Failed to fetch DJ stats' });
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 } 

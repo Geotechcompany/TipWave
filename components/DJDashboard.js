@@ -15,9 +15,16 @@ import { RequestsPanel } from "./RequestsPanel";
 import { LibraryPanel } from "./LibraryPanel";
 import { EarningsPanel } from "./EarningsPanel";
 import { AnalyticsPanel } from "./AnalyticsPanel";
+import { EventsPanel } from "./EventsPanel";
+import { FanManagementPanel } from "./FanManagementPanel";
+import { VenuesPanel } from "./VenuesPanel";
+import { SettingsPanel } from "./SettingsPanel";
+import { useRouter } from 'next/router';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 
 export default function DJDashboard() {
   const { user } = useUser();
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalRequests: 0,
     completedRequests: 0,
@@ -25,16 +32,33 @@ export default function DJDashboard() {
     upcomingEvents: [],
     topSongs: [],
     completionRate: 0,
-    recentRequests: []
+    recentRequests: [],
+    trends: {
+      requests: 0,
+      earnings: 0
+    }
   });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState("overview");
   const [showNotifications, setShowNotifications] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [genres, setGenres] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [isEventsLoading, setIsEventsLoading] = useState(true);
+  const [recentRequests, setRecentRequests] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    weeklyData: [],
+    monthlyData: [],
+    yearlyData: []
+  });
+  const [selectedTimeframe, setSelectedTimeframe] = useState('week');
   
   // Mock notifications - in a real app these would come from an API
-  const notifications = [
+  const mockNotifications = [
     { id: 1, type: 'success', message: 'New song request: "Dancing Queen" - $20 bid', time: '2m ago' },
     { id: 2, type: 'info', message: 'Venue "Pulse Nightclub" has booked you', time: '1h ago' },
     { id: 3, type: 'alert', message: 'Your profile is getting 45% more views this week', time: '5h ago' }
@@ -62,6 +86,113 @@ export default function DJDashboard() {
       fetchStats();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchNotifications();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchGenres();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchEvents();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchRecentRequests();
+      fetchAnalytics(selectedTimeframe);
+    }
+  }, [user?.id, selectedTimeframe]);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch(`/api/dj/${user.id}/notifications`);
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      
+      const data = await response.json();
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      toast.error('Failed to load notifications');
+    }
+  };
+
+  const fetchGenres = async () => {
+    try {
+      const response = await fetch(`/api/dj/${user.id}/genres`);
+      if (!response.ok) throw new Error('Failed to fetch genres');
+      
+      const data = await response.json();
+      setGenres(data.topGenres);
+    } catch (error) {
+      console.error('Error fetching genres:', error);
+      toast.error('Failed to load genre stats');
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      setIsEventsLoading(true);
+      const response = await fetch(`/api/dj/${user.id}/events?view=upcoming`);
+      if (!response.ok) throw new Error('Failed to fetch events');
+      const data = await response.json();
+      setEvents(data.events);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast.error('Failed to load events');
+    } finally {
+      setIsEventsLoading(false);
+    }
+  };
+
+  const fetchRecentRequests = async () => {
+    try {
+      const response = await fetch(`/api/dj/${user.id}/requests/recent`);
+      if (!response.ok) throw new Error('Failed to fetch recent requests');
+      const data = await response.json();
+      setRecentRequests(data.requests);
+    } catch (error) {
+      console.error('Error fetching recent requests:', error);
+      toast.error('Failed to load recent requests');
+    }
+  };
+
+  const fetchAnalytics = async (timeframe) => {
+    try {
+      const response = await fetch(`/api/dj/${user.id}/analytics?timeframe=${timeframe}`);
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      const data = await response.json();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      toast.error('Failed to load analytics data');
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const response = await fetch(`/api/dj/${user.id}/notifications`, {
+        method: 'PATCH'
+      });
+      if (!response.ok) throw new Error('Failed to mark notifications as read');
+      
+      setUnreadCount(0);
+      fetchNotifications();
+      toast.success('Marked all as read');
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+      toast.error('Failed to update notifications');
+    }
+  };
 
   const handlePanelToggle = (panel) => {
     setActivePanel(activePanel === panel ? null : panel);
@@ -118,6 +249,13 @@ export default function DJDashboard() {
     }
   ];
 
+  const managementNavigation = [
+    { name: "Events", icon: Calendar, onClick: () => setSelectedView("events") },
+    { name: "Fan Management", icon: Users, onClick: () => setSelectedView("fans") },
+    { name: "Venues", icon: Share2, onClick: () => setSelectedView("venues") },
+    { name: "Settings", icon: Settings, onClick: () => setSelectedView("settings") }
+  ];
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Top navigation bar */}
@@ -139,74 +277,108 @@ export default function DJDashboard() {
                 className="p-2 rounded-full hover:bg-gray-800 relative"
               >
                 <Bell className="h-5 w-5 text-gray-400" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 h-4 w-4 bg-blue-500 rounded-full text-xs flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-xl shadow-lg overflow-hidden z-50 border border-gray-700">
-                  <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+                <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
+                  <div className="p-4 border-b border-gray-700 flex items-center justify-between">
                     <h3 className="font-medium">Notifications</h3>
-                    <button className="text-xs text-blue-400 hover:text-blue-300">Mark all as read</button>
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      Mark all as read
+                    </button>
                   </div>
-                  <div className="max-h-80 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     {notifications.map((notification) => (
-                      <div key={notification.id} className="p-3 border-b border-gray-700/50 hover:bg-gray-700/50 transition-colors">
-                        <div className="flex items-start space-x-3">
-                          <div className={`p-1.5 rounded-full ${
+                      <div
+                        key={notification._id}
+                        className="p-4 border-b border-gray-700/50 hover:bg-gray-800/50"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className={`p-2 rounded-lg ${
                             notification.type === 'success' ? 'bg-green-500/20 text-green-500' :
-                            notification.type === 'alert' ? 'bg-amber-500/20 text-amber-500' :
-                            'bg-blue-500/20 text-blue-500'
+                            notification.type === 'info' ? 'bg-blue-500/20 text-blue-500' :
+                            'bg-yellow-500/20 text-yellow-500'
                           }`}>
-                            {notification.type === 'success' ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : notification.type === 'alert' ? (
-                              <Bell className="h-4 w-4" />
-                            ) : (
-                              <Info className="h-4 w-4" />
-                            )}
+                            {notification.type === 'success' ? '✓' : 
+                             notification.type === 'info' ? 'ℹ' : '⚠'}
                           </div>
                           <div className="flex-1">
                             <p className="text-sm">{notification.message}</p>
-                            <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {new Date(notification.createdAt).toRelativeTimeString()}
+                            </p>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <div className="p-2 border-t border-gray-700 text-center">
-                    <button className="text-sm text-blue-400 hover:text-blue-300 w-full py-1">
-                      View all notifications
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
             
-            <button className="p-2 rounded-full hover:bg-gray-800">
+            <button 
+              onClick={() => setSelectedView("settings")}
+              className="p-2 rounded-full hover:bg-gray-800"
+            >
               <Settings className="h-5 w-5 text-gray-400" />
             </button>
             
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 p-0.5">
-                <div className="bg-gray-800 w-full h-full rounded-full flex items-center justify-center">
-                  {user?.imageUrl ? (
-                    <Image
-                      src={user.imageUrl}
-                      alt={user.firstName || "DJ"}
-                      width={30}
-                      height={30}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium">
-                      {user?.firstName?.[0] || "D"}
-                    </span>
-                  )}
+            <div className="relative">
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center space-x-2 hover:bg-gray-800 rounded-full p-1"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 p-0.5">
+                  <div className="bg-gray-800 w-full h-full rounded-full flex items-center justify-center">
+                    {user?.imageUrl ? (
+                      <Image
+                        src={user.imageUrl}
+                        alt={user.firstName || "DJ"}
+                        width={30}
+                        height={30}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium">
+                        {user?.firstName?.[0] || "D"}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span className="text-sm font-medium hidden md:block">
-                {user?.firstName ? `DJ ${user.firstName}` : "DJ Dashboard"}
-              </span>
+                <span className="text-sm font-medium hidden md:block">
+                  {user?.firstName ? `DJ ${user.firstName}` : "DJ Dashboard"}
+                </span>
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setSelectedView("settings");
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800"
+                    >
+                      Settings
+                    </button>
+                    <button
+                      onClick={() => router.push('/api/auth/signout')}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 text-red-400"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -243,45 +415,21 @@ export default function DJDashboard() {
               Management
             </div>
             <ul className="space-y-1">
-              <li>
-                <button
-                  onClick={() => setSelectedView("events")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "events"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Calendar className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Events</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("fans")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "fans"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Users className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Fan Management</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedView("venues")}
-                  className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                    selectedView === "venues"
-                      ? "bg-blue-900/20 text-blue-400"
-                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}
-                >
-                  <Share2 className="h-5 w-5 mr-2" />
-                  <span className="hidden md:inline-block">Venues</span>
-                </button>
-              </li>
+              {managementNavigation.map((item) => (
+                <li key={item.name}>
+                  <button
+                    onClick={item.onClick}
+                    className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
+                      selectedView === item.name.toLowerCase()
+                        ? "bg-blue-900/20 text-blue-400"
+                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5 mr-2" />
+                    <span className="hidden md:inline-block">{item.name}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
           
@@ -315,6 +463,14 @@ export default function DJDashboard() {
                 <RequestsPanel />
               ) : selectedView === "library" ? (
                 <LibraryPanel />
+              ) : selectedView === "events" ? (
+                <EventsPanel />
+              ) : selectedView === "fans" ? (
+                <FanManagementPanel />
+              ) : selectedView === "venues" ? (
+                <VenuesPanel />
+              ) : selectedView === "settings" ? (
+                <SettingsPanel />
               ) : selectedView === "overview" ? (
                 <motion.div
                   key="overview"
@@ -361,8 +517,14 @@ export default function DJDashboard() {
                           </div>
                         </div>
                         <div className="mt-3 flex items-center text-xs text-gray-400">
-                          <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                          <span className="text-green-500 font-medium">12%</span>
+                          <TrendingUp className={`h-3 w-3 mr-1 ${
+                            stats.trends.requests >= 0 ? 'text-green-500' : 'text-red-500'
+                          }`} />
+                          <span className={
+                            stats.trends.requests >= 0 ? 'text-green-500' : 'text-red-500'
+                          }>
+                            {Math.abs(stats.trends.requests)}%
+                          </span>
                           <span className="ml-1">vs last week</span>
                         </div>
                       </div>
@@ -378,8 +540,14 @@ export default function DJDashboard() {
                           </div>
                         </div>
                         <div className="mt-3 flex items-center text-xs text-gray-400">
-                          <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-                          <span className="text-green-500 font-medium">24%</span>
+                          <TrendingUp className={`h-3 w-3 mr-1 ${
+                            stats.trends.earnings >= 0 ? 'text-green-500' : 'text-red-500'
+                          }`} />
+                          <span className={
+                            stats.trends.earnings >= 0 ? 'text-green-500' : 'text-red-500'
+                          }>
+                            {Math.abs(stats.trends.earnings)}%
+                          </span>
                           <span className="ml-1">vs last month</span>
                         </div>
                       </div>
@@ -421,7 +589,10 @@ export default function DJDashboard() {
                       <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
                         <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
                           <h3 className="font-medium">Recent Song Requests</h3>
-                          <button className="text-sm text-blue-400 hover:text-blue-300">
+                          <button 
+                            onClick={() => setSelectedView("requests")}
+                            className="text-sm text-blue-400 hover:text-blue-300"
+                          >
                             View all
                           </button>
                         </div>
@@ -440,28 +611,32 @@ export default function DJDashboard() {
                                 </div>
                               </div>
                             ))
-                          ) : stats.topSongs?.length > 0 ? (
-                            stats.topSongs.map((song, i) => (
+                          ) : recentRequests.length > 0 ? (
+                            recentRequests.map((request, i) => (
                               <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
                                 <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg flex items-center justify-center">
                                     <Music className="h-5 w-5 text-blue-400" />
                                   </div>
                                   <div className="flex-1">
-                                    <p className="font-medium">{song.title}</p>
-                                    <p className="text-sm text-gray-400">{song.artist}</p>
+                                    <h4 className="font-medium">{request.songTitle}</h4>
+                                    <p className="text-sm text-gray-400">{request.requesterName}</p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="font-medium text-green-500">${song.amount}</p>
-                                    <p className="text-xs text-gray-400">{song.time}</p>
+                                    <span className="px-2 py-1 rounded-md bg-green-900/30 text-green-400 text-xs font-medium">
+                                      ${request.amount}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
                             ))
                           ) : (
-                            <div className="p-6 text-center">
+                            <div className="text-center py-8">
                               <p className="text-gray-400">No song requests yet</p>
-                              <button className="mt-2 text-sm text-blue-400 hover:text-blue-300">
+                              <button 
+                                onClick={() => setIsCreateEventModalOpen(true)}
+                                className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+                              >
                                 Create your first event
                               </button>
                             </div>
@@ -469,30 +644,72 @@ export default function DJDashboard() {
                         </div>
                       </div>
                       
-                      <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                          <h3 className="font-medium">Performance Analytics</h3>
-                          <div className="flex items-center space-x-2">
-                            <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
-                              Week
-                            </button>
-                            <button className="text-xs bg-blue-600 px-2 py-1 rounded">
-                              Month
-                            </button>
-                            <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
-                              Year
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="p-4 h-64 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="w-16 h-16 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
-                              <BarChart2 className="h-8 w-8 text-blue-400" />
+                      <div className="mt-6 col-span-full">
+                        <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                          <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                            <h3 className="font-medium">Performance Analytics</h3>
+                            <div className="flex space-x-2">
+                              {['Week', 'Month', 'Year'].map((timeframe) => (
+                                <button
+                                  key={timeframe}
+                                  onClick={() => setSelectedTimeframe(timeframe.toLowerCase())}
+                                  className={`px-3 py-1 rounded-md text-sm ${
+                                    selectedTimeframe === timeframe.toLowerCase()
+                                      ? 'bg-blue-900/30 text-blue-400'
+                                      : 'text-gray-400 hover:bg-gray-700/30'
+                                  }`}
+                                >
+                                  {timeframe}
+                                </button>
+                              ))}
                             </div>
-                            <p className="mt-4 text-gray-400">
-                              Analytics visualization will appear here
-                            </p>
+                          </div>
+                          <div className="p-6">
+                            {isLoading ? (
+                              <div className="animate-pulse">
+                                <div className="h-[200px] bg-gray-700/50 rounded-lg" />
+                              </div>
+                            ) : analytics[`${selectedTimeframe}lyData`]?.length > 0 ? (
+                              <div className="h-[200px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart
+                                    data={analytics[`${selectedTimeframe}lyData`]}
+                                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                                  >
+                                    <defs>
+                                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                      </linearGradient>
+                                    </defs>
+                                    <XAxis 
+                                      dataKey="date" 
+                                      stroke="#6B7280"
+                                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                                    />
+                                    <YAxis stroke="#6B7280" />
+                                    <Tooltip
+                                      contentStyle={{
+                                        backgroundColor: '#1F2937',
+                                        border: '1px solid #374151',
+                                        borderRadius: '0.5rem'
+                                      }}
+                                    />
+                                    <Area
+                                      type="monotone"
+                                      dataKey="amount"
+                                      stroke="#3B82F6"
+                                      fillOpacity={1}
+                                      fill="url(#colorRevenue)"
+                                    />
+                                  </AreaChart>
+                                </ResponsiveContainer>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <p className="text-gray-400">No analytics data available</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -503,48 +720,46 @@ export default function DJDashboard() {
                         <div className="p-4 border-b border-gray-700/50">
                           <h3 className="font-medium">Upcoming Events</h3>
                         </div>
-                        
-                        <div className="divide-y divide-gray-700/50">
-                          {isLoading ? (
-                            [...Array(3)].map((_, i) => (
-                              <div key={i} className="p-4 animate-pulse">
-                                <div className="flex items-start space-x-3">
-                                  <div className="w-12 h-12 bg-gray-700 rounded-lg"></div>
-                                  <div className="flex-1">
-                                    <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                                    <div className="h-3 bg-gray-700 rounded w-1/2 mb-2"></div>
-                                    <div className="h-3 bg-gray-700 rounded w-1/3"></div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : stats.upcomingEvents?.length > 0 ? (
-                            stats.upcomingEvents.map((event, i) => (
-                              <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
-                                <div className="flex items-start space-x-3">
-                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg flex items-center justify-center">
+                        <div className="p-4">
+                          {isEventsLoading ? (
+                            <div className="animate-pulse space-y-4">
+                              {[...Array(3)].map((_, i) => (
+                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
+                              ))}
+                            </div>
+                          ) : events.length > 0 ? (
+                            <div className="space-y-4">
+                              {events.map((event, i) => (
+                                <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
                                     <Calendar className="h-6 w-6 text-blue-400" />
                                   </div>
-                                  <div>
-                                    <p className="font-medium">{event.name}</p>
-                                    <p className="text-sm text-blue-400">{event.date}</p>
-                                    <p className="text-xs text-gray-400">{event.venue}</p>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium">{event.name}</h4>
+                                    <p className="text-sm text-gray-400">
+                                      {new Date(event.date).toLocaleDateString()}
+                                    </p>
                                   </div>
                                 </div>
-                              </div>
-                            ))
+                              ))}
+                            </div>
                           ) : (
-                            <div className="p-6 text-center">
+                            <div className="text-center py-6">
                               <p className="text-gray-400">No upcoming events</p>
-                              <button className="mt-2 text-sm text-blue-400 hover:text-blue-300">
+                              <button 
+                                onClick={() => setIsCreateEventModalOpen(true)}
+                                className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+                              >
                                 Schedule a new event
                               </button>
                             </div>
                           )}
                         </div>
-                        
-                        <div className="p-3 border-t border-gray-700/50">
-                          <button className="w-full py-2 text-sm text-blue-400 hover:text-blue-300 rounded-lg hover:bg-gray-700/50 transition-colors">
+                        <div className="p-4 border-t border-gray-700/50">
+                          <button 
+                            onClick={() => setSelectedView("events")}
+                            className="text-sm text-blue-400 hover:text-blue-300"
+                          >
                             View calendar
                           </button>
                         </div>
@@ -554,83 +769,41 @@ export default function DJDashboard() {
                         <div className="p-4 border-b border-gray-700/50">
                           <h3 className="font-medium">Top Genres</h3>
                         </div>
-                        
                         <div className="p-4">
-                          {[
-                            { name: "House", percent: 42 },
-                            { name: "Hip Hop", percent: 28 },
-                            { name: "Pop", percent: 15 },
-                            { name: "RnB", percent: 10 },
-                            { name: "Rock", percent: 5 },
-                          ].map((genre, i) => (
-                            <div key={i} className="mb-4 last:mb-0">
-                              <div className="flex justify-between items-center mb-1">
-                                <span className="text-sm">{genre.name}</span>
-                                <span className="text-sm text-gray-400">{genre.percent}%</span>
-                              </div>
-                              <div className="w-full bg-gray-700 rounded-full h-1.5">
-                                <div
-                                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full"
-                                  style={{ width: `${genre.percent}%` }}
-                                ></div>
-                              </div>
+                          {isLoading ? (
+                            <div className="animate-pulse space-y-4">
+                              {[...Array(5)].map((_, i) => (
+                                <div key={i}>
+                                  <div className="h-4 bg-gray-700/50 rounded w-20 mb-1" />
+                                  <div className="h-2 bg-gray-700/50 rounded" />
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          ) : genres.length > 0 ? (
+                            <div className="space-y-4">
+                              {genres.map((genre, i) => (
+                                <div key={i}>
+                                  <div className="flex justify-between text-sm mb-1">
+                                    <span>{genre.name}</span>
+                                    <span>{genre.percentage}%</span>
+                                  </div>
+                                  <div className="h-2 bg-gray-700 rounded-full">
+                                    <div
+                                      className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"
+                                      style={{ width: `${genre.percentage}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6">
+                              <p className="text-gray-400">No genre data available</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ) : selectedView === "events" ? (
-                <motion.div
-                  key={selectedView}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="min-h-[calc(100vh-140px)] flex items-center justify-center"
-                >
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
-                      <Calendar className="h-10 w-10 text-blue-400" />
-                    </div>
-                    <h2 className="mt-4 text-xl font-medium capitalize">{selectedView}</h2>
-                    <p className="mt-2 text-gray-400 max-w-md">
-                      This {selectedView} section is under development. Check back soon for updates!
-                    </p>
-                    <button
-                      onClick={() => setSelectedView("overview")}
-                      className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm inline-flex items-center"
-                    >
-                      <ChevronRight className="h-4 w-4 mr-1" />
-                      Go back to Overview
-                    </button>
-                  </div>
-                </motion.div>
-              ) : selectedView === "fans" ? (
-                <motion.div
-                  key={selectedView}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="min-h-[calc(100vh-140px)] flex items-center justify-center"
-                >
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
-                      <Users className="h-10 w-10 text-blue-400" />
-                    </div>
-                    <h2 className="mt-4 text-xl font-medium capitalize">{selectedView}</h2>
-                    <p className="mt-2 text-gray-400 max-w-md">
-                      This {selectedView} section is under development. Check back soon for updates!
-                    </p>
-                    <button
-                      onClick={() => setSelectedView("overview")}
-                      className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm inline-flex items-center"
-                    >
-                      <ChevronRight className="h-4 w-4 mr-1" />
-                      Go back to Overview
-                    </button>
                   </div>
                 </motion.div>
               ) : null}
