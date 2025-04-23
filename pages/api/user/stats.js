@@ -1,110 +1,92 @@
-import { getAuth } from "@clerk/nextjs/server";
-import { getCollection } from '../../../lib/db';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-
-  if (!clerkId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (req.method === 'GET') {
-    try {
-      const bids = await getCollection('bids');
-      const songs = await getCollection('songs');
-      
-      // Get active bids
-      const activeBids = await bids.aggregate([
-        { 
-          $match: { 
-            clerkId,
-            status: { $in: ['PENDING', 'ACCEPTED'] }
-          }
-        },
-        {
-          $lookup: {
-            from: 'songs',
-            localField: 'songId',
-            foreignField: '_id',
-            as: 'song'
-          }
-        },
-        { $unwind: '$song' },
-        { $sort: { createdAt: -1 } }
-      ]).toArray();
-
-      // Get past bids
-      const pastBids = await bids.aggregate([
-        { 
-          $match: { 
-            clerkId,
-            status: { $in: ['COMPLETED', 'REJECTED', 'EXPIRED'] }
-          }
-        },
-        {
-          $lookup: {
-            from: 'songs',
-            localField: 'songId',
-            foreignField: '_id',
-            as: 'song'
-          }
-        },
-        { $unwind: '$song' },
-        {
-          $lookup: {
-            from: 'events',
-            localField: 'eventId',
-            foreignField: '_id',
-            as: 'event'
-          }
-        },
-        { $unwind: { path: '$event', preserveNullAndEmptyArrays: true } },
-        { $sort: { createdAt: -1 } }
-      ]).toArray();
-
-      // Get other stats
-      const totalBids = await bids.countDocuments({ clerkId });
-      const wonBids = await bids.countDocuments({ clerkId, status: 'COMPLETED' });
-      const totalSpentAgg = await bids.aggregate([
-        { $match: { clerkId } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]).toArray();
-
-      res.status(200).json({
-        totalBids,
-        wonBids,
-        totalSpent: totalSpentAgg[0]?.total || 0,
-        activeBids: activeBids.map(bid => ({
-          id: bid._id,
-          song: {
-            title: bid.song.title,
-            artist: bid.song.artist,
-            albumArt: bid.song.albumArt
-          },
-          amount: bid.amount,
-          status: bid.status,
-          createdAt: bid.createdAt,
-          djName: bid.djName
-        })),
-        pastBids: pastBids.map(bid => ({
-          id: bid._id,
-          song: {
-            title: bid.song.title,
-            artist: bid.song.artist,
-            albumArt: bid.song.albumArt
-          },
-          amount: bid.amount,
-          status: bid.status,
-          createdAt: bid.createdAt,
-          djName: bid.djName,
-          eventName: bid.event?.name
-        }))
-      });
-    } catch (error) {
-      console.error('Error fetching user stats:', error);
-      res.status(500).json({ error: 'Error fetching user stats' });
+  try {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
+
+    const client = await clientPromise;
+    const db = client.db();
+
+    // Get total song requests count
+    const totalRequests = await db.collection('song_requests')
+      .countDocuments({ userId: session.user.id });
+
+    // Get total amount spent
+    const spendingAggregate = await db.collection('song_requests')
+      .aggregate([
+        { $match: { userId: session.user.id } },
+        { $group: { 
+          _id: null, 
+          totalSpent: { $sum: '$amount' } 
+        }}
+      ]).toArray();
+    
+    const totalSpent = spendingAggregate.length > 0 ? spendingAggregate[0].totalSpent : 0;
+
+    // Get favorite DJs (most requested)
+    const favoriteDJs = await db.collection('song_requests')
+      .aggregate([
+        { $match: { userId: session.user.id } },
+        { $group: { 
+          _id: '$djId', 
+          count: { $sum: 1 } 
+        }},
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        { $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'djInfo'
+        }},
+        { $unwind: { path: '$djInfo', preserveNullAndEmptyArrays: true } },
+        { $project: {
+          _id: 1,
+          djId: '$_id',
+          djName: '$djInfo.name',
+          djImage: '$djInfo.image',
+          count: 1
+        }}
+      ]).toArray();
+
+    // Get current month's tips
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const monthlyTipsAggregate = await db.collection('song_requests')
+      .aggregate([
+        { 
+          $match: { 
+            userId: session.user.id,
+            createdAt: { $gte: firstDayOfMonth }
+          } 
+        },
+        { $group: { 
+          _id: null, 
+          monthlyTotal: { $sum: '$amount' } 
+        }}
+      ]).toArray();
+    
+    const tipsThisMonth = monthlyTipsAggregate.length > 0 ? monthlyTipsAggregate[0].monthlyTotal : 0;
+
+    res.status(200).json({
+      totalSpent,
+      songsRequested: totalRequests,
+      favoriteDJs: favoriteDJs.length,
+      tipsThisMonth,
+      favoriteDJsList: favoriteDJs
+    });
+  } catch (error) {
+    console.error('Error fetching user stats:', error);
+    res.status(500).json({ error: 'Failed to fetch user stats' });
   }
 }

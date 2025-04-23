@@ -1,37 +1,39 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
+  const session = await getServerSession(req, res, authOptions);
+  
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const client = await clientPromise;
     const db = client.db();
 
     // Get total and completed requests
     const totalRequests = await db.collection('song_requests')
-      .countDocuments({ djId: userId });
+      .countDocuments({ djId: session.user.id });
     
     const completedRequests = await db.collection('song_requests')
-      .countDocuments({ djId: userId, status: 'completed' });
+      .countDocuments({ djId: session.user.id, status: 'completed' });
 
     // Calculate total earnings
     const earnings = await db.collection('song_requests')
       .aggregate([
-        { $match: { djId: userId, status: 'completed' } },
+        { $match: { djId: session.user.id, status: 'completed' } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]).toArray();
 
     // Get recent requests
     const recentRequests = await db.collection('song_requests')
-      .find({ djId: userId })
+      .find({ djId: session.user.id })
       .sort({ createdAt: -1 })
       .limit(5)
       .toArray();
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
     // Get top songs
     const topSongs = await db.collection('song_requests')
       .aggregate([
-        { $match: { djId: userId } },
+        { $match: { djId: session.user.id } },
         { $group: { 
           _id: '$songId',
           title: { $first: '$songTitle' },
@@ -54,7 +56,7 @@ export default async function handler(req, res) {
     // Get upcoming events
     const upcomingEvents = await db.collection('events')
       .find({ 
-        djId: userId,
+        djId: session.user.id,
         date: { $gte: new Date() }
       })
       .sort({ date: 1 })
@@ -69,7 +71,7 @@ export default async function handler(req, res) {
       .aggregate([
         { 
           $match: { 
-            djId: userId,
+            djId: session.user.id,
             createdAt: { $gte: lastWeek }
           }
         },
@@ -89,7 +91,7 @@ export default async function handler(req, res) {
       .aggregate([
         { 
           $match: { 
-            djId: userId,
+            djId: session.user.id,
             createdAt: { 
               $gte: previousWeek,
               $lt: lastWeek

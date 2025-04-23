@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { 
   LayoutDashboard, Music, Clock, DollarSign, 
@@ -19,11 +22,10 @@ import { EventsPanel } from "./EventsPanel";
 import { FanManagementPanel } from "./FanManagementPanel";
 import { VenuesPanel } from "./VenuesPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { useRouter } from 'next/router';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 
 export default function DJDashboard() {
-  const { user } = useUser();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [stats, setStats] = useState({
     totalRequests: 0,
@@ -36,7 +38,8 @@ export default function DJDashboard() {
     trends: {
       requests: 0,
       earnings: 0
-    }
+    },
+    events: []
   });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState("overview");
@@ -65,56 +68,60 @@ export default function DJDashboard() {
   ];
 
   useEffect(() => {
-    if (user?.id) {
-      const fetchStats = async () => {
-        try {
-          setIsLoading(true);
-          const response = await fetch(`/api/dj/${user.id}/stats`);
-          if (!response.ok) {
-            throw new Error('Failed to fetch stats');
-          }
-          const data = await response.json();
-          setStats(data);
-        } catch (error) {
-          console.error('Error fetching stats:', error);
-          toast.error('Failed to load dashboard stats');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      fetchStats();
+    if (status === "unauthenticated") {
+      router.push('/auth/dj');
+    } else if (session?.user?.id) {
+      fetchDJStats();
     }
-  }, [user?.id]);
+  }, [status, session?.user?.id, router]);
+
+  const fetchDJStats = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/dj/${session.user.id}/stats`);
+      if (!response.ok) throw new Error('Failed to fetch DJ stats');
+      const data = await response.json();
+      setStats(prevStats => ({
+        ...prevStats,
+        ...data,
+        events: data.upcomingEvents || []
+      }));
+    } catch (error) {
+      console.error('Error fetching DJ stats:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (user?.id) {
+    if (session?.user?.id) {
       fetchNotifications();
     }
-  }, [user?.id]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (session?.user?.id) {
       fetchGenres();
     }
-  }, [user?.id]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (session?.user?.id) {
       fetchEvents();
     }
-  }, [user?.id]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (session?.user?.id) {
       fetchRecentRequests();
       fetchAnalytics(selectedTimeframe);
     }
-  }, [user?.id, selectedTimeframe]);
+  }, [session?.user?.id, selectedTimeframe]);
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/notifications`);
+      const response = await fetch(`/api/dj/${session.user.id}/notifications`);
       if (!response.ok) throw new Error('Failed to fetch notifications');
       
       const data = await response.json();
@@ -128,21 +135,22 @@ export default function DJDashboard() {
 
   const fetchGenres = async () => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/genres`);
+      const response = await fetch(`/api/dj/${session.user.id}/genres`);
       if (!response.ok) throw new Error('Failed to fetch genres');
       
       const data = await response.json();
-      setGenres(data.topGenres);
+      setGenres(data.topGenres || []);
     } catch (error) {
       console.error('Error fetching genres:', error);
       toast.error('Failed to load genre stats');
+      setGenres([]);
     }
   };
 
   const fetchEvents = async () => {
     try {
       setIsEventsLoading(true);
-      const response = await fetch(`/api/dj/${user.id}/events?view=upcoming`);
+      const response = await fetch(`/api/dj/${session.user.id}/events?view=upcoming`);
       if (!response.ok) throw new Error('Failed to fetch events');
       const data = await response.json();
       setEvents(data.events);
@@ -156,19 +164,20 @@ export default function DJDashboard() {
 
   const fetchRecentRequests = async () => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/requests/recent`);
+      const response = await fetch(`/api/dj/${session.user.id}/requests/recent`);
       if (!response.ok) throw new Error('Failed to fetch recent requests');
       const data = await response.json();
-      setRecentRequests(data.requests);
+      setRecentRequests(data.requests || []);
     } catch (error) {
       console.error('Error fetching recent requests:', error);
       toast.error('Failed to load recent requests');
+      setRecentRequests([]);
     }
   };
 
   const fetchAnalytics = async (timeframe) => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/analytics?timeframe=${timeframe}`);
+      const response = await fetch(`/api/dj/${session.user.id}/analytics?timeframe=${timeframe}`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       const data = await response.json();
       setAnalytics(data);
@@ -180,7 +189,7 @@ export default function DJDashboard() {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/notifications`, {
+      const response = await fetch(`/api/dj/${session.user.id}/notifications`, {
         method: 'PATCH'
       });
       if (!response.ok) throw new Error('Failed to mark notifications as read');
@@ -202,8 +211,12 @@ export default function DJDashboard() {
     setIsCreateEventModalOpen(true);
   };
 
+  const handleSignOut = async () => {
+    await signOut({ redirect: true, callbackUrl: "/" });
+  };
+
   // Loading state
-  if (isLoading) {
+  if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -255,6 +268,49 @@ export default function DJDashboard() {
     { name: "Venues", icon: Share2, onClick: () => setSelectedView("venues") },
     { name: "Settings", icon: Settings, onClick: () => setSelectedView("settings") }
   ];
+
+  const ProfileSection = () => (
+    <div className="relative">
+      <button
+        onClick={() => setShowProfileMenu(!showProfileMenu)}
+        className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800/50"
+      >
+        <div className="relative w-8 h-8 rounded-full overflow-hidden">
+          <Image
+            src={session?.user?.image || "/default-avatar.png"}
+            alt={session?.user?.name || "DJ"}
+            fill
+            className="object-cover"
+          />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-medium">{session?.user?.name}</p>
+          <p className="text-xs text-gray-400">{session?.user?.email}</p>
+        </div>
+      </button>
+      {showProfileMenu && (
+        <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
+          <div className="py-1">
+            <button
+              onClick={() => {
+                setSelectedView("settings");
+                setShowProfileMenu(false);
+              }}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800"
+            >
+              Settings
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 text-red-400"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -331,55 +387,7 @@ export default function DJDashboard() {
               <Settings className="h-5 w-5 text-gray-400" />
             </button>
             
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-2 hover:bg-gray-800 rounded-full p-1"
-              >
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 p-0.5">
-                  <div className="bg-gray-800 w-full h-full rounded-full flex items-center justify-center">
-                    {user?.imageUrl ? (
-                      <Image
-                        src={user.imageUrl}
-                        alt={user.firstName || "DJ"}
-                        width={30}
-                        height={30}
-                        className="rounded-full"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium">
-                        {user?.firstName?.[0] || "D"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="text-sm font-medium hidden md:block">
-                  {user?.firstName ? `DJ ${user.firstName}` : "DJ Dashboard"}
-                </span>
-              </button>
-
-              {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        setSelectedView("settings");
-                        setShowProfileMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800"
-                    >
-                      Settings
-                    </button>
-                    <button
-                      onClick={() => router.push('/api/auth/signout')}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 text-red-400"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ProfileSection />
           </div>
         </div>
       </div>
@@ -599,19 +607,12 @@ export default function DJDashboard() {
                         
                         <div className="divide-y divide-gray-700/50">
                           {isLoading ? (
-                            [...Array(5)].map((_, i) => (
-                              <div key={i} className="p-4 animate-pulse">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-gray-700 rounded-lg"></div>
-                                  <div className="flex-1">
-                                    <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                                    <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-                                  </div>
-                                  <div className="h-6 bg-gray-700 rounded w-16"></div>
-                                </div>
-                              </div>
-                            ))
-                          ) : recentRequests.length > 0 ? (
+                            <div className="animate-pulse space-y-4">
+                              {[...Array(3)].map((_, i) => (
+                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
+                              ))}
+                            </div>
+                          ) : recentRequests?.length > 0 ? (
                             recentRequests.map((request, i) => (
                               <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
                                 <div className="flex items-center space-x-3">
@@ -727,9 +728,9 @@ export default function DJDashboard() {
                                 <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : events.length > 0 ? (
+                          ) : stats.events.length > 0 ? (
                             <div className="space-y-4">
-                              {events.map((event, i) => (
+                              {stats.events.map((event, i) => (
                                 <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
                                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
                                     <Calendar className="h-6 w-6 text-blue-400" />
@@ -772,14 +773,11 @@ export default function DJDashboard() {
                         <div className="p-4">
                           {isLoading ? (
                             <div className="animate-pulse space-y-4">
-                              {[...Array(5)].map((_, i) => (
-                                <div key={i}>
-                                  <div className="h-4 bg-gray-700/50 rounded w-20 mb-1" />
-                                  <div className="h-2 bg-gray-700/50 rounded" />
-                                </div>
+                              {[...Array(3)].map((_, i) => (
+                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : genres.length > 0 ? (
+                          ) : genres?.length > 0 ? (
                             <div className="space-y-4">
                               {genres.map((genre, i) => (
                                 <div key={i}>

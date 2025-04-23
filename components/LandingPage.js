@@ -1,6 +1,9 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from 'next/navigation'; // Changed from 'next/router'
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
@@ -58,110 +61,82 @@ const LandingPage = () => {
 };
 
 const Header = () => {
-  const { isSignedIn, user } = useUser();
+  const { data: session, status } = useSession();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const router = useRouter();
+
+  const handleSignIn = async () => {
+    try {
+      await signIn(undefined, { callbackUrl: '/dashboard/user' });
+    } catch (error) {
+      console.error('Sign in error:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut({ callbackUrl: '/' });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-lg border-b border-white/10">
       <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-3xl font-bold"
-          >
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-              TipWave
-            </span>
-          </motion.div>
-        </div>
-        
-        {/* Desktop Menu */}
-        <ul className="hidden md:flex space-x-8 items-center">
-          <motion.li
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <a
-              href="#features"
-              className="text-white/80 hover:text-white transition-colors duration-300 text-sm uppercase tracking-wider font-medium"
-            >
-              Features
-            </a>
-          </motion.li>
-          <motion.li
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <a
-              href="#how-it-works"
-              className="text-white/80 hover:text-white transition-colors duration-300 text-sm uppercase tracking-wider font-medium"
-            >
-              How It Works
-            </a>
-          </motion.li>
-          <motion.li
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <a
-              href="#testimonials"
-              className="text-white/80 hover:text-white transition-colors duration-300 text-sm uppercase tracking-wider font-medium"
-            >
-              Testimonials
-            </a>
-          </motion.li>
-          <li className="ml-8">
-            {isSignedIn ? (
-              <div className="flex items-center space-x-4">
-                <Link href="/dashboard/user">
-                  <motion.button
-                    whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(139, 92, 246, 0.5)" }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium overflow-hidden group"
-                  >
-                    <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></span>
-                    <span className="relative">Dashboard</span>
-                  </motion.button>
-                </Link>
-                <SignOutButton>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-6 py-2.5 rounded-full border border-purple-500/50 hover:border-purple-500 text-white/90 font-medium transition-colors duration-300"
-                  >
-                    Sign Out
-                  </motion.button>
-                </SignOutButton>
-              </div>
-            ) : (
-              <SignInButton mode="modal">
+        <Link href="/">
+          <span className="text-2xl font-bold">TipWave</span>
+        </Link>
+
+        <div className="hidden md:flex items-center space-x-8">
+          <a href="#features" className="text-white/80 hover:text-white transition-colors duration-300">Features</a>
+          <a href="#how-it-works" className="text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
+          <a href="#testimonials" className="text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
+          
+          {status === "authenticated" ? (
+            <div className="flex items-center gap-4">
+              <Link href="/dashboard/user">
                 <motion.button
-                  whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(139, 92, 246, 0.5)" }}
+                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="relative px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium overflow-hidden group"
+                  className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
                 >
-                  <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></span>
-                  <span className="relative">Sign In</span>
+                  Dashboard
                 </motion.button>
-              </SignInButton>
-            )}
-          </li>
-        </ul>
-        
+              </Link>
+              <motion.button
+                onClick={handleSignOut}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 rounded-full border border-purple-500/50 text-white/90 font-medium"
+              >
+                Sign Out
+              </motion.button>
+            </div>
+          ) : (
+            <motion.button
+              onClick={handleSignIn}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
+            >
+              Sign In
+            </motion.button>
+          )}
+        </div>
+
         {/* Mobile menu button */}
         <motion.button
-          whileTap={{ scale: 0.9 }}
-          className="md:hidden text-white"
+          whileTap={{ scale: 0.95 }}
           onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="md:hidden text-white/80 hover:text-white"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-6 h-6">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </motion.button>
       </nav>
-      
+
       {/* Mobile menu */}
       <AnimatePresence>
         {isMenuOpen && (
@@ -172,53 +147,44 @@ const Header = () => {
             className="md:hidden bg-black/80 backdrop-blur-lg border-b border-white/10"
           >
             <div className="px-6 py-4 space-y-4">
-              <a
-                href="#features"
-                className="block text-white/80 hover:text-white transition-colors duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                className="block text-white/80 hover:text-white transition-colors duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                How It Works
-              </a>
-              <a
-                href="#testimonials"
-                className="block text-white/80 hover:text-white transition-colors duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Testimonials
-              </a>
-              <div className="pt-4 pb-2">
-                {isSignedIn ? (
+              <a href="#features" className="block text-white/80 hover:text-white transition-colors duration-300">Features</a>
+              <a href="#how-it-works" className="block text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
+              <a href="#testimonials" className="block text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
+              
+              <div className="pt-4">
+                {status === "authenticated" ? (
                   <div className="flex flex-col space-y-3">
                     <Link href="/dashboard/user">
-                      <button
-                        onClick={() => setIsMenuOpen(false)}
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
+                        onClick={() => setIsMenuOpen(false)}
                       >
                         Dashboard
-                      </button>
+                      </motion.button>
                     </Link>
-                    <SignOutButton>
-                      <button className="w-full px-4 py-2 rounded-full border border-purple-500/50 text-white/90 font-medium">
-                        Sign Out
-                      </button>
-                    </SignOutButton>
+                    <motion.button
+                      onClick={() => {
+                        handleSignOut();
+                        setIsMenuOpen(false);
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full px-4 py-2 rounded-full border border-purple-500/50 text-white/90 font-medium"
+                    >
+                      Sign Out
+                    </motion.button>
                   </div>
                 ) : (
-                  <SignInButton mode="modal">
-                    <button
-                      onClick={() => setIsMenuOpen(false)}
-                      className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
-                    >
-                      Sign In
-                    </button>
-                  </SignInButton>
+                  <motion.button
+                    onClick={() => {
+                      handleSignIn();
+                      setIsMenuOpen(false);
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
+                  >
+                    Sign In
+                  </motion.button>
                 )}
               </div>
             </div>
@@ -230,7 +196,7 @@ const Header = () => {
 };
 
 const Hero = () => {
-  const { isSignedIn } = useUser();
+  const { data: session } = useSession();
   const videoRef = useRef(null);
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
@@ -282,39 +248,34 @@ const Hero = () => {
             influence the DJ's playlist in real-time.
           </motion.p>
           
-          {isSignedIn ? (
-            <Link href="/dashboard/user">
+          <div className="flex justify-center gap-4 mt-8">
+            {session ? (
+              <Link href="/dashboard/user">
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
+                  whileTap={{ scale: 0.95 }}
+                  className="relative group px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden"
+                >
+                  <span className="relative flex items-center justify-center">
+                    Go to Dashboard
+                    <ChevronRight className="ml-2 h-5 w-5" />
+                  </span>
+                </motion.button>
+              </Link>
+            ) : (
               <motion.button
+                onClick={() => signIn()}
                 whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
                 whileTap={{ scale: 0.95 }}
                 className="relative group px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden"
               >
-                <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
-                <span className="relative flex items-center justify-center">
-                  Go to Dashboard
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              </motion.button>
-            </Link>
-          ) : (
-            <SignInButton mode="modal">
-              <motion.button
-                whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
-                whileTap={{ scale: 0.95 }}
-                className="relative group px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden"
-              >
-                <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
                 <span className="relative flex items-center justify-center">
                   Start Bidding Now
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                  <ChevronRight className="ml-2 h-5 w-5" />
                 </span>
               </motion.button>
-            </SignInButton>
-          )}
+            )}
+          </div>
           
           <motion.div 
             initial={{ opacity: 0, y: 20 }}

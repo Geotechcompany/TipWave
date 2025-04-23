@@ -1,19 +1,21 @@
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Dialog } from "@headlessui/react";
 import { motion } from "framer-motion";
 import { X, MapPin, Users, Globe, Loader2, Plus } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
 export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [venueData, setVenueData] = useState({
     name: "",
     address: "",
     capacity: "",
     website: "",
-    description: ""
+    description: "",
+    contactEmail: "",
+    contactPhone: ""
   });
 
   const handleSubmit = async (e) => {
@@ -21,20 +23,31 @@ export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/venues/create', {
+      const response = await fetch(`/api/dj/${session?.user?.id}/venues`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...venueData,
-          djId: user?.id,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(venueData),
       });
 
-      if (!response.ok) throw new Error('Failed to create venue');
-      
+      if (!response.ok) {
+        throw new Error('Failed to create venue');
+      }
+
       toast.success('Venue created successfully!');
-      onVenueCreated();
       onClose();
+      if (onVenueCreated) onVenueCreated();
+      
+      setVenueData({
+        name: "",
+        address: "",
+        capacity: "",
+        website: "",
+        description: "",
+        contactEmail: "",
+        contactPhone: ""
+      });
     } catch (error) {
       console.error('Error creating venue:', error);
       toast.error('Failed to create venue');
@@ -43,123 +56,159 @@ export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
     }
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setVenueData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   return (
     <Dialog
       open={isOpen}
       onClose={onClose}
-      className="relative z-50"
+      className="fixed inset-0 z-50 overflow-y-auto"
     >
-      <div className="fixed inset-0 bg-black/80" aria-hidden="true" />
-
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="relative bg-gray-900 rounded-xl max-w-md w-full shadow-xl">
-          <form onSubmit={handleSubmit} className="p-6">
-            <div className="flex justify-between items-start mb-6">
-              <Dialog.Title className="text-xl font-bold">
-                Add New Venue
-              </Dialog.Title>
+      <div className="flex items-center justify-center min-h-screen px-4 sm:px-6 text-center">
+        <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="relative bg-gray-900 rounded-xl w-full max-w-lg mx-auto shadow-xl overflow-hidden"
+        >
+          <div>
+            <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+              <Dialog.Title className="text-lg font-medium">Add New Venue</Dialog.Title>
               <button
-                type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-300"
+                className="rounded-full p-1 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Venue Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={venueData.name}
-                  onChange={(e) => setVenueData({ ...venueData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                />
+            
+            <form onSubmit={handleSubmit} className="p-4 overflow-y-auto max-h-[80vh]">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Venue Name</label>
+                  <input
+                    required
+                    type="text"
+                    value={venueData.name}
+                    onChange={handleInputChange}
+                    name="name"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Address</label>
+                  <input
+                    required
+                    type="text"
+                    value={venueData.address}
+                    onChange={handleInputChange}
+                    name="address"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue address"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Capacity</label>
+                  <input
+                    required
+                    type="number"
+                    value={venueData.capacity}
+                    onChange={handleInputChange}
+                    name="capacity"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue capacity"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Website</label>
+                  <input
+                    type="url"
+                    value={venueData.website}
+                    onChange={handleInputChange}
+                    name="website"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue website"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <textarea
+                    value={venueData.description}
+                    onChange={handleInputChange}
+                    name="description"
+                    rows="3"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue description"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contact Email</label>
+                  <input
+                    type="email"
+                    value={venueData.contactEmail}
+                    onChange={handleInputChange}
+                    name="contactEmail"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue contact email"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={venueData.contactPhone}
+                    onChange={handleInputChange}
+                    name="contactPhone"
+                    className="w-full px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                    placeholder="Enter venue contact phone"
+                  />
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={venueData.address}
-                  onChange={(e) => setVenueData({ ...venueData, address: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                />
+              
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end space-y-3 space-y-reverse sm:space-y-0 sm:space-x-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-3 text-sm font-medium text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-600 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center justify-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Venue
+                    </>
+                  )}
+                </button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Capacity
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={venueData.capacity}
-                  onChange={(e) => setVenueData({ ...venueData, capacity: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Website
-                </label>
-                <input
-                  type="url"
-                  value={venueData.website}
-                  onChange={(e) => setVenueData({ ...venueData, website: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={venueData.description}
-                  onChange={(e) => setVenueData({ ...venueData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Venue
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </Dialog.Panel>
+            </form>
+          </div>
+        </motion.div>
       </div>
     </Dialog>
   );

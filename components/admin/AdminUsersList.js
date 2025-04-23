@@ -2,6 +2,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 export default function AdminUsersList({ stats, isLoading }) {
+  if (isLoading) {
+    return <div>Loading users...</div>;
+  }
+
   return (
     <motion.div 
       className="bg-gray-800/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden"
@@ -14,34 +18,22 @@ export default function AdminUsersList({ stats, isLoading }) {
         <Link href="/admin/users" className="text-sm text-blue-400 hover:text-blue-300">View all</Link>
       </div>
       <div className="px-6 divide-y divide-gray-700">
-        {isLoading ? (
-          [...Array(5)].map((_, i) => (
-            <div key={i} className="py-4 flex items-center space-x-3 animate-pulse">
-              <div className="w-10 h-10 bg-gray-700 rounded-full"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-700 rounded w-2/3 mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-              </div>
+        {stats.recentUsers.map((user, i) => (
+          <div key={i} className="py-4 flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
+              <span className="text-sm">{user.name[0]}</span>
             </div>
-          ))
-        ) : (
-          stats.recentUsers.map((user, i) => (
-            <div key={i} className="py-4 flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                <span className="text-sm">{user.name[0]}</span>
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">{user.name}</p>
-                <p className="text-sm text-gray-400">{user.email}</p>
-              </div>
-              <div className={`text-xs px-2 py-1 rounded-full ${
-                user.status === "active" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"
-              }`}>
-                {user.status}
-              </div>
+            <div className="flex-1">
+              <p className="font-medium">{user.name}</p>
+              <p className="text-sm text-gray-400">{user.email}</p>
             </div>
-          ))
-        )}
+            <div className={`text-xs px-2 py-1 rounded-full ${
+              user.status === "active" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"
+            }`}>
+              {user.status}
+            </div>
+          </div>
+        ))}
       </div>
     </motion.div>
   );

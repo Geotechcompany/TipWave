@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Music, DollarSign, BarChart2, Settings } from "lucide-react";
+import { Users, Music, TrendingUp, Settings, LayoutDashboard, DollarSign, BarChart2 } from "lucide-react";
 
 export default function AdminSidebar({ activeTab, setActiveTab }) {
   const navigationItems = [
@@ -11,7 +11,7 @@ export default function AdminSidebar({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <div className="w-16 md:w-56 border-r border-gray-800 flex flex-col fixed h-[calc(100vh-64px)] z-20 bg-gray-900">
+    <aside className="fixed left-0 top-16 bottom-0 w-16 md:w-56 bg-gray-800 border-r border-gray-700">
       <div className="p-3">
         <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
           Main
@@ -34,6 +34,6 @@ export default function AdminSidebar({ activeTab, setActiveTab }) {
           ))}
         </ul>
       </div>
-    </div>
+    </aside>
   );
 } 

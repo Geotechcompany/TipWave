@@ -1,25 +1,33 @@
-import { getAuth } from "@clerk/nextjs/server";
-import DJDashboard from '../../components/DJDashboard'
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import DJDashboard from '@/components/DJDashboard';
+import { useEffect } from 'react';
+import { AppLoader } from '@/components/AppLoader';
 
-function DJDashboardPage() {
-  return <DJDashboard />
-}
+export default function DJDashboardPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-export default DJDashboardPage
-
-export const getServerSideProps = async (ctx) => {
-  const { userId } = getAuth(ctx.req);
-  
-  if (!userId) {
-    return {
-      redirect: {
-        destination: '/sign-in?redirect_url=/dashboard/dj',
-        permanent: false,
-      },
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push('/auth/dj?callbackUrl=/dashboard/dj');
+    } else if (status === "authenticated" && 
+              session?.user?.role !== 'DJ' && 
+              session?.user?.role !== 'BOTH' &&
+              session?.user?.role !== 'ADMIN') {
+      router.push('/dashboard/user');
     }
+  }, [status, session, router]);
+
+  if (status === "loading") {
+    return <AppLoader />;
   }
 
-  return { 
-    props: {} 
-  };
-};
+  if (!session || (session.user.role !== 'DJ' && 
+                   session.user.role !== 'BOTH' && 
+                   session.user.role !== 'ADMIN')) {
+    return null;
+  }
+
+  return <DJDashboard user={session.user} />;
+}

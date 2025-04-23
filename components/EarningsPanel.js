@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DollarSign, Calendar, TrendingUp, Download, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export function EarningsPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [earnings, setEarnings] = useState({
     total: 0,
     monthly: [],
@@ -18,11 +18,11 @@ export function EarningsPanel() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const fetchEarnings = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/dj/${user.id}/earnings?timeframe=${timeframe}`);
+      const response = await fetch(`/api/dj/${session.user.id}/earnings?timeframe=${timeframe}`);
       if (!response.ok) throw new Error('Failed to fetch earnings');
       const data = await response.json();
       setEarnings(data);
@@ -35,15 +35,17 @@ export function EarningsPanel() {
   };
 
   useEffect(() => {
-    fetchEarnings();
-  }, [user?.id, timeframe]);
+    if (session?.user?.id) {
+      fetchEarnings();
+    }
+  }, [session?.user?.id, timeframe]);
 
   const handleWithdraw = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
       setIsWithdrawing(true);
-      const response = await fetch(`/api/dj/${user.id}/earnings/withdraw`, {
+      const response = await fetch(`/api/dj/${session.user.id}/earnings/withdraw`, {
         method: 'POST',
       });
       

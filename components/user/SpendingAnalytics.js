@@ -1,10 +1,20 @@
+"use client";
+
 import { motion } from "framer-motion";
 import { DollarSign, TrendingUp, Calendar, Filter } from "lucide-react";
 import { useState } from "react";
 
-export function SpendingAnalytics({ stats, isLoading }) {
+export function SpendingAnalytics({ stats = {}, isLoading = false }) {
   const [timeRange, setTimeRange] = useState("month");
   const [category, setCategory] = useState("all");
+
+  // Destructure stats with default values
+  const {
+    totalSpent = 0,
+    totalBids = 0,
+    pastBids = [],
+    activeBids = []
+  } = stats;
 
   // Mock data for spending chart
   const spendingData = {
@@ -19,113 +29,108 @@ export function SpendingAnalytics({ stats, isLoading }) {
   const spendingStats = [
     {
       title: "Total Spent",
-      value: `$${stats.totalSpent.toFixed(2)}`,
+      value: `$${totalSpent.toFixed(2)}`,
       change: "+15%",
       icon: <DollarSign className="h-5 w-5 text-green-400" />,
       color: "from-green-500/20 to-green-600/20"
     },
     {
       title: "Average Per Request",
-      value: `$${(stats.totalSpent / (stats.totalBids || 1)).toFixed(2)}`,
+      value: `$${(totalSpent / (totalBids || 1)).toFixed(2)}`,
       change: "+8%",
       icon: <TrendingUp className="h-5 w-5 text-blue-400" />,
       color: "from-blue-500/20 to-blue-600/20"
     }
   ];
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(2)].map((_, i) => (
+            <div 
+              key={i}
+              className="h-32 bg-gray-800/50 animate-pulse rounded-xl border border-gray-700/50"
+            />
+          ))}
+        </div>
+        <div className="h-64 bg-gray-800/50 animate-pulse rounded-xl border border-gray-700/50" />
+        <div className="h-96 bg-gray-800/50 animate-pulse rounded-xl border border-gray-700/50" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200">
-            Spending Analytics
-          </h1>
-          <p className="text-gray-400">Track your song request spending</p>
-        </div>
-        
-        {/* Filters */}
-        <div className="flex gap-3">
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300"
-          >
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="year">This Year</option>
-            <option value="all">All Time</option>
-          </select>
-        </div>
-      </div>
-
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {spendingStats.map((stat, index) => (
           <motion.div
-            key={index}
+            key={stat.title}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`p-6 rounded-xl border border-gray-800 bg-gradient-to-br ${stat.color}`}
+            className={`
+              relative p-6 rounded-xl border border-gray-800/50
+              bg-gradient-to-br ${stat.color}
+            `}
           >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray-400">{stat.title}</p>
-                <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
-                <div className="flex items-center mt-2 text-sm text-green-400">
-                  <TrendingUp className="h-4 w-4 mr-1" />
-                  {stat.change} vs last period
-                </div>
-              </div>
-              <div className="p-3 bg-gray-900/30 rounded-lg">
+            <div className="flex justify-between items-start mb-4">
+              <span className="p-2 rounded-lg bg-gray-900/30">
                 {stat.icon}
-              </div>
+              </span>
+            </div>
+            <p className="text-sm text-gray-400">{stat.title}</p>
+            <div className="flex items-end gap-2">
+              <p className="text-2xl font-bold">{stat.value}</p>
+              <span className="text-sm text-green-400">{stat.change}</span>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Spending History Table */}
+      {/* Recent Transactions Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gray-800/50 rounded-xl border border-gray-700"
+        className="bg-gray-900/50 rounded-xl border border-gray-800/50 overflow-hidden"
       >
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="font-semibold">Recent Transactions</h2>
+        <div className="p-4 border-b border-gray-800/50">
+          <h3 className="text-lg font-semibold">Recent Transactions</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="text-left text-gray-400 text-sm border-b border-gray-700/50">
-                <th className="p-4 font-medium">Date</th>
-                <th className="p-4 font-medium">Song</th>
-                <th className="p-4 font-medium">DJ</th>
-                <th className="p-4 font-medium">Amount</th>
-                <th className="p-4 font-medium">Status</th>
+            <thead className="bg-gray-800/30">
+              <tr>
+                <th className="p-4 text-left text-sm font-medium text-gray-400">Date</th>
+                <th className="p-4 text-left text-sm font-medium text-gray-400">Song</th>
+                <th className="p-4 text-left text-sm font-medium text-gray-400">DJ</th>
+                <th className="p-4 text-left text-sm font-medium text-gray-400">Amount</th>
+                <th className="p-4 text-left text-sm font-medium text-gray-400">Status</th>
               </tr>
             </thead>
             <tbody>
-              {stats.pastBids.slice(0, 5).map((transaction, index) => (
-                <tr key={index} className="border-b border-gray-800/50 hover:bg-gray-700/10">
+              {pastBids.slice(0, 5).map((transaction, index) => (
+                <tr key={transaction.id || index} className="border-b border-gray-800/50 hover:bg-gray-700/10">
                   <td className="p-4 text-gray-300">
                     {new Date(transaction.createdAt).toLocaleDateString()}
                   </td>
                   <td className="p-4">
                     <div>
-                      <p className="font-medium">{transaction.song.title}</p>
-                      <p className="text-sm text-gray-400">{transaction.song.artist}</p>
+                      <p className="font-medium">{transaction.song?.title || 'Unknown Song'}</p>
+                      <p className="text-sm text-gray-400">{transaction.song?.artist || 'Unknown Artist'}</p>
                     </div>
                   </td>
-                  <td className="p-4 text-gray-300">{transaction.djName}</td>
-                  <td className="p-4 font-medium">${transaction.amount.toFixed(2)}</td>
+                  <td className="p-4 text-gray-300">{transaction.djName || 'Unknown DJ'}</td>
+                  <td className="p-4 font-medium">${(transaction.amount || 0).toFixed(2)}</td>
                   <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
+                    <span className={`
+                      inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
                       ${transaction.status === 'COMPLETED' ? 'bg-green-500/20 text-green-300' :
                         transaction.status === 'REJECTED' ? 'bg-red-500/20 text-red-300' :
-                        'bg-gray-500/20 text-gray-300'}`}>
-                      {transaction.status.toLowerCase()}
+                        'bg-gray-500/20 text-gray-300'}
+                    `}>
+                      {(transaction.status || 'pending').toLowerCase()}
                     </span>
                   </td>
                 </tr>

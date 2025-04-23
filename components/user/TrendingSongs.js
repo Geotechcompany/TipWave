@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Music, TrendingUp, Fire, Clock } from "lucide-react";
+import { TrendingUp, Music } from "lucide-react";
+import { Flame as Fire } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { DEFAULT_ALBUM_ART } from '@/utils/constants';

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Bell, Moon, Globe, Lock, CreditCard, User, Save, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
 export function SettingsPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -27,13 +27,14 @@ export function SettingsPanel() {
 
   useEffect(() => {
     fetchSettings();
-  }, [user?.id]);
+  }, [session?.user?.id]);
 
   const fetchSettings = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
-      const response = await fetch(`/api/dj/${user.id}/settings`);
+      setIsLoading(true);
+      const response = await fetch(`/api/dj/${session.user.id}/settings`);
       if (!response.ok) throw new Error('Failed to fetch settings');
       
       const data = await response.json();
@@ -49,7 +50,7 @@ export function SettingsPanel() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/dj/${user?.id}/settings`, {
+      const response = await fetch(`/api/dj/${session?.user?.id}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -75,17 +76,16 @@ export function SettingsPanel() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="space-y-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="w-full max-w-4xl mx-auto"
     >
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Settings</h1>
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 px-4 sm:px-0">
+        <h1 className="text-2xl font-bold mb-4 sm:mb-0">Settings</h1>
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center disabled:opacity-50"
+          className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors duration-200 disabled:opacity-50"
         >
           {isSaving ? (
             <>
@@ -101,20 +101,20 @@ export function SettingsPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-blue-500/20 text-blue-500 rounded-lg">
-              <Bell className="h-5 w-5" />
+      <div className="space-y-6 px-4 sm:px-0">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-5 border border-gray-700/30">
+          <div className="flex items-center mb-4">
+            <div className="bg-indigo-900/50 p-2 rounded-lg mr-3">
+              <Bell className="h-5 w-5 text-indigo-400" />
             </div>
-            <h2 className="text-lg font-medium">Notifications</h2>
+            <h2 className="text-xl font-semibold">Notifications</h2>
           </div>
           
           <div className="space-y-4">
             {Object.entries(settings.notifications).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between">
                 <label className="text-sm font-medium capitalize">
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                  {key === 'songRequests' ? 'Song Requests' : key}
                 </label>
                 <button
                   onClick={() => setSettings({
@@ -127,7 +127,9 @@ export function SettingsPanel() {
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     value ? 'bg-blue-600' : 'bg-gray-700'
                   }`}
+                  aria-pressed={value}
                 >
+                  <span className="sr-only">{key} notifications</span>
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                       value ? 'translate-x-6' : 'translate-x-1'
@@ -139,17 +141,17 @@ export function SettingsPanel() {
           </div>
         </div>
 
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-purple-500/20 text-purple-500 rounded-lg">
-              <Lock className="h-5 w-5" />
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-5 border border-gray-700/30">
+          <div className="flex items-center mb-4">
+            <div className="bg-purple-900/50 p-2 rounded-lg mr-3">
+              <Lock className="h-5 w-5 text-purple-400" />
             </div>
-            <h2 className="text-lg font-medium">Privacy</h2>
+            <h2 className="text-xl font-semibold">Privacy</h2>
           </div>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Profile Visibility</label>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+              <label className="text-sm font-medium mb-2 sm:mb-0">Profile Visibility</label>
               <select
                 value={settings.privacy.profileVisibility}
                 onChange={(e) => setSettings({
@@ -159,7 +161,7 @@ export function SettingsPanel() {
                     profileVisibility: e.target.value
                   }
                 })}
-                className="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                className="px-3 py-2 bg-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none w-full sm:w-auto"
               >
                 <option value="public">Public</option>
                 <option value="private">Private</option>
@@ -180,7 +182,9 @@ export function SettingsPanel() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   settings.privacy.showEarnings ? 'bg-blue-600' : 'bg-gray-700'
                 }`}
+                aria-pressed={settings.privacy.showEarnings}
               >
+                <span className="sr-only">Show earnings</span>
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     settings.privacy.showEarnings ? 'translate-x-6' : 'translate-x-1'

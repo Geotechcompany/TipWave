@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Clock, Users, ChevronRight, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventDetailsModal } from "./EventDetailsModal";
 
 export function EventsPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [view, setView] = useState('upcoming'); // upcoming, past, all
@@ -17,20 +17,21 @@ export function EventsPanel() {
 
   useEffect(() => {
     fetchEvents();
-  }, [user?.id, view]);
+  }, [session?.user?.id, view]);
 
   const fetchEvents = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/dj/${user.id}/events?view=${view}`);
+      const response = await fetch(`/api/dj/${session.user.id}/events?view=${view}`);
       if (!response.ok) throw new Error('Failed to fetch events');
       const data = await response.json();
-      setEvents(data.events);
+      setEvents(data.events || []);
     } catch (error) {
       console.error('Error fetching events:', error);
       toast.error('Failed to load events');
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +78,7 @@ export function EventsPanel() {
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
-        ) : events.length === 0 ? (
+        ) : events?.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-300 mb-2">No events found</h3>
@@ -87,7 +88,7 @@ export function EventsPanel() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {events.map((event) => (
               <EventCard 
-                key={event.id} 
+                key={event.id || index}
                 event={event} 
                 onViewDetails={() => handleViewDetails(event)}
               />

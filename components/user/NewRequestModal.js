@@ -4,8 +4,9 @@ import { X, Music, Search, DollarSign, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { searchTracksWithDebounce } from "@/lib/spotify";
 import useDebounce from "@/hooks/useDebounce";
+import toast from "react-hot-toast";
 
-export function NewRequestModal({ isOpen, onClose, onSubmit, availableDJs }) {
+export function NewRequestModal({ isOpen, onClose, onSubmit }) {
   const [songSearch, setSongSearch] = useState("");
   const [amount, setAmount] = useState(5);
   const [message, setMessage] = useState("");
@@ -16,6 +17,43 @@ export function NewRequestModal({ isOpen, onClose, onSubmit, availableDJs }) {
   const [error, setError] = useState(null);
   
   const debouncedSearch = useDebounce(songSearch, 500);
+
+  // New state variables for DJ loading
+  const [availableDJs, setAvailableDJs] = useState([]);
+  const [isDJsLoading, setIsDJsLoading] = useState(true);
+  const [djsError, setDJsError] = useState(null);
+
+  // Add isSubmitting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch DJs with role "DJ" on component mount
+  useEffect(() => {
+    async function fetchDJs() {
+      setIsDJsLoading(true);
+      setDJsError(null);
+      
+      try {
+        const response = await fetch('/api/djs');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch DJs');
+        }
+        
+        const data = await response.json();
+        setAvailableDJs(data.djs);
+      } catch (error) {
+        console.error('Error fetching DJs:', error);
+        setDJsError('Could not load DJs. Please try again.');
+        toast.error('Failed to load DJs');
+      } finally {
+        setIsDJsLoading(false);
+      }
+    }
+    
+    if (isOpen) {
+      fetchDJs();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const searchSpotify = async () => {
@@ -42,17 +80,40 @@ export function NewRequestModal({ isOpen, onClose, onSubmit, availableDJs }) {
     searchSpotify();
   }, [debouncedSearch]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedTrack || !selectedDJ) return;
     
-    onSubmit({
-      track: selectedTrack,
-      djId: selectedDJ,
-      amount,
-      message
-    });
-    onClose();
+    if (!selectedTrack || !selectedDJ) {
+      return; // Button should be disabled already, but just in case
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare the request data
+      const requestData = {
+        selectedTrack,
+        djId: selectedDJ,
+        amount,
+        message
+      };
+      
+      // Call the onSubmit prop function with the request data
+      await onSubmit(requestData);
+      
+      // Reset form after successful submission
+      setSelectedTrack(null);
+      setSongSearch('');
+      setMessage('');
+      setAmount(5);
+      
+      // Success message handled by the parent component
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      toast.error('Failed to submit song request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -87,19 +148,36 @@ export function NewRequestModal({ isOpen, onClose, onSubmit, availableDJs }) {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Select DJ
                 </label>
-                <select
-                  value={selectedDJ}
-                  onChange={(e) => setSelectedDJ(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Choose a DJ</option>
-                  {availableDJs?.map(dj => (
-                    <option key={dj._id} value={dj._id}>
-                      {dj.name} - {dj.venue} {dj.rating && `(${dj.rating}⭐)`}
-                    </option>
-                  ))}
-                </select>
+                {isDJsLoading ? (
+                  <div className="flex items-center justify-center h-10 bg-gray-800 rounded-lg">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  </div>
+                ) : djsError ? (
+                  <div className="p-2 bg-red-900/20 border border-red-800 rounded-lg text-red-400 text-sm">
+                    {djsError}
+                    <button 
+                      type="button"
+                      onClick={() => fetchDJs()}
+                      className="ml-2 underline hover:text-red-300"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedDJ}
+                    onChange={(e) => setSelectedDJ(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Choose a DJ</option>
+                    {availableDJs.map(dj => (
+                      <option key={dj._id} value={dj._id}>
+                        {dj.name}{dj.venueName ? ` - ${dj.venueName}` : ''}{dj.rating ? ` (${dj.rating}⭐)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -236,10 +314,17 @@ export function NewRequestModal({ isOpen, onClose, onSubmit, availableDJs }) {
 
               <button
                 type="submit"
-                disabled={!selectedTrack || !selectedDJ}
+                disabled={!selectedTrack || !selectedDJ || isSubmitting}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors duration-200"
               >
-                Submit Request
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Submitting...
+                  </span>
+                ) : (
+                  "Submit Request"
+                )}
               </button>
             </form>
           </motion.div>

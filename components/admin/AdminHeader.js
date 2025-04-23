@@ -21,12 +21,9 @@ export default function AdminHeader({
   setActiveTab
 }) {
   return (
-    <header className="fixed top-0 left-0 right-0 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 z-50">
+    <header className="fixed top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 z-50">
       <div className="flex items-center justify-between px-6 h-16">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold">Admin Dashboard</h1>
-        </div>
-        
+        <h1 className="text-xl font-semibold text-white">Admin Dashboard</h1>
         <div className="flex items-center space-x-4">
           {/* Search Bar */}
           <div className="hidden md:flex items-center bg-gray-900/50 rounded-lg px-3 py-1.5">

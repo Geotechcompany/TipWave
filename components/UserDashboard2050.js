@@ -1,7 +1,9 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
+import Image from 'next/image';
 import { 
   LayoutDashboard, Music, Clock, DollarSign, 
   TrendingUp, Zap, Share2, ChevronRight, 
@@ -9,7 +11,8 @@ import {
   ChevronDown, Search, Maximize, BarChart2,
   PlusCircle, UserCheck, History, PartyPopper,
   Info, User, Shield, Sun, Moon, Globe, Save,
-  CreditCard, Volume2, VolumeX, Monitor, Menu
+  CreditCard, Volume2, VolumeX, Monitor, Menu,
+  LogOut
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { MyRequests } from "./user/MyRequests";
@@ -26,22 +29,21 @@ import { ActivityTab } from './user/ActivityTab';
 import { EventsTab } from './user/EventsTab';
 import { SettingsPanel } from './user/SettingsPanel';
 import { DEFAULT_ALBUM_ART } from '@/utils/constants';
-import { useRouter } from "next/router";
 import { MobileSidebar } from "./user/MobileSidebar";
+import { useSession, signOut } from 'next-auth/react';
+import { AppLoader } from './AppLoader';
+import { formatDistanceToNow } from 'date-fns';
 
-export default function UserDashboard2050() {
-  const { user } = useUser();
-  const [stats, setStats] = useState({
-    totalBids: 0,
-    wonBids: 0,
-    totalSpent: 0,
-    activeBids: [],
-    pastBids: [],
-    trendingSongs: [],
-    liveDJs: [],
-    sharedPlaylists: []
-  });
+export default function UserDashboard() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [userStats, setUserStats] = useState({
+    totalSpent: 0,
+    songsRequested: 0,
+    favoriteDJs: [],
+    tipsThisMonth: 0
+  });
   const [selectedView, setSelectedView] = useState("overview");
   const [showNotifications, setShowNotifications] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
@@ -63,99 +65,179 @@ export default function UserDashboard2050() {
     privacyMode: "balanced"
   });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
-  const router = useRouter();
+  const [activeRequests, setActiveRequests] = useState([]);
 
   useEffect(() => {
-    const initializeDashboard = async () => {
+    if (status === "unauthenticated") {
+      router.push('/auth/user');
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([
-          fetchUserStats(),
-          fetchAvailableDJs(),
-          fetchRecentActivity(),
-          fetchUpcomingEvents(),
-          fetchNotifications()
-        ]);
+        const response = await fetch('/api/user/stats');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user stats');
+        }
+        
+        const data = await response.json();
+        setUserStats(data);
+        
+        // Also fetch active requests with specific status filter
+        const requestsResponse = await fetch('/api/user/requests?status=pending,accepted');
+        
+        if (!requestsResponse.ok) {
+          throw new Error('Failed to fetch requests');
+        }
+        
+        const requestsData = await requestsResponse.json();
+        console.log('Active requests:', requestsData.requests); // Debug log
+        
+        // Make sure we're properly setting the active requests
+        if (Array.isArray(requestsData.requests)) {
+          setActiveRequests(requestsData.requests);
+        } else {
+          console.error('Expected requests array but got:', requestsData);
+          setActiveRequests([]);
+        }
+        
+        // Fetch recent activity and upcoming events
+        fetchRecentActivity();
+        fetchUpcomingEvents();
       } catch (error) {
-        console.error('Error initializing dashboard:', error);
+        console.error('Error fetching user data:', error);
+        toast.error('Could not load your dashboard data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    initializeDashboard();
-  }, []);
-
-  const fetchUserStats = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/user/stats");
-      if (!response.ok) {
-        throw new Error("Failed to fetch user stats");
-      }
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error("Error fetching user stats:", error);
-      toast.error("Failed to load your dashboard data");
-    } finally {
-      setIsLoading(false);
+    if (session?.user) {
+      fetchUserStats();
     }
-  };
+  }, [session]);
 
-  const fetchAvailableDJs = async () => {
-    try {
-      const response = await fetch('/api/djs/available');
-      if (!response.ok) {
-        throw new Error('Failed to fetch DJs');
-      }
-      const data = await response.json();
-      setAvailableDJs(data);
-    } catch (error) {
-      console.error('Error fetching DJs:', error);
-      toast.error('Failed to load available DJs');
-    }
-  };
-
+  // Fix the fetchRecentActivity function to better handle errors
   const fetchRecentActivity = async () => {
     try {
-      const response = await fetch('/api/user/recent-activity');
-      if (!response.ok) throw new Error('Failed to fetch activity');
+      const response = await fetch('/api/user/activity');
+      if (!response.ok) {
+        console.warn('Activity endpoint returned status:', response.status);
+        setRecentActivity([]); // Set empty array instead of undefined
+        return;
+      }
+      
       const data = await response.json();
-      setRecentActivity(data || []);
+      setRecentActivity(Array.isArray(data.activities) ? data.activities : []);
     } catch (error) {
-      console.error('Error fetching recent activity:', error);
-      toast.error('Failed to load recent activity');
+      console.error('Error fetching activity:', error);
+      // Instead of failing, just set an empty array
       setRecentActivity([]);
     }
   };
 
   const fetchUpcomingEvents = async () => {
     try {
-      const response = await fetch('/api/events/upcoming');
-      if (!response.ok) throw new Error('Failed to fetch events');
+      const response = await fetch('/api/user/events');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch upcoming events');
+      }
+      
       const data = await response.json();
-      setUpcomingEvents(data || []);
+      console.log('Upcoming events:', data.events); // Debug log
+      
+      if (Array.isArray(data.events)) {
+        setUpcomingEvents(data.events);
+      } else {
+        console.error('Expected events array but got:', data);
+        setUpcomingEvents([]);
+      }
     } catch (error) {
       console.error('Error fetching upcoming events:', error);
-      toast.error('Failed to load upcoming events');
+      toast.error('Could not load upcoming events');
       setUpcomingEvents([]);
     }
   };
 
-  const fetchNotifications = async () => {
+  if (status === "loading" || isLoading) {
+    return <AppLoader />;
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  const handleViewAllActivity = () => {
+    router.push('/activity');
+  };
+
+  const handleViewCalendar = () => {
+    router.push('/events');
+  };
+
+  const handleBrowseEvents = () => {
+    router.push('/events/browse');
+  };
+
+  const handleNotificationClick = async (notificationId) => {
     try {
-      const response = await fetch('/api/user/notifications');
-      if (!response.ok) throw new Error('Failed to fetch notifications');
-      const data = await response.json();
-      setNotifications(data || []);
-      setNotificationCount(data.length);
+      const response = await fetch(`/api/user/notifications/${notificationId}/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) throw new Error('Failed to mark notification as read');
+      
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
+      setNotificationCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-      setNotifications([]);
-      setNotificationCount(0);
+      console.error('Error marking notification as read:', error);
+      toast.error('Failed to update notification');
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const response = await fetch('/api/user/notifications/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) throw new Error('Failed to mark notifications as read');
+      
+      fetchNotifications();
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+      toast.error('Failed to update notifications');
+    }
+  };
+
+  const handleChange = (setting, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [setting]: value
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+
+      if (!response.ok) throw new Error('Failed to save settings');
+      
+      toast.success("Settings saved successfully");
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
     }
   };
 
@@ -173,141 +255,24 @@ export default function UserDashboard2050() {
         throw new Error('Failed to create request');
       }
 
-      // Refresh the stats/data after successful request
-      if (typeof onRequestCreated === 'function') {
-        onRequestCreated();
-      }
-      
       toast.success('Song request submitted successfully!');
+      setIsNewRequestModalOpen(false);
+      // Refresh the stats/data after successful request
+      fetchUserStats();
     } catch (error) {
       console.error('Error creating request:', error);
       toast.error('Failed to submit request. Please try again.');
     }
   };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'PLAYED':
-        return <Music className="h-4 w-4 text-blue-400" />;
-      case 'REQUEST':
-        return <PlusCircle className="h-4 w-4 text-green-400" />;
-      case 'RECOMMENDATION':
-        return <UserCheck className="h-4 w-4 text-purple-400" />;
-      default:
-        return <Music className="h-4 w-4 text-gray-400" />;
-    }
-  };
-
-  const getActivityBackground = (type) => {
-    switch (type) {
-      case 'PLAYED':
-        return 'bg-blue-500/20';
-      case 'REQUEST':
-        return 'bg-green-500/20';
-      case 'RECOMMENDATION':
-        return 'bg-purple-500/20';
-      default:
-        return 'bg-gray-500/20';
-    }
-  };
-
-  const formatTimeAgo = (timestamp) => {
-    if (!timestamp) return 'just now';
-    
-    const date = new Date(timestamp);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-    
-    let interval = Math.floor(seconds / 86400);
-    if (interval >= 1) return `${interval}d ago`;
-    
-    interval = Math.floor(seconds / 3600);
-    if (interval >= 1) return `${interval}h ago`;
-    
-    interval = Math.floor(seconds / 60);
-    if (interval >= 1) return `${interval}m ago`;
-    
-    return 'just now';
-  };
-
-  // Navigation handlers for buttons
-  const handleViewAllActivity = () => {
-    router.push('/activity');
-  };
-
-  const handleViewCalendar = () => {
-    router.push('/events');
-  };
-
-  const handleBrowseEvents = () => {
-    router.push('/events/browse');
-  };
-
-  const markAllNotificationsAsRead = async () => {
+  const handleLogout = async () => {
     try {
-      const response = await fetch('/api/user/notifications/mark-read', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) throw new Error('Failed to mark notifications as read');
-      
-      // Refresh notifications after marking as read
-      fetchNotifications();
-      toast.success('All notifications marked as read');
+      await signOut({ redirect: false });
+      toast.success('Logged out successfully');
+      router.push('/auth/user');
     } catch (error) {
-      console.error('Error marking notifications as read:', error);
-      toast.error('Failed to update notifications');
-    }
-  };
-
-  const handleNotificationClick = async (notificationId) => {
-    try {
-      const response = await fetch(`/api/user/notifications/${notificationId}/mark-read`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) throw new Error('Failed to mark notification as read');
-      
-      // Remove this notification from the local state
-      setNotifications(prev => prev.filter(n => n._id !== notificationId));
-      setNotificationCount(prev => Math.max(0, prev - 1));
-      
-      // Here you could also add navigation logic based on notification type
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast.error('Failed to update notification');
-    }
-  };
-
-  const handleChange = (setting, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
-  };
-
-  const handleSave = async () => {
-    try {
-      // In a real implementation, you would save to an API
-      // const response = await fetch('/api/user/settings', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(settings),
-      // });
-      // if (!response.ok) throw new Error('Failed to save settings');
-      
-      toast.success("Settings saved successfully");
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      console.error('Logout error:', error);
+      toast.error('Failed to logout');
     }
   };
 
@@ -344,9 +309,9 @@ export default function UserDashboard2050() {
               transition={{ type: "spring", stiffness: 100 }}
               className="relative"
             >
-              {user?.imageUrl ? (
+              {session.user.image ? (
                 <Image 
-                  src={user.imageUrl} 
+                  src={session.user.image} 
                   alt="Profile" 
                   width={50} 
                   height={50} 
@@ -355,7 +320,7 @@ export default function UserDashboard2050() {
               ) : (
                 <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
                   <span className="text-lg font-bold">
-                    {user?.firstName?.charAt(0) || user?.username?.charAt(0) || "U"}
+                    {session.user.name?.charAt(0) || "U"}
                   </span>
                 </div>
               )}
@@ -367,7 +332,7 @@ export default function UserDashboard2050() {
                 animate={{ x: 0, opacity: 1 }}
                 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200"
               >
-                Welcome, {user?.firstName || user?.username || "User"}
+                Welcome, {session.user.name}
               </motion.h1>
               <motion.p 
                 initial={{ x: -20, opacity: 0 }}
@@ -541,6 +506,15 @@ export default function UserDashboard2050() {
                     </button>
                   ))}
                 </div>
+                <div className="mt-6">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+                  >
+                    <LogOut className="h-5 w-5 text-red-500" />
+                    <span>Logout</span>
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -550,7 +524,7 @@ export default function UserDashboard2050() {
             {selectedView === "overview" ? (
               <>
                 {/* Overview content */}
-                <UserStats stats={stats} isLoading={isLoading} />
+                <UserStats stats={userStats} isLoading={isLoading} />
                 
                 {/* Active Requests */}
                 <motion.div
@@ -575,77 +549,93 @@ export default function UserDashboard2050() {
                     </div>
                     
                     {isLoading ? (
-                      <div className="flex justify-center items-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                      <div className="space-y-4">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700 animate-pulse">
+                            <div className="h-16 w-16 bg-gray-700 rounded-md"></div>
+                            <div className="flex-1">
+                              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                              <div className="h-3 bg-gray-700 rounded w-1/2 mb-3"></div>
+                              <div className="flex gap-2">
+                                <div className="h-4 bg-gray-700 rounded w-12"></div>
+                                <div className="h-4 bg-gray-700 rounded w-20"></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ) : stats.activeBids && stats.activeBids.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="text-left text-gray-400 text-sm border-b border-gray-700/50">
-                              <th className="pb-3 font-medium">Song</th>
-                              <th className="pb-3 font-medium">Amount</th>
-                              <th className="pb-3 font-medium">Status</th>
-                              <th className="pb-3 font-medium">Date</th>
-                              <th className="pb-3 font-medium text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {stats.activeBids.map((bid, index) => (
-                              <tr key={index} className="border-b border-gray-800/50 hover:bg-gray-700/10 transition-colors duration-150">
-                                <td className="py-4">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
-                                      <Image 
-                                        src={bid.song.albumArt || DEFAULT_ALBUM_ART} 
-                                        alt={bid.song.title}
-                                        width={40}
-                                        height={40}
-                                        className="object-cover w-full h-full"
-                                        unoptimized={bid.song.albumArt?.startsWith('http')}
-                                      />
-                                    </div>
-                                    <div>
-                                      <p className="font-medium truncate max-w-xs">{bid.song.title}</p>
-                                      <p className="text-sm text-gray-400 truncate max-w-xs">{bid.song.artist}</p>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="py-4">
-                                  <span className="font-medium">${bid.amount.toFixed(2)}</span>
-                                </td>
-                                <td className="py-4">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                                    bid.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300' :
-                                    bid.status === 'ACCEPTED' ? 'bg-green-500/20 text-green-300' :
-                                    'bg-red-500/20 text-red-300'
-                                  }`}>
-                                    {bid.status.toLowerCase()}
-                                  </span>
-                                </td>
-                                <td className="py-4">
-                                  <span className="text-gray-400 text-sm">
-                                    {new Date(bid.createdAt).toLocaleDateString()}
-                                  </span>
-                                </td>
-                                <td className="py-4 text-right">
-                                  <button className="p-1.5 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors duration-200">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                    ) : activeRequests && activeRequests.length > 0 ? (
+                      <div className="space-y-4">
+                        {activeRequests.map((request) => (
+                          <motion.div
+                            key={request._id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:bg-gray-700/30 transition-colors"
+                          >
+                            {/* Album Art */}
+                            <div className="h-16 w-16 relative rounded-md overflow-hidden flex-shrink-0">
+                              <Image
+                                src={request.albumArt || DEFAULT_ALBUM_ART}
+                                alt={request.songTitle}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                            
+                            {/* Song Info */}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium truncate">{request.songTitle}</h3>
+                              <p className="text-sm text-gray-400 truncate">{request.songArtist}</p>
+                              <div className="flex items-center gap-4 mt-1">
+                                <span className="text-blue-400 text-sm">${request.amount}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                  request.status === 'pending' ? 'bg-yellow-900/30 text-yellow-300' :
+                                  request.status === 'accepted' ? 'bg-green-900/30 text-green-300' :
+                                  'bg-blue-900/30 text-blue-300'
+                                }`}>
+                                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Request Time & DJ */}
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm text-gray-400">
+                                {request.djName || 'Unknown DJ'}
+                              </p>
+                              <div className="flex items-center justify-end gap-1 text-xs text-gray-500 mt-1">
+                                <Clock className="h-3 w-3" />
+                                {request.createdAt && 
+                                  formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })
+                                }
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
                       </div>
                     ) : (
-                      <div className="py-12 text-center">
-                        <Music className="h-12 w-12 mx-auto text-gray-600 mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No active requests</h3>
-                        <p className="text-gray-400 text-sm mb-4">Make a request to get your favorite songs played</p>
-                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors duration-200">
-                          Make Your First Request
-                        </button>
+                      <div className="text-center py-10">
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex flex-col items-center"
+                        >
+                          <div className="w-16 h-16 bg-gray-800/50 rounded-full flex items-center justify-center mb-4">
+                            <Music className="h-8 w-8 text-gray-600" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-300 mb-2">No Active Requests</h3>
+                          <p className="text-gray-500 mb-6 max-w-sm">
+                            Ready to make your first song request? Click below to get started!
+                          </p>
+                          <button
+                            onClick={() => setIsNewRequestModalOpen(true)}
+                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 group"
+                          >
+                            <PlusCircle className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                            Make Your First Request
+                          </button>
+                        </motion.div>
                       </div>
                     )}
                   </div>
@@ -726,7 +716,7 @@ export default function UserDashboard2050() {
                               </div>
                               <div>
                                 <p className="font-medium text-sm">{event.title}</p>
-                                <p className="text-xs text-gray-400">{new Date(event.startDate).toLocaleDateString()}</p>
+                                <p className="text-xs text-gray-400">{new Date(event.startDate || event.date).toLocaleDateString()}</p>
                               </div>
                             </div>
                           ))}
@@ -754,43 +744,45 @@ export default function UserDashboard2050() {
               </>
             ) : selectedView === "requests" ? (
               <MyRequests
-                requests={stats.activeBids}
+                requests={activeRequests}
                 isLoading={isLoading}
               />
             ) : selectedView === "history" ? (
               <ActivityTab activities={recentActivity} />
             ) : selectedView === "spending" ? (
               <SpendingAnalytics
-                stats={stats}
+                stats={userStats}
                 isLoading={isLoading}
               />
             ) : selectedView === "analytics" ? (
               <BiddingAnalytics
-                stats={stats}
+                stats={userStats}
                 isLoading={isLoading}
               />
             ) : selectedView === "trending" ? (
               <TrendingSongs
-                stats={stats}
+                stats={userStats}
                 isLoading={isLoading}
               />
             ) : selectedView === "live" ? (
               <LiveDJs
-                stats={stats}
+                stats={userStats}
                 isLoading={isLoading}
               />
             ) : selectedView === "playlists" ? (
               <SharedPlaylists
                 stats={{
-                  sharedPlaylists: stats.sharedPlaylists?.map(playlist => ({
-                    id: playlist.id,
-                    name: playlist.name,
-                    creator: playlist.creator,
-                    coverImage: playlist.coverImage,
-                    songCount: playlist.songCount,
-                    followers: playlist.followers,
-                    likes: playlist.likes
-                  }))
+                  sharedPlaylists: Array.isArray(userStats.favoriteDJs) 
+                    ? userStats.favoriteDJs.map(playlist => ({
+                        id: playlist.id,
+                        name: playlist.name,
+                        creator: playlist.creator,
+                        coverImage: playlist.coverImage,
+                        songCount: playlist.songCount,
+                        followers: playlist.followers,
+                        likes: playlist.likes
+                      }))
+                    : []
                 }}
                 isLoading={isLoading}
               />
@@ -865,7 +857,7 @@ export default function UserDashboard2050() {
                               <label className="block text-sm font-medium text-gray-300 mb-1">Display Name</label>
                               <input 
                                 type="text" 
-                                defaultValue={user?.firstName + " " + user?.lastName}
+                                defaultValue={session.user.name}
                                 className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                               />
                             </div>
@@ -874,7 +866,7 @@ export default function UserDashboard2050() {
                               <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
                               <input 
                                 type="email" 
-                                defaultValue={user?.emailAddresses?.[0]?.emailAddress}
+                                defaultValue={session.user.email}
                                 className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                                 disabled
                               />
@@ -1085,7 +1077,20 @@ export default function UserDashboard2050() {
         setIsOpen={setIsMobileSidebarOpen} 
         selectedView={selectedView} 
         setSelectedView={setSelectedView} 
-      />
+      >
+        <button
+          onClick={handleLogout}
+          className="flex items-center w-full px-4 py-2 text-left text-red-500 hover:bg-gray-700 rounded-md"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm7 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm1 4a1 1 0 102 0V7a1 1 0 10-2 0v4z" clipRule="evenodd" />
+          </svg>
+          Logout
+        </button>
+      </MobileSidebar>
+      <div className="mt-4 px-4">
+   
+      </div>
     </div>
   );
 }

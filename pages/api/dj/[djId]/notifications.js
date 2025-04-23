@@ -1,9 +1,11 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
-  const { userId } = getAuth(req);
-  if (!userId) {
+  const session = await getServerSession(req, res, authOptions);
+  
+  if (!session) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -14,7 +16,7 @@ export default async function handler(req, res) {
     try {
       const notifications = await db.collection('notifications')
         .find({ 
-          djId: userId,
+          djId: session.user.id,
           read: { $ne: true } 
         })
         .sort({ createdAt: -1 })
@@ -23,7 +25,7 @@ export default async function handler(req, res) {
 
       const unreadCount = await db.collection('notifications')
         .countDocuments({ 
-          djId: userId, 
+          djId: session.user.id, 
           read: { $ne: true } 
         });
 
@@ -35,7 +37,7 @@ export default async function handler(req, res) {
   } else if (req.method === 'PATCH') {
     try {
       await db.collection('notifications').updateMany(
-        { djId: userId },
+        { djId: session.user.id },
         { $set: { read: true, updatedAt: new Date() } }
       );
 

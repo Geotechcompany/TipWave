@@ -2,22 +2,8 @@ import { motion } from "framer-motion";
 import { DollarSign } from "lucide-react";
 
 export default function AdminRevenueChart({ stats, isLoading }) {
-  // Early return for loading state
   if (isLoading) {
-    return (
-      <motion.div 
-        className="bg-gray-800/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden h-72"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="p-6 border-b border-gray-700">
-          <h3 className="font-semibold">Revenue Trends</h3>
-        </div>
-        <div className="p-6 h-48 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500" />
-        </div>
-      </motion.div>
-    );
+    return <div>Loading chart...</div>;
   }
 
   // Ensure revenueByDay exists and has data

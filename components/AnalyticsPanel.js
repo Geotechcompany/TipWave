@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { BarChart2, TrendingUp, Users, Music, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import {
   LineChart,
@@ -14,25 +14,48 @@ import {
 } from "recharts";
 
 export function AnalyticsPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [analytics, setAnalytics] = useState({
     requestTrends: [],
     popularSongs: [],
-    audienceStats: {},
+    audienceStats: {
+      totalRequests: 0,
+      totalRevenue: 0,
+      totalUsers: 0,
+      averageBid: 0,
+      requestsPerDay: 0,
+      uniqueRequesters: 0,
+      avgRequestValue: 0
+    },
     revenueData: []
   });
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState("month");
 
   const fetchAnalytics = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/dj/${user.id}/analytics?timeframe=${timeframe}`);
+      const response = await fetch(`/api/dj/${session.user.id}/analytics?timeframe=${timeframe}`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
       const data = await response.json();
-      setAnalytics(data);
+      
+      // Make sure all properties exist with proper defaults
+      setAnalytics({
+        requestTrends: data.requestTrends || [],
+        popularSongs: data.popularSongs || [],
+        audienceStats: {
+          totalRequests: data.audienceStats?.totalRequests || 0,
+          totalRevenue: data.audienceStats?.totalRevenue || 0, 
+          totalUsers: data.audienceStats?.totalUsers || 0,
+          averageBid: data.audienceStats?.averageBid || 0,
+          requestsPerDay: data.audienceStats?.requestsPerDay || 0,
+          uniqueRequesters: data.audienceStats?.uniqueRequesters || 0,
+          avgRequestValue: data.audienceStats?.avgRequestValue || 0
+        },
+        revenueData: data.revenueData || []
+      });
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast.error('Failed to load analytics data');
@@ -43,7 +66,7 @@ export function AnalyticsPanel() {
 
   useEffect(() => {
     fetchAnalytics();
-  }, [user?.id, timeframe]);
+  }, [session?.user?.id, timeframe]);
 
   return (
     <motion.div
@@ -75,17 +98,17 @@ export function AnalyticsPanel() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <StatCard
               title="Total Requests"
-              value={analytics.audienceStats.totalRequests || 0}
+              value={analytics.audienceStats?.totalRequests || 0}
               icon={Music}
             />
             <StatCard
               title="Unique Requesters"
-              value={analytics.audienceStats.uniqueRequesters || 0}
+              value={analytics.audienceStats?.uniqueRequesters || 0}
               icon={Users}
             />
             <StatCard
               title="Average Request Value"
-              value={`$${analytics.audienceStats.avgRequestValue?.toFixed(2) || '0.00'}`}
+              value={`$${analytics.audienceStats?.avgRequestValue?.toFixed(2) || '0.00'}`}
               icon={TrendingUp}
             />
           </div>
@@ -132,15 +155,19 @@ export function AnalyticsPanel() {
               <h3 className="text-lg font-medium">Most Requested Songs</h3>
             </div>
             <div className="divide-y divide-gray-700/50">
-              {analytics.popularSongs.map((song, index) => (
+              {analytics.popularSongs?.map((song, index) => (
                 <SongRow
-                  key={song._id}
+                  key={song._id || index}
                   rank={index + 1}
                   title={song.title}
+                  artist={song.artist}
                   requestCount={song.requestCount}
-                  totalRevenue={song.totalRevenue}
                 />
-              ))}
+              )) || (
+                <div className="text-center py-6 text-gray-400">
+                  No song data available
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -165,7 +192,7 @@ function StatCard({ title, value, icon: Icon }) {
   );
 }
 
-function SongRow({ rank, title, requestCount, totalRevenue }) {
+function SongRow({ rank, title, artist, requestCount }) {
   return (
     <div className="flex items-center justify-between p-4 hover:bg-gray-700/20">
       <div className="flex items-center space-x-4">
@@ -178,7 +205,7 @@ function SongRow({ rank, title, requestCount, totalRevenue }) {
         </div>
       </div>
       <div className="text-right">
-        <p className="font-medium text-green-400">${totalRevenue.toFixed(2)}</p>
+        <p className="font-medium text-green-400">${artist.totalRevenue.toFixed(2)}</p>
       </div>
     </div>
   );

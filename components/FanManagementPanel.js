@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, Search, Filter, MoreVertical, Mail, Ban, Star } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
 export function FanManagementPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [fans, setFans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -18,14 +18,14 @@ export function FanManagementPanel() {
 
   useEffect(() => {
     fetchFans();
-  }, [user?.id, filter]);
+  }, [session?.user?.id, filter]);
 
   const fetchFans = async () => {
-    if (!user?.id) return;
+    if (!session?.user?.id) return;
     
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/dj/${user.id}/fans?filter=${filter}`);
+      const response = await fetch(`/api/dj/${session.user.id}/fans?filter=${filter}`);
       if (!response.ok) throw new Error('Failed to fetch fans');
       const data = await response.json();
       setFans(data.fans);
@@ -40,7 +40,7 @@ export function FanManagementPanel() {
 
   const handleStatusChange = async (fanId, newStatus) => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/fans/${fanId}/status`, {
+      const response = await fetch(`/api/dj/${session.user.id}/fans/${fanId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

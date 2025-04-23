@@ -1,41 +1,41 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Music, DollarSign, Clock, User, Loader2 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
 export function RequestsPanel() {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      if (!user?.id) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/dj/${user.id}/requests?status=${activeTab}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch requests');
-        }
-        const data = await response.json();
-        setRequests(data);
-      } catch (error) {
-        console.error('Error fetching requests:', error);
-        toast.error('Failed to load requests');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (session?.user?.id) {
+      fetchRequests();
+    }
+  }, [session?.user?.id, activeTab]);
 
-    fetchRequests();
-  }, [user?.id, activeTab]);
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/dj/${session.user.id}/requests?status=${activeTab}`);
+      if (!response.ok) throw new Error('Failed to fetch requests');
+      
+      const data = await response.json();
+      setRequests(data.requests || []);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      toast.error('Failed to load requests');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAcceptRequest = async (requestId) => {
     try {
-      const response = await fetch(`/api/dj/${user.id}/requests/${requestId}/accept`, {
+      const response = await fetch(`/api/dj/${session.user.id}/requests/${requestId}/accept`, {
         method: 'POST',
       });
       
@@ -45,9 +45,9 @@ export function RequestsPanel() {
       
       toast.success('Request accepted successfully!');
       // Refresh the requests list
-      const updatedResponse = await fetch(`/api/dj/${user.id}/requests?status=${activeTab}`);
+      const updatedResponse = await fetch(`/api/dj/${session.user.id}/requests?status=${activeTab}`);
       const updatedData = await updatedResponse.json();
-      setRequests(updatedData);
+      setRequests(updatedData.requests || []);
     } catch (error) {
       console.error('Error accepting request:', error);
       toast.error('Failed to accept request');

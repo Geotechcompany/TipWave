@@ -2,50 +2,43 @@ import { motion } from "framer-motion";
 import { Users, DollarSign, Music } from "lucide-react";
 
 export default function AdminStats({ stats, isLoading, timeRange, setTimeRange }) {
+  if (isLoading) {
+    return <div>Loading stats...</div>;
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-      {isLoading ? (
-        Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50 animate-pulse h-32">
-            <div className="h-4 bg-gray-700 rounded w-1/3 mb-2"></div>
-            <div className="h-6 bg-gray-700 rounded w-1/2 mt-4"></div>
-          </div>
-        ))
-      ) : (
-        <>
-          <StatCard 
-            title="Total Users" 
-            value={stats.totalUsers.toLocaleString()} 
-            icon={<Users className="h-5 w-5" />}
-            color="bg-blue-500/20 text-blue-500"
-            change="+12%"
-          />
-          
-          <StatCard 
-            title="Total Revenue" 
-            value={`$${stats.totalRevenue.toLocaleString()}`} 
-            icon={<DollarSign className="h-5 w-5" />}
-            color="bg-green-500/20 text-green-500"
-            change="+24%"
-          />
-          
-          <StatCard 
-            title="Active DJs" 
-            value={stats.activeDJs.toLocaleString()} 
-            icon={<Music className="h-5 w-5" />}
-            color="bg-purple-500/20 text-purple-500"
-            change="+8%"
-          />
-          
-          <StatCard 
-            title="Total Songs" 
-            value={stats.totalSongs.toLocaleString()} 
-            icon={<Music className="h-5 w-5" />}
-            color="bg-amber-500/20 text-amber-500"
-            change="+15%"
-          />
-        </>
-      )}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatCard 
+        title="Total Users" 
+        value={stats.totalUsers.toLocaleString()} 
+        icon={<Users className="h-5 w-5" />}
+        color="bg-blue-500/20 text-blue-500"
+        change="+12%"
+      />
+      
+      <StatCard 
+        title="Total Revenue" 
+        value={`$${stats.totalRevenue.toLocaleString()}`} 
+        icon={<DollarSign className="h-5 w-5" />}
+        color="bg-green-500/20 text-green-500"
+        change="+24%"
+      />
+      
+      <StatCard 
+        title="Active DJs" 
+        value={stats.activeDJs.toLocaleString()} 
+        icon={<Music className="h-5 w-5" />}
+        color="bg-purple-500/20 text-purple-500"
+        change="+8%"
+      />
+      
+      <StatCard 
+        title="Total Songs" 
+        value={stats.totalSongs.toLocaleString()} 
+        icon={<Music className="h-5 w-5" />}
+        color="bg-amber-500/20 text-amber-500"
+        change="+15%"
+      />
     </div>
   );
 }
