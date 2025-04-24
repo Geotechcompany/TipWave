@@ -14,7 +14,7 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const debouncedSearch = useDebounce(songSearch, 500);
 
@@ -22,9 +22,6 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
   const [availableDJs, setAvailableDJs] = useState([]);
   const [isDJsLoading, setIsDJsLoading] = useState(true);
   const [djsError, setDJsError] = useState(null);
-
-  // Add isSubmitting state
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch DJs with role "DJ" on component mount
   useEffect(() => {
@@ -59,18 +56,16 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
     const searchSpotify = async () => {
       if (debouncedSearch.length < 2) {
         setSearchResults([]);
-        setError(null);
         return;
       }
       
       setIsSearching(true);
-      setError(null);
       
       try {
         const results = await searchTracksWithDebounce(debouncedSearch);
         setSearchResults(results);
       } catch (error) {
-        setError('Failed to search songs. Please try again.');
+        console.error('Failed to search songs:', error);
         setSearchResults([]);
       } finally {
         setIsSearching(false);
@@ -244,7 +239,9 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-[100px] text-center p-4">
                         <Search className="h-8 w-8 text-gray-600 mb-2" />
-                        <p className="text-sm text-gray-400">Start typing to search for songs</p>
+                        <p className="text-sm text-gray-400 mt-2">
+                          Not seeing your favorite song? Try searching by artist name - song title
+                        </p>
                         <p className="text-xs text-gray-500">Enter at least 2 characters</p>
                       </div>
                     )}

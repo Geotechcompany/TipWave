@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Loader2, Music, Headphones, AlertTriangle } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, Headphones, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 

@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../auth/[...nextauth]";
-import clientPromise from '@/lib/mongodb';
+// import clientPromise from '@/lib/mongodb';  // Remove if not using
 
 export default async function handler(req, res) {
   // Check authentication
@@ -11,6 +11,7 @@ export default async function handler(req, res) {
   }
 
   const { id } = req.query;
+  console.log(`Processing scheduled email ID: ${id}`);
 
   if (req.method === 'DELETE') {
     try {

@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BarChart2, TrendingUp, PieChart, Calendar, Filter, ArrowUpRight } from "lucide-react";
-import { useState } from "react";
+import { BarChart2, TrendingUp, PieChart } from "lucide-react";
+
 
 export function BiddingAnalytics({ stats = {}, isLoading = false }) {
-  const [timeRange, setTimeRange] = useState("month");
+  // Optional time filtering could be implemented later
+  // const [timeRange, setTimeRange] = useState("month");
 
   // Destructure stats with default values
   const {
@@ -43,6 +44,12 @@ export function BiddingAnalytics({ stats = {}, isLoading = false }) {
     PENDING: activeBids?.filter(bid => bid.status === 'PENDING')?.length || 0,
     REJECTED: pastBids?.filter(bid => bid.status === 'REJECTED')?.length || 0
   };
+
+  // Calculate total bids for percentage calculation
+  const totalDistributionBids = 
+    bidDistribution.COMPLETED + 
+    bidDistribution.PENDING + 
+    bidDistribution.REJECTED;
 
   // Calculate DJ success rates
   const djStats = pastBids?.reduce((acc, bid) => {
@@ -85,12 +92,12 @@ export function BiddingAnalytics({ stats = {}, isLoading = false }) {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {analyticsStats.map((stat, index) => (
+        {analyticsStats.map((stat, i) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            transition={{ delay: i * 0.1 }}
             className={`
               relative p-6 rounded-xl border border-gray-800/50
               bg-gradient-to-br ${stat.color}
@@ -110,6 +117,84 @@ export function BiddingAnalytics({ stats = {}, isLoading = false }) {
         ))}
       </div>
 
+      {/* Bid Distribution Visualization */}
+      {totalDistributionBids > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gray-800/50 rounded-xl border border-gray-700 p-6"
+        >
+          <h3 className="font-semibold mb-4 flex items-center">
+            <PieChart className="h-5 w-5 mr-2 text-purple-400" />
+            Bid Status Distribution
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-gray-700/30 rounded-lg p-4 flex flex-col items-center">
+              <span className="text-2xl font-bold text-green-400">{bidDistribution.COMPLETED}</span>
+              <span className="text-sm text-gray-400">Completed</span>
+              <span className="text-xs text-gray-500 mt-1">
+                {totalDistributionBids ? 
+                  `${((bidDistribution.COMPLETED / totalDistributionBids) * 100).toFixed(1)}%` 
+                  : '0%'}
+              </span>
+            </div>
+            
+            <div className="bg-gray-700/30 rounded-lg p-4 flex flex-col items-center">
+              <span className="text-2xl font-bold text-yellow-400">{bidDistribution.PENDING}</span>
+              <span className="text-sm text-gray-400">Pending</span>
+              <span className="text-xs text-gray-500 mt-1">
+                {totalDistributionBids ? 
+                  `${((bidDistribution.PENDING / totalDistributionBids) * 100).toFixed(1)}%` 
+                  : '0%'}
+              </span>
+            </div>
+            
+            <div className="bg-gray-700/30 rounded-lg p-4 flex flex-col items-center">
+              <span className="text-2xl font-bold text-red-400">{bidDistribution.REJECTED}</span>
+              <span className="text-sm text-gray-400">Rejected</span>
+              <span className="text-xs text-gray-500 mt-1">
+                {totalDistributionBids ? 
+                  `${((bidDistribution.REJECTED / totalDistributionBids) * 100).toFixed(1)}%` 
+                  : '0%'}
+              </span>
+            </div>
+          </div>
+          
+          {/* Visual bar representation */}
+          <div className="h-8 flex rounded-md overflow-hidden">
+            {bidDistribution.COMPLETED > 0 && (
+              <div 
+                className="bg-green-500/70 h-full" 
+                style={{ 
+                  width: `${(bidDistribution.COMPLETED / totalDistributionBids) * 100}%` 
+                }}
+                title={`${bidDistribution.COMPLETED} Completed Bids`}
+              />
+            )}
+            {bidDistribution.PENDING > 0 && (
+              <div 
+                className="bg-yellow-500/70 h-full" 
+                style={{ 
+                  width: `${(bidDistribution.PENDING / totalDistributionBids) * 100}%` 
+                }}
+                title={`${bidDistribution.PENDING} Pending Bids`}
+              />
+            )}
+            {bidDistribution.REJECTED > 0 && (
+              <div 
+                className="bg-red-500/70 h-full" 
+                style={{ 
+                  width: `${(bidDistribution.REJECTED / totalDistributionBids) * 100}%` 
+                }}
+                title={`${bidDistribution.REJECTED} Rejected Bids`}
+              />
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Top DJs Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -118,17 +203,31 @@ export function BiddingAnalytics({ stats = {}, isLoading = false }) {
       >
         <h3 className="font-semibold mb-4">Top DJs by Success Rate</h3>
         <div className="space-y-4">
-          {topDJs.map((dj, index) => (
-            <div key={dj.name} className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{dj.name}</p>
-                <p className="text-sm text-gray-400">{dj.won} won of {dj.total} requests</p>
+          {topDJs.length > 0 ? (
+            topDJs.map((dj) => (
+              <div key={dj.name} className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{dj.name}</p>
+                  <p className="text-sm text-gray-400">{dj.won} won of {dj.total} requests</p>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-32 bg-gray-700 rounded-full h-2 mr-3">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full" 
+                      style={{ width: `${(dj.won / dj.total) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-green-400">
+                    {((dj.won / (dj.total || 1)) * 100).toFixed(1)}%
+                  </span>
+                </div>
               </div>
-              <span className="text-green-400">
-                {((dj.won / (dj.total || 1)) * 100).toFixed(1)}%
-              </span>
+            ))
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              No DJ history available yet
             </div>
-          ))}
+          )}
         </div>
       </motion.div>
     </div>

@@ -42,7 +42,8 @@ export default async function handler(req, res) {
     const objectIds = bidIds.map(id => {
       try {
         return new ObjectId(id);
-      } catch (e) {
+      } catch (error) {
+        console.warn(`Invalid ObjectId: ${id}`, error);
         return null;
       }
     }).filter(id => id !== null);
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
       modifiedCount: updateResult.modifiedCount
     });
   } catch (error) {
-    console.error("Error performing bulk bid update:", error);
-    return res.status(500).json({ error: "Failed to update bids" });
+    console.error('Error processing bulk operations:', error);
+    res.status(500).json({ error: 'Failed to process bulk operations' });
   }
 } 

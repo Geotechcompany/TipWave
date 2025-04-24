@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 
 import { 
-  Users, Search, Filter, RefreshCw, UserPlus, Edit, Trash2, 
-  Shield, Mail, Key, AlertTriangle, CheckCircle, X, XCircle,
+  Users, Search,  RefreshCw, Edit, Trash2, 
+  Shield,  AlertTriangle, CheckCircle, X, XCircle,
   Music, User, Crown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function AdminUserManagement({ refreshData, isLoading }) {
+export default function AdminUserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -28,18 +28,16 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-  }, [pagination.page, pagination.limit, filters]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
+      const currentPage = pagination.page;
+      const currentLimit = pagination.limit;
+      
       const queryParams = new URLSearchParams({
-        page: pagination.page,
-        limit: pagination.limit,
+        page: currentPage,
+        limit: currentLimit,
         role: filters.role,
         status: filters.status,
         search: filters.search,
@@ -74,55 +72,11 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, filters, pagination]);
 
-  const handleRoleChange = async (userId, newRole) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update user role');
-      }
-
-      toast.success(`User role updated to ${newRole}`);
-      loadUsers();
-    } catch (error) {
-      console.error('Error updating user role:', error);
-      toast.error('Failed to update user role');
-    }
-  };
-
-  const handleStatusChange = async (userId, newStatus) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update user status');
-      }
-
-      toast.success(`User ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
-      loadUsers();
-    } catch (error) {
-      console.error('Error updating user status:', error);
-      toast.error('Failed to update user status');
-    }
-  };
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
@@ -154,17 +108,15 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
         return;
       }
       
-      // Set loading state to true
-      setIsUpdating(true);
+      setLoading(true);
       
-      // Use the specific endpoint for updating a user by ID
       const response = await fetch(`/api/admin/users/${editingUser._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
-        credentials: 'include', // Include cookies for auth
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -173,16 +125,14 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
         throw new Error(data.error || 'Failed to update user');
       }
 
-      // Show success notification
       toast.success('User updated successfully');
       closeEditModal();
-      loadUsers(); // Refresh the user list
+      loadUsers();
     } catch (error) {
       console.error('Error updating user:', error);
       toast.error(error.message || 'Failed to update user');
     } finally {
-      // Always reset loading state
-      setIsUpdating(false);
+      setLoading(false);
     }
   };
 
@@ -213,10 +163,6 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
       month: 'short',
       day: 'numeric',
     });
-  };
-
-  const refreshUserList = () => {
-    loadUsers();
   };
 
   const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
@@ -523,7 +469,6 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
         </div>
       )}
       
-      {/* Pagination controls */}
       {pagination.totalPages > 1 && (
         <div className="flex justify-center mt-6">
           <nav className="flex items-center space-x-2">
@@ -539,13 +484,11 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
             
             {Array.from({length: pagination.totalPages}, (_, i) => i + 1)
               .filter(page => {
-                // Show only pages close to current page to avoid too many buttons
                 return page === 1 || 
                        page === pagination.totalPages || 
                        Math.abs(page - pagination.page) <= 1;
               })
               .map((page, i, arr) => {
-                // Add ellipsis when there are gaps in the sequence
                 const showEllipsisBefore = i > 0 && arr[i - 1] !== page - 1;
                 const showEllipsisAfter = i < arr.length - 1 && arr[i + 1] !== page + 1;
                 
@@ -588,7 +531,6 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
       {deleteDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -621,7 +563,6 @@ export default function AdminUserManagement({ refreshData, isLoading }) {
         </div>
       )}
 
-      {/* Edit User Dialog */}
       <EditUserModal
         user={editingUser}
         isOpen={editDialogOpen}

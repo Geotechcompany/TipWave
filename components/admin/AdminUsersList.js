@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { User, Calendar, Loader2, Mail } from "lucide-react";
+import { User, Loader2, Mail } from "lucide-react";
 import axios from "axios";
 
 export default function AdminUsersList({ initialUsers = null }) {

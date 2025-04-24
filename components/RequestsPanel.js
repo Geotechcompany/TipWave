@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Music, DollarSign, Clock, User, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -9,15 +9,10 @@ export function RequestsPanel() {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchRequests();
-    }
-  }, [session?.user?.id, activeTab]);
-
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
       setIsLoading(true);
       const response = await fetch(`/api/dj/${session.user.id}/requests?status=${activeTab}`);
@@ -31,7 +26,11 @@ export function RequestsPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, activeTab]);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleAcceptRequest = async (requestId) => {
     try {

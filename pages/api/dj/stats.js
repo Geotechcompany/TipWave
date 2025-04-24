@@ -1,6 +1,5 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
   // Replace Clerk auth with NextAuth

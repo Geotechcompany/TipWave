@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Headphones, Music, Users, Calendar, MapPin, Star } from "lucide-react";
+import { Headphones, Users, Calendar, MapPin, Star } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 

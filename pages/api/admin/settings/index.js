@@ -45,7 +45,8 @@ export default async function handler(req, res) {
         });
       }
       
-      // Remove internal fields
+      // Destructure to remove internal fields from the response
+      // eslint-disable-next-line no-unused-vars
       const { _id, createdAt, updatedAt, ...settings } = settingsDoc;
       
       return res.status(200).json(settings);
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
       }
       
       // Update or create settings document
-      const updateResult = await settingsCollection.updateOne(
+      await settingsCollection.updateOne(
         { _id: "system_settings" },
         { 
           $set: {

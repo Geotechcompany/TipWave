@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+/* eslint-disable no-unused-vars */
 import { motion } from "framer-motion";
 import { 
-  Send, Clock, DownloadCloud, RefreshCw, Check, AlertTriangle, 
-  Mail, Search, Calendar, Users, FileText, Filter, PlusCircle, 
-  MoreHorizontal, ChevronDown, Loader2, CheckCircle, XCircle
+  Mail, Send, RefreshCw, Clock, 
+  Loader2, AlertTriangle,
+  Search, Filter, CheckCircle, XCircle,
+  Calendar
 } from "lucide-react";
+/* eslint-enable no-unused-vars */
 import toast from "react-hot-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { Input } from "../ui/input";
@@ -13,8 +16,6 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter }
 import { Badge } from "../ui/badge";
 import { EmailTypes } from "@/lib/emailTypes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
-import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 
 export default function EmailManagement({ stats, refreshData }) {

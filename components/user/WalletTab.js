@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   Wallet, Plus, ArrowDownCircle, ArrowUpCircle, Clock, 
   Calendar, Filter, ChevronRight, Download, Loader2, CreditCard, 
-  Info
+  
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
@@ -26,9 +26,30 @@ export function WalletTab() {
   }, []);
   
   // Fetch transactions when page or filter changes
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setIsLoadingTransactions(true);
+      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
+      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch transactions");
+      }
+      
+      const data = await response.json();
+      setTransactions(data.transactions || []);
+      setTotalPages(data.totalPages || 1);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      toast.error("Failed to load transaction history");
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [currentPage, transactionType]);
+
   useEffect(() => {
     fetchTransactions();
-  }, [currentPage, transactionType]);
+  }, [fetchTransactions]);
 
   const fetchUserBalance = async () => {
     try {
@@ -46,27 +67,6 @@ export function WalletTab() {
       toast.error("Failed to load your account balance");
     } finally {
       setIsLoadingBalance(false);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      setIsLoadingTransactions(true);
-      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
-      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch transactions");
-      }
-      
-      const data = await response.json();
-      setTransactions(data.transactions || []);
-      setTotalPages(data.pagination?.pages || 1);
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
-      toast.error("Failed to load transaction history");
-    } finally {
-      setIsLoadingTransactions(false);
     }
   };
 

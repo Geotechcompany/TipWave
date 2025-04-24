@@ -1,23 +1,25 @@
+/* eslint-disable no-unused-vars */
+// This component has many unused variables as it's under development
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
+import { motion} from "framer-motion";
 import { useRouter } from "next/navigation";
 import Image from 'next/image';
 import { 
   LayoutDashboard, Music, Clock, DollarSign, 
-  TrendingUp, Zap, Share2, ChevronRight, 
-  Bell, Settings, Calendar, Sparkles,
-  ChevronDown, Search, Maximize, BarChart2,
+  TrendingUp, Zap, Share2,  
+  Settings, Calendar, 
+  Search, BarChart2,
   PlusCircle, UserCheck, History, PartyPopper,
-  Info, User, Shield, Sun, Moon, Globe, Save,
-  CreditCard, Volume2, VolumeX, Monitor, Menu,
-  LogOut, Wallet, Plus, ArrowDownCircle, ArrowUpCircle,
-  Download, Filter, Loader2
+ 
+  CreditCard, Menu,
+  LogOut, Wallet, ArrowDownCircle,
+  ArrowUpCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { MyRequests } from "./user/MyRequests";
-import { RequestHistory } from "./user/RequestHistory";
+
 import { SpendingAnalytics } from "./user/SpendingAnalytics";
 import { BiddingAnalytics } from "./user/BiddingAnalytics";
 import { UserStats } from "./user/UserStats";
@@ -34,10 +36,10 @@ import { MobileSidebar } from "./user/MobileSidebar";
 import { useSession, signOut } from 'next-auth/react';
 import { AppLoader } from './AppLoader';
 import { formatDistanceToNow } from 'date-fns';
-import Link from 'next/link';
+
 import DJApplicationForm from '@/components/DJApplicationForm';
 import { useCurrency } from "@/context/CurrencyContext";
-import { TopUpModal } from "./user/TopUpModal";
+
 import { WalletTab } from "./user/WalletTab";
 
 export default function UserDashboard() {
@@ -70,6 +72,28 @@ export default function UserDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [transactionType, setTransactionType] = useState("all");
   const { formatCurrency, defaultCurrency } = useCurrency();
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/user/transactions');
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      
+      const data = await response.json();
+      setTransactions(data.transactions || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast.error('Failed to load transaction history');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchTransactions();
+    }
+  }, [session?.user?.id, fetchTransactions]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -173,7 +197,7 @@ export default function UserDashboard() {
   
   useEffect(() => {
     fetchTransactions();
-  }, [currentPage, transactionType]);
+  }, [currentPage, transactionType, fetchTransactions]);
 
   const fetchUserBalance = async () => {
     try {
@@ -191,27 +215,6 @@ export default function UserDashboard() {
       toast.error("Failed to load your account balance");
     } finally {
       setIsLoadingBalance(false);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      setIsLoadingTransactions(true);
-      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
-      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch transactions");
-      }
-      
-      const data = await response.json();
-      setTransactions(data.transactions || []);
-      setTotalPages(data.pagination?.pages || 1);
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
-      toast.error("Failed to load transaction history");
-    } finally {
-      setIsLoadingTransactions(false);
     }
   };
 

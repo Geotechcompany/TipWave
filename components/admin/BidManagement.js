@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Search, Filter, RefreshCw, Check, X, DollarSign, 
-  ArrowUpDown, ChevronLeft, ChevronRight, Loader2,
-  AlertCircle, MoreHorizontal, Calendar, Music, User
+  Search, RefreshCw, Check, X, DollarSign, 
+  ChevronLeft, ChevronRight, Loader2,
+  AlertCircle, MoreHorizontal, Music, User
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -25,15 +25,8 @@ export default function BidManagement() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Add debouncing for search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchBids();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [pagination.page, search, filter, sortBy]);
-
-  const fetchBids = async () => {
+  // Memoize fetchBids function with useCallback
+  const fetchBids = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -80,8 +73,17 @@ export default function BidManagement() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, search, filter, sortBy]);
 
+  // Add debouncing for search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchBids();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchBids]);
+  
+  // Now the refreshBids function should use the memoized fetchBids
   const refreshBids = async () => {
     setIsRefreshing(true);
     try {

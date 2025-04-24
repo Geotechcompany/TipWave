@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { 
-  Users, Music, TrendingUp, Settings, LayoutDashboard, 
+  Users, Music, Settings, LayoutDashboard, 
   DollarSign, BarChart2, FileCheck, ChevronRight, Mail
 } from "lucide-react";
 import { motion } from "framer-motion";

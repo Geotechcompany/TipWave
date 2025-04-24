@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
 import { sendNotificationEmail, EmailTypes } from '@/lib/email';
 
 export default async function handler(req, res) {

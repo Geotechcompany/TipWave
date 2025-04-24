@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { MapPin, Search, Plus, Star, Clock, Users, ExternalLink, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -17,11 +17,7 @@ export function VenuesPanel() {
     favoriteVenues: 0
   });
 
-  useEffect(() => {
-    fetchVenues();
-  }, [session?.user?.id]);
-
-  const fetchVenues = async () => {
+  const fetchVenues = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -41,7 +37,11 @@ export function VenuesPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    fetchVenues();
+  }, [fetchVenues]);
 
   const toggleFavorite = async (venueId) => {
     try {
@@ -195,14 +195,24 @@ function VenueCard({ venue, onToggleFavorite }) {
           </div>
         </div>
         
-        <a
-          href={venue.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300"
-        >
-          <ExternalLink className="h-5 w-5" />
-        </a>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => onToggleFavorite(venue._id)}
+            className="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+            aria-label={venue.isFavorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star className={`h-5 w-5 ${venue.isFavorite ? "text-yellow-400 fill-current" : ""}`} />
+          </button>
+          
+          <a
+            href={venue.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300"
+          >
+            <ExternalLink className="h-5 w-5" />
+          </a>
+        </div>
       </div>
     </div>
   );

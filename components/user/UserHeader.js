@@ -1,4 +1,4 @@
-import { Bell, Settings, ChevronDown } from "lucide-react";
+import { Bell } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -6,7 +6,7 @@ export default function UserHeader({
   user, 
   showNotifications, 
   setShowNotifications, 
-  notificationsRef 
+  notificationsRef  
 }) {
   const notifications = [
     { id: 1, type: 'success', message: 'Your bid for "Uptown Funk" was accepted', time: '10m ago' },

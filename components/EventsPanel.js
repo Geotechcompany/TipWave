@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Clock, Users, ChevronRight, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -15,11 +15,8 @@ export function EventsPanel() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [session?.user?.id, view]);
-
-  const fetchEvents = async () => {
+  // Memoize fetchEvents with useCallback to maintain stable reference
+  const fetchEvents = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -35,7 +32,11 @@ export function EventsPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, view]); // Include dependencies used in the function
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]); // Use the memoized function as dependency
 
   const handleCreateEvent = () => {
     setIsCreateModalOpen(true);

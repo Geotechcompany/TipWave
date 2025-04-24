@@ -3,8 +3,6 @@ import { X } from "lucide-react";
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 
-const DEFAULT_ALBUM_ART = 'https://i.scdn.co/image/ab67616d0000b273c5716278e04baa78274ff6cc';
-
 export default function BidModal({ isOpen, onClose, onSubmit, song, isSubmitting }) {
   const [bidAmount, setBidAmount] = useState("");
 
@@ -37,7 +35,7 @@ export default function BidModal({ isOpen, onClose, onSubmit, song, isSubmitting
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-4">
             <Image
-              src={song?.albumArt || '/images/default-album-art.jpg'}
+              src={song?.albumArt || DEFAULT_ALBUM_ART}
               alt={song?.name || 'Album Art'}
               width={64}
               height={64}

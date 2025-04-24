@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       maxFileSize: 10 * 1024 * 1024, // 10MB limit
     });
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       form.parse(req, async (err, fields, files) => {
         if (err) {
           console.error('Error parsing form data:', err);

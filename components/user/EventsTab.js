@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Calendar, PartyPopper } from "lucide-react";
 import Image from "next/image";
-import { DEFAULT_ALBUM_ART } from '@/utils/constants';
+
 
 export function EventsTab({ events = [] }) {
   const formatEventDate = (startDate, endDate) => {

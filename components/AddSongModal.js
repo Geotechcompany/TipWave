@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Dialog } from "@headlessui/react";
-import { motion } from "framer-motion";
+
 import { X, Music, Clock, User, Disc, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 

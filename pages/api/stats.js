@@ -1,11 +1,16 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
 import { getCollection } from '../../lib/db';
 
 export default async function handler(req, res) {
-  const { userId } = getAuth(req);
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (session.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden - Admin access required' });
   }
 
   if (req.method === 'GET') {

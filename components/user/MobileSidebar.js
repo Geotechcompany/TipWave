@@ -1,11 +1,14 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+/* eslint-disable no-unused-vars */
 import { 
-  LayoutDashboard, Music, Clock, DollarSign, 
-  TrendingUp, Zap, ChevronRight, Settings, 
-  Calendar, BarChart2, User, X, Menu
+  LayoutDashboard, Music, Clock, DollarSign,
+  TrendingUp, Zap,
+  BarChart2, User, Menu,
+  Settings, Wallet, LogOut, X, ChevronRight, Calendar
 } from "lucide-react";
+/* eslint-enable no-unused-vars */
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 

@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   const [amount, setAmount] = useState(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { formatCurrency, defaultCurrency, currencies } = useCurrency();
+  const { formatCurrency, defaultCurrency} = useCurrency();
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("creditCard");
 
   const handleSubmit = async (e) => {

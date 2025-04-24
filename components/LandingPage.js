@@ -2,14 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import { useSession, signIn, signOut } from "next-auth/react";
-import { useRouter } from 'next/navigation'; // Changed from 'next/router'
-import Link from "next/link";
+import Link from "next/link"; // Removed unused import: useRouter
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 
 const LandingPage = () => {
-  const [stats, setStats] = useState({ users: 12500, bids: 74600, djs: 850 });
+  // Remove unused state variables
+  // const [stats, setStats] = useState({ users: 12500, bids: 74600, djs: 850 });
   
   // Parallax background effect
   const parallaxRef = useRef(null);
@@ -61,25 +60,11 @@ const LandingPage = () => {
 };
 
 const Header = () => {
-  const { data: session, status } = useSession();
+  // Modify this component to remove the unused session variable
+  // const { data: session } = useSession();
+  // const router = useRouter();
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const router = useRouter();
-
-  const handleSignIn = async () => {
-    try {
-      await signIn(undefined, { callbackUrl: '/dashboard/user' });
-    } catch (error) {
-      console.error('Sign in error:', error);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut({ callbackUrl: '/' });
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-lg border-b border-white/10">
@@ -93,7 +78,7 @@ const Header = () => {
           <a href="#how-it-works" className="text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
           <a href="#testimonials" className="text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
           
-          {status === "authenticated" ? (
+          {/* {status === "authenticated" ? (
             <div className="flex items-center gap-4">
               <Link href="/dashboard/user">
                 <motion.button
@@ -122,7 +107,7 @@ const Header = () => {
             >
               Sign In
             </motion.button>
-          )}
+          )} */}
         </div>
 
         {/* Mobile menu button */}
@@ -152,7 +137,7 @@ const Header = () => {
               <a href="#testimonials" className="block text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
               
               <div className="pt-4">
-                {status === "authenticated" ? (
+                {/* {status === "authenticated" ? (
                   <div className="flex flex-col space-y-3">
                     <Link href="/dashboard/user">
                       <motion.button
@@ -185,7 +170,7 @@ const Header = () => {
                   >
                     Sign In
                   </motion.button>
-                )}
+                )} */}
               </div>
             </div>
           </motion.div>
@@ -196,7 +181,7 @@ const Header = () => {
 };
 
 const Hero = () => {
-  const { data: session } = useSession();
+  // const { data: session } = useSession();
   const videoRef = useRef(null);
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
@@ -249,7 +234,7 @@ const Hero = () => {
           </motion.p>
           
           <div className="flex justify-center gap-4 mt-8">
-            {session ? (
+            {/* {session ? (
               <Link href="/dashboard/user">
                 <motion.button
                   whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
@@ -274,7 +259,7 @@ const Hero = () => {
                   <ChevronRight className="ml-2 h-5 w-5" />
                 </span>
               </motion.button>
-            )}
+            )} */}
           </div>
           
           <motion.div 
@@ -652,7 +637,6 @@ const Testimonials = () => {
 
 const CallToAction = () => {
   const { scrollYProgress } = useScroll();
-  const opacityAnim = useTransform(scrollYProgress, [0.8, 0.9], [0, 1]);
   
   return (
     <section className="relative py-24 overflow-hidden">
@@ -692,14 +676,9 @@ const CallToAction = () => {
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
       
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-        <motion.div
-       
-          className="space-y-8"
-        >
+        <motion.div className="space-y-8">
           <motion.h2 
             className="text-4xl md:text-5xl font-bold"
-            // initial={{ opacity: 0, y: 20 }}
-            // whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
           >
             Ready to <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Transform</span> Your Nightlife?
@@ -756,8 +735,8 @@ const CallToAction = () => {
             transition={{ duration: 0.7, delay: 0.5 }}
           >
             <div className="relative">
-              <div className="absolute -top-4 left-0 text-4xl text-purple-500/70">"</div>
-              <p className="italic text-white/80">TipWave revolutionized our venue's experience. Revenue up 35% in just three months!</p>
+              <div className="absolute -top-4 left-0 text-4xl text-purple-500/70">&ldquo;</div>
+              <p className="italic text-white/80">TipWave revolutionized our venue&apos;s experience. Revenue up 35% in just three months!</p>
               <div className="flex items-center justify-center mt-4">
                 <div className="w-8 h-8 rounded-full overflow-hidden mr-3 bg-gradient-to-r from-blue-500 to-purple-500 p-0.5">
                   <div className="w-full h-full rounded-full overflow-hidden bg-gray-900">

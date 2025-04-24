@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell, RefreshCw, Search, Settings, 
-  LogOut, User, ChevronDown, Shield, 
-  Menu, X 
+  LogOut, User, ChevronDown, Shield,
+  
 } from "lucide-react";
 import Image from "next/image";
 

@@ -1,5 +1,4 @@
 import { checkAdminAuth } from './auth-middleware';
-import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
   // Check auth

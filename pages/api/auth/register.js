@@ -40,12 +40,14 @@ export default async function handler(req, res) {
     };
 
     const result = await db.collection('users').insertOne(newUser);
+    console.log(`User registered with ID: ${result.insertedId}`);
 
     // Exclude password from response
-    const { password: _, ...userWithoutPassword } = newUser;
+    // eslint-disable-next-line no-unused-vars
+    const { _id, password: _, ...userWithoutSensitiveInfo } = newUser;
 
     res.status(201).json({
-      user: userWithoutPassword,
+      user: userWithoutSensitiveInfo,
       message: 'User registered successfully'
     });
   } catch (error) {

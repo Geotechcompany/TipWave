@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
-  User, Search, MoreVertical, Edit, Trash2, Shield, CheckCircle, XCircle,
-  Music, Crown, ChevronDown, Filter, RefreshCw, Loader2, AlertTriangle
+  User, Search, MoreVertical, Edit, Trash2, CheckCircle, XCircle,
+  ChevronDown, RefreshCw, Loader2, AlertTriangle
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Card, CardHeader, CardContent } from "../ui/card";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -32,6 +32,22 @@ export default function UserManagement() {
   const dropdownRef = useRef(null);
   const bulkActionRef = useRef(null);
 
+  // Memoize the fetchUsers function with useCallback
+  const fetchUsers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/admin/users?filter=${activeFilter}`);
+      if (!response.ok) throw new Error("Failed to fetch users");
+      const data = await response.json();
+      setUsers(data.users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("Failed to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeFilter]);
+
   useEffect(() => {
     fetchUsers();
     
@@ -47,22 +63,7 @@ export default function UserManagement() {
     
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [activeFilter]);
-
-  const fetchUsers = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/admin/users?filter=${activeFilter}`);
-      if (!response.ok) throw new Error("Failed to fetch users");
-      const data = await response.json();
-      setUsers(data.users);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to load users");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [fetchUsers]);
 
   const handleUserAction = async (userId, action) => {
     try {

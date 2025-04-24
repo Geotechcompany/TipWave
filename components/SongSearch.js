@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Music, Clock, DollarSign } from "lucide-react";
+import { Search, DollarSign } from "lucide-react";
 import BidModal from "./BidModal";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
@@ -38,17 +38,17 @@ export function SongSearch({ onBidPlaced }) {
     setIsBidModalOpen(true);
   };
 
-  const fetchActiveBids = async () => {
-    try {
-      const response = await fetch("/api/user/stats");
-      if (response.ok) {
-        const data = await response.json();
-        return data.activeBids;
-      }
-    } catch (error) {
-      console.error("Error fetching active bids:", error);
-    }
-  };
+  // const fetchActiveBids = async () => {
+  //   try {
+  //     const response = await fetch("/api/user/stats");
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       return data.activeBids;
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching active bids:", error);
+  //   }
+  // };
 
   const handleBidSubmit = async (bidAmount) => {
     if (!user || !selectedSong) return;

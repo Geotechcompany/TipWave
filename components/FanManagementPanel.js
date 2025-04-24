@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Users, Search, Filter, MoreVertical, Mail, Ban, Star } from "lucide-react";
+import { Users, Search, Ban, Star } from "lucide-react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
@@ -16,11 +16,8 @@ export function FanManagementPanel() {
     activeToday: 0
   });
 
-  useEffect(() => {
-    fetchFans();
-  }, [session?.user?.id, filter]);
-
-  const fetchFans = async () => {
+  // Memoize fetchFans with useCallback to maintain a stable reference
+  const fetchFans = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -36,7 +33,11 @@ export function FanManagementPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, filter]); // Include all dependencies used in the function
+
+  useEffect(() => {
+    fetchFans();
+  }, [fetchFans]); // Use the memoized function as the dependency
 
   const handleStatusChange = async (fanId, newStatus) => {
     try {

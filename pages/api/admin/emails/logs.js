@@ -13,39 +13,42 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Connect to MongoDB
     const client = await clientPromise;
     const db = client.db();
     
-    // In a real implementation, you would have an email_logs collection
-    // For demo purposes, we'll return mock data
-    const mockLogs = [
-      {
-        id: '1',
-        recipient: 'user@example.com',
-        subject: 'Welcome to SongBid!',
-        template: 'user_welcome',
-        status: 'sent',
-        sentAt: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        id: '2',
-        recipient: 'dj@example.com',
-        subject: 'Your DJ Application Has Been Approved',
-        template: 'dj_application_approved',
-        status: 'sent',
-        sentAt: new Date(Date.now() - 7200000).toISOString(),
-      },
-      {
-        id: '3',
-        recipient: 'failed@example.com',
-        subject: 'Bid Approved',
-        template: 'bid_approved',
-        status: 'failed',
-        sentAt: new Date(Date.now() - 10800000).toISOString(),
-      }
-    ];
+    // Get query parameters for pagination and filtering
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const status = req.query.status || null;
     
-    return res.status(200).json({ logs: mockLogs });
+    // Build query object
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+    
+    // Fetch email logs from database with pagination
+    const logs = await db.collection('email_logs')
+      .find(query)
+      .sort({ sentAt: -1 }) // Sort by newest first
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+    
+    // Get total count for pagination
+    const totalCount = await db.collection('email_logs').countDocuments(query);
+    
+    return res.status(200).json({ 
+      logs,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        pages: Math.ceil(totalCount / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching email logs:', error);
     return res.status(500).json({ message: 'Failed to fetch email logs', error: error.message });

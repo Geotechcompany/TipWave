@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { useAlert } from "../contexts/AlertContext";
 
-export function InviteFriendsCard({ onInvite }) {
+export function InviteFriendsCard() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState(""); // Add this line
+  const [message, setMessage] = useState("");
   const { addAlert } = useAlert();
 
   const handleInvite = async (e) => {

@@ -1,26 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import {
-  Users,
-  DollarSign,
-  Music,
+
   TrendingUp,
-  Bell,
-  LogOut,
-  Settings,
-  ChevronDown,
-  Calendar,
-  BarChart2,
+ 
   Shield,
-  Zap,
-  User,
-  AlertTriangle,
+  
+
   Database
 } from "lucide-react";
 
@@ -41,7 +33,7 @@ import DJApplicationsReview from "./admin/DJApplicationsReview";
 import UserManagement from "./admin/UserManagement";
 import EmailManagement from "./admin/EmailManagement";
 
-export default function AdminDashboard({ user }) {
+export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -86,11 +78,7 @@ export default function AdminDashboard({ user }) {
     }
   };
 
-  useEffect(() => {
-    fetchAdminData();
-  }, [timeRange, session?.user?.id]); // Add session?.user?.id as dependency
-
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     if (!session?.user?.id) return;
 
     try {
@@ -107,7 +95,11 @@ export default function AdminDashboard({ user }) {
       setRefreshing(false);
       setIsLoading(false);
     }
-  };
+  }, [timeRange, session?.user?.id]);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, [fetchAdminData]);
 
   const refreshData = async () => {
     setRefreshing(true);
@@ -132,7 +124,7 @@ export default function AdminDashboard({ user }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Add helper function for formatting notification time
+  // eslint-disable-next-line no-unused-vars
   const formatNotificationTime = (timestamp) => {
     const now = new Date();
     const notificationDate = new Date(timestamp);
@@ -149,7 +141,7 @@ export default function AdminDashboard({ user }) {
     }
   };
 
-  // Update profile section
+  // eslint-disable-next-line no-unused-vars
   const ProfileSection = () => (
     <div className="relative">
       <button
@@ -281,6 +273,7 @@ export default function AdminDashboard({ user }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars
 function StatCard({ title, value, icon: Icon, trend }) {
   const trendColor = trend >= 0 ? 'text-green-500' : 'text-red-500';
   

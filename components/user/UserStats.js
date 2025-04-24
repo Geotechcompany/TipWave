@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Music, UserCheck, DollarSign, Clock, TrendingUp, Users } from "lucide-react";
+import { Music, DollarSign, TrendingUp, Users } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useState, useEffect } from "react";
 

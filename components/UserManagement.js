@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
-  Search, Filter, PlusCircle, RefreshCw, Edit, Trash, MoreHorizontal, CheckCircle, XCircle
+  Search, Filter, PlusCircle, RefreshCw, Edit, /* Trash, */ MoreHorizontal, CheckCircle, XCircle, X
 } from "lucide-react";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -22,11 +22,8 @@ export function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [pagination.page, search, filter]);
-
-  const fetchUsers = async () => {
+  // Wrap fetchUsers in useCallback to avoid recreating it on every render
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
       let url = `/api/admin/users?page=${pagination.page}&limit=${pagination.limit}`;
@@ -47,7 +44,7 @@ export function UserManagement() {
       
       const data = await response.json();
       setUsers(data.users || []);
-      setPagination(data.pagination || pagination);
+      setPagination(prev => data.pagination || prev);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast.error("Failed to load users");
@@ -55,7 +52,11 @@ export function UserManagement() {
       setIsLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [pagination.page, pagination.limit, search, filter]); // Removed full pagination object
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]); // Now fetchUsers is stable between renders
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -104,9 +105,28 @@ export function UserManagement() {
   };
 
   const handleAddUser = async (userData) => {
-    // This would require additional backend implementation
-    toast.error("Add user functionality not implemented yet");
-    setShowAddUserModal(false);
+    try {
+      // Implementation would be added when backend is ready
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to add user");
+      }
+      
+      toast.success("User added successfully");
+      setShowAddUserModal(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error adding user:", error);
+      toast.error("Add user functionality not implemented yet");
+    }
   };
 
   return (

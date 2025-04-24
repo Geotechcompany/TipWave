@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { 
-  LayoutDashboard, Music, Clock, DollarSign, 
-  TrendingUp, Zap, Share2, ChevronRight, 
-  Bell, Settings, Calendar, BarChart2,
-  ChevronDown, Search, Maximize, Users,
-  PlusCircle, Headphones, ListMusic, Loader2
+  LayoutDashboard, Music, DollarSign, 
+  TrendingUp, Zap, Share2,
+  Bell, Settings, Calendar, BarChart2, Users,
+  PlusCircle, ListMusic, Loader2, CheckCircle
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { CreateEventModal } from "./CreateEventModal";
@@ -44,13 +43,11 @@ export default function DJDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedView, setSelectedView] = useState("overview");
   const [showNotifications, setShowNotifications] = useState(false);
-  const [activePanel, setActivePanel] = useState(null);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [genres, setGenres] = useState([]);
-  const [events, setEvents] = useState([]);
   const [isEventsLoading, setIsEventsLoading] = useState(true);
   const [recentRequests, setRecentRequests] = useState([]);
   const [analytics, setAnalytics] = useState({
@@ -60,12 +57,79 @@ export default function DJDashboard() {
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState('week');
   
-  // Mock notifications - in a real app these would come from an API
-  const mockNotifications = [
-    { id: 1, type: 'success', message: 'New song request: "Dancing Queen" - $20 bid', time: '2m ago' },
-    { id: 2, type: 'info', message: 'Venue "Pulse Nightclub" has booked you', time: '1h ago' },
-    { id: 3, type: 'alert', message: 'Your profile is getting 45% more views this week', time: '5h ago' }
-  ];
+  // Memoize all the fetch functions to use in dependency arrays
+  const fetchDJStats = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/dj/${session.user.id}/stats`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      const { data } = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching DJ stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [session?.user?.id]);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/notifications`);
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      const { data } = await response.json();
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, [session?.user?.id]);
+
+  const fetchGenres = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/genres`);
+      if (!response.ok) throw new Error('Failed to fetch genres');
+      const { data } = await response.json();
+      setGenres(data.genres);
+    } catch (error) {
+      console.error('Error fetching genres:', error);
+    }
+  }, [session?.user?.id]);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      setIsEventsLoading(true);
+      const response = await fetch(`/api/dj/${session.user.id}/events?upcoming=true`);
+      if (!response.ok) throw new Error('Failed to fetch events');
+      
+      await response.json();
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setIsEventsLoading(false);
+    }
+  }, [session?.user?.id]);
+
+  const fetchRecentRequests = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/requests?limit=5`);
+      if (!response.ok) throw new Error('Failed to fetch recent requests');
+      const { data } = await response.json();
+      setRecentRequests(data.requests);
+    } catch (error) {
+      console.error('Error fetching recent requests:', error);
+    }
+  }, [session?.user?.id]);
+
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/analytics`);
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      const { data } = await response.json();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -73,119 +137,32 @@ export default function DJDashboard() {
     } else if (session?.user?.id) {
       fetchDJStats();
     }
-  }, [status, session?.user?.id, router]);
-
-  const fetchDJStats = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/dj/${session.user.id}/stats`);
-      if (!response.ok) throw new Error('Failed to fetch DJ stats');
-      const data = await response.json();
-      setStats(prevStats => ({
-        ...prevStats,
-        ...data,
-        events: data.upcomingEvents || []
-      }));
-    } catch (error) {
-      console.error('Error fetching DJ stats:', error);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [status, session?.user?.id, router, fetchDJStats]);
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchNotifications();
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fetchNotifications]);
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchGenres();
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fetchGenres]);
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchEvents();
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fetchEvents]);
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchRecentRequests();
-      fetchAnalytics(selectedTimeframe);
+      fetchAnalytics();
     }
-  }, [session?.user?.id, selectedTimeframe]);
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/notifications`);
-      if (!response.ok) throw new Error('Failed to fetch notifications');
-      
-      const data = await response.json();
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
-    }
-  };
-
-  const fetchGenres = async () => {
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/genres`);
-      if (!response.ok) throw new Error('Failed to fetch genres');
-      
-      const data = await response.json();
-      setGenres(data.topGenres || []);
-    } catch (error) {
-      console.error('Error fetching genres:', error);
-      toast.error('Failed to load genre stats');
-      setGenres([]);
-    }
-  };
-
-  const fetchEvents = async () => {
-    try {
-      setIsEventsLoading(true);
-      const response = await fetch(`/api/dj/${session.user.id}/events?view=upcoming`);
-      if (!response.ok) throw new Error('Failed to fetch events');
-      const data = await response.json();
-      setEvents(data.events);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-      toast.error('Failed to load events');
-    } finally {
-      setIsEventsLoading(false);
-    }
-  };
-
-  const fetchRecentRequests = async () => {
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/requests/recent`);
-      if (!response.ok) throw new Error('Failed to fetch recent requests');
-      const data = await response.json();
-      setRecentRequests(data.requests || []);
-    } catch (error) {
-      console.error('Error fetching recent requests:', error);
-      toast.error('Failed to load recent requests');
-      setRecentRequests([]);
-    }
-  };
-
-  const fetchAnalytics = async (timeframe) => {
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/analytics?timeframe=${timeframe}`);
-      if (!response.ok) throw new Error('Failed to fetch analytics');
-      const data = await response.json();
-      setAnalytics(data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-      toast.error('Failed to load analytics data');
-    }
-  };
+  }, [session?.user?.id, fetchRecentRequests, fetchAnalytics]);
 
   const markAllAsRead = async () => {
     try {
@@ -201,10 +178,6 @@ export default function DJDashboard() {
       console.error('Error marking notifications as read:', error);
       toast.error('Failed to update notifications');
     }
-  };
-
-  const handlePanelToggle = (panel) => {
-    setActivePanel(activePanel === panel ? null : panel);
   };
 
   const handleCreateEvent = () => {
@@ -814,26 +787,5 @@ export default function DJDashboard() {
         onClose={() => setIsCreateEventModalOpen(false)} 
       />
     </div>
-  );
-}
-
-// Helper component for CheckCircle icon
-function CheckCircle({ className }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-      <polyline points="22 4 12 14.01 9 11.01"></polyline>
-    </svg>
-  );
-}
-
-// Helper component for Info icon
-function Info({ className }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="12" y1="16" x2="12" y2="12"></line>
-      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-    </svg>
   );
 }

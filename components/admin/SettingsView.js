@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Save, Bell, Lock, Globe, CreditCard, Users, Settings, 
+  Save, Bell,  Users,  
   RefreshCw, AlertCircle, DollarSign 
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -27,21 +27,17 @@ export default function SettingsView() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch settings on component mount
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  // Memoize fetchSettings with useCallback to maintain reference stability
+  const fetchSettings = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
     try {
       const response = await axios.get('/api/admin/settings');
-      setSettings({
-        ...settings, // Keep defaults as fallback
+      setSettings(prevSettings => ({
+        ...prevSettings, // Keep defaults as fallback
         ...response.data // Override with server values
-      });
+      }));
     } catch (err) {
       console.error("Error fetching settings:", err);
       setError("Failed to load settings from server");
@@ -49,7 +45,12 @@ export default function SettingsView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // No dependencies needed as we use the function form of setSettings
+
+  // Fetch settings on component mount
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]); // Add fetchSettings to dependency array
 
   const handleSave = async () => {
     setIsSaving(true);

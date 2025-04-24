@@ -133,7 +133,11 @@ export default async function handler(req, res) {
   }
 }
 
+// Add ESLint disable directive for the unused parameter
+// eslint-disable-next-line no-unused-vars
 function calculateTrend(data, period) {
+  // Currently calculate a simple percentage change regardless of period
+  // period parameter is kept for future implementation of different calculation methods
   if (data.length < 2) return 0;
   const current = data[data.length - 1].total;
   const previous = data[data.length - 2].total;

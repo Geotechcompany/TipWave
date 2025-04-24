@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Users, DollarSign, Music } from "lucide-react";
 
-export default function AdminStats({ stats, isLoading, timeRange, setTimeRange }) {
+export default function AdminStats({ stats, isLoading }) {
   if (isLoading) {
     return <div>Loading stats...</div>;
   }

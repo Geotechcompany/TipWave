@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Music, History, Filter, ChevronDown } from "lucide-react";
+import { Music, History } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 

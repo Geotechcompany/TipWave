@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
-  Music, Search, Plus, Edit, Trash2, Check, X, 
+  Music, Search, Plus, Edit, Trash2, X, 
   ArrowLeft, ArrowRight, Save, Upload, Loader
 } from "lucide-react";
 import axios from "axios";
@@ -17,7 +17,7 @@ export default function SongManagement() {
   
   // Pagination
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
   
   // Search/Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,12 +41,8 @@ export default function SongManagement() {
   const [imagePreview, setImagePreview] = useState("");
   const [imageFile, setImageFile] = useState(null);
   
-  // Fetch songs when page, pageSize, search term or filter changes
-  useEffect(() => {
-    fetchSongs();
-  }, [page, pageSize, debouncedSearchTerm, filterCategory]);
-  
-  const fetchSongs = async () => {
+  // Wrap fetchSongs in useCallback to memoize it
+  const fetchSongs = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -69,7 +65,12 @@ export default function SongManagement() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, pageSize, debouncedSearchTerm, filterCategory]);
+  
+  // Fetch songs when page, pageSize, search term or filter changes
+  useEffect(() => {
+    fetchSongs();
+  }, [fetchSongs]);
   
   // Total pages calculation
   const totalPages = useMemo(() => {
@@ -174,46 +175,42 @@ export default function SongManagement() {
     setIsSubmitting(true);
     
     try {
-      // Validate form
-      if (!currentSong.title || !currentSong.artist) {
-        throw new Error("Title and artist are required");
+      const formData = new FormData();
+      
+      // Add song data
+      Object.keys(currentSong).forEach(key => {
+        if (key !== 'albumArt') { // Don't add albumArt URL to form data
+          formData.append(key, currentSong[key]);
+        }
+      });
+      
+      // Add image file if any
+      if (imageFile) {
+        formData.append('albumArt', imageFile);
       }
       
-      // Create form data if there's an image file
-      let songData = {...currentSong};
-      let response;
-      
-      if (imageFile) {
-        // First upload the image
-        const formData = new FormData();
-        formData.append("image", imageFile);
-        
-        const uploadResponse = await axios.post("/api/admin/upload", formData, {
+      if (formMode === "add") {
+        await axios.post("/api/admin/songs", formData, {
           headers: {
-            "Content-Type": "multipart/form-data"
+            'Content-Type': 'multipart/form-data'
           }
         });
-        
-        songData.albumArt = uploadResponse.data.imageUrl;
-      }
-      
-      // Create or update song
-      if (formMode === "add") {
-        response = await axios.post("/api/admin/songs", songData);
         toast.success("Song added successfully");
       } else {
-        response = await axios.put(`/api/admin/songs/${currentSong.id}`, songData);
+        await axios.put(`/api/admin/songs/${currentSong.id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
         toast.success("Song updated successfully");
       }
       
-      // Refresh the song list
-      fetchSongs();
-      
-      // Close the form
+      // Close form and refresh songs
       closeForm();
+      fetchSongs();
     } catch (error) {
-      console.error(`Error ${formMode === "add" ? "adding" : "updating"} song:`, error);
-      toast.error(error.response?.data?.error || error.message || `Failed to ${formMode === "add" ? "add" : "update"} song`);
+      console.error("Error saving song:", error);
+      toast.error("Failed to save song");
     } finally {
       setIsSubmitting(false);
     }
@@ -245,7 +242,7 @@ export default function SongManagement() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
   
-  // Parse duration input from MM:SS to seconds
+  // eslint-disable-next-line no-unused-vars
   const parseDuration = (durationString) => {
     const parts = durationString.split(":");
     if (parts.length === 2) {

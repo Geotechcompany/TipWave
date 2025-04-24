@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { DollarSign, Calendar, TrendingUp, Download, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -17,7 +17,7 @@ export function EarningsPanel() {
   const [timeframe, setTimeframe] = useState("month");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const fetchEarnings = async () => {
+  const fetchEarnings = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -32,13 +32,13 @@ export function EarningsPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, timeframe]);
 
   useEffect(() => {
     if (session?.user?.id) {
       fetchEarnings();
     }
-  }, [session?.user?.id, timeframe]);
+  }, [fetchEarnings, session?.user?.id]);
 
   const handleWithdraw = async () => {
     if (!session?.user?.id) return;

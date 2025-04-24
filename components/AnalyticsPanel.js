@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { BarChart2, TrendingUp, Users, Music, Loader2 } from "lucide-react";
+import { TrendingUp, Users, Music, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import {
@@ -32,7 +32,8 @@ export function AnalyticsPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState("month");
 
-  const fetchAnalytics = async () => {
+  // Memoize fetchAnalytics with useCallback
+  const fetchAnalytics = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -62,11 +63,11 @@ export function AnalyticsPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, timeframe]); // Add dependencies used in the function
 
   useEffect(() => {
     fetchAnalytics();
-  }, [session?.user?.id, timeframe]);
+  }, [fetchAnalytics]); // Use the memoized function as dependency
 
   return (
     <motion.div

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Bell, Moon, Globe, Lock, CreditCard, User, Save, Loader2 } from "lucide-react";
+import { Bell, Save, Loader2, Lock } from "lucide-react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 
@@ -25,11 +25,7 @@ export function SettingsPanel() {
     }
   });
 
-  useEffect(() => {
-    fetchSettings();
-  }, [session?.user?.id]);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     if (!session?.user?.id) return;
     
     try {
@@ -45,7 +41,11 @@ export function SettingsPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleSave = async () => {
     setIsSaving(true);

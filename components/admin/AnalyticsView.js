@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { BarChart2, TrendingUp, Users, DollarSign, Calendar, Activity, ChevronDown } from "lucide-react";
+import { BarChart2, TrendingUp, Users, DollarSign, Activity } from "lucide-react";
 import { 
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -22,11 +22,8 @@ export default function AnalyticsView() {
     avgBidAmount: 0
   });
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, [timeRange]);
-
-  const fetchAnalyticsData = async () => {
+  // Use useCallback to memoize the fetchAnalyticsData function
+  const fetchAnalyticsData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -38,6 +35,7 @@ export default function AnalyticsView() {
       const revenue = response.data.revenue || [];
       const users = response.data.users || [];
       const bids = response.data.bids || [];
+      // This is used in the PieChart - keep it
       const bidsByStatus = response.data.bidsByStatus || [];
       
       const totalRevenue = revenue.reduce((sum, item) => sum + (item.amount || 0), 0);
@@ -61,7 +59,11 @@ export default function AnalyticsView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [timeRange]); // Add timeRange as a dependency
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, [fetchAnalyticsData]); // Include fetchAnalyticsData in the dependency array
 
   // Color constants for charts
   const COLORS = {

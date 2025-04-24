@@ -43,7 +43,8 @@ export default async function handler(req, res) {
     let objectId;
     try {
       objectId = new ObjectId(id);
-    } catch (e) {
+    } catch (error) {
+      console.warn(`Invalid bid ID format: ${id}`, error);
       return res.status(400).json({ error: "Invalid bid ID format" });
     }
     

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Card, CardContent, CardDescription, 
@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/card";
 import {
   Loader2, CheckCircle, XCircle, ExternalLink,
-  Instagram, Globe, Music, AlertTriangle
+  Instagram, Globe, Music, 
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ export default function DJApplicationsReview() {
     pages: 0
   });
   
-  const loadApplications = async (status = currentStatus, page = 1) => {
+  const loadApplications = useCallback(async (status = currentStatus, page = 1) => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/admin/dj-applications?status=${status}&page=${page}&limit=10`);
@@ -42,11 +42,11 @@ export default function DJApplicationsReview() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentStatus]);
   
   useEffect(() => {
     loadApplications();
-  }, []);
+  }, [loadApplications]);
   
   const handleStatusChange = async (applicationId, newStatus, notes = '') => {
     try {
@@ -77,12 +77,15 @@ export default function DJApplicationsReview() {
     }
   };
   
+  // eslint-disable-next-line no-unused-vars
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(date);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
   
   return (

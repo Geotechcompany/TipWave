@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
-  Save, User, Bell, Shield, CreditCard, 
-  Moon, Sun, Monitor, Smartphone, Globe, Volume2, VolumeX,
+  Save, User, Bell, CreditCard, 
+  Moon, Sun, Monitor, Globe,
   Loader2, DollarSign
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -35,21 +35,8 @@ export function SettingsPanel({ isOpen, onClose }) {
     defaultCurrency?.code || "USD"
   );
 
-  // Fetch user settings when panel opens
-  useEffect(() => {
-    if (isOpen && session?.user) {
-      fetchUserSettings();
-    }
-  }, [isOpen, session]);
-
-  // Update selected currency when defaultCurrency changes
-  useEffect(() => {
-    if (defaultCurrency?.code) {
-      setSelectedCurrency(defaultCurrency.code);
-    }
-  }, [defaultCurrency]);
-
-  const fetchUserSettings = async () => {
+  // Memoize fetchUserSettings to maintain a stable reference
+  const fetchUserSettings = useCallback(async () => {
     setIsLoading(true);
     try {
       // Simulation: replace with actual API call
@@ -76,7 +63,21 @@ export function SettingsPanel({ isOpen, onClose }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [defaultCurrency?.code, setSelectedCurrency]); // Add dependencies used in the function
+
+  // Fetch user settings when panel opens
+  useEffect(() => {
+    if (isOpen && session?.user) {
+      fetchUserSettings();
+    }
+  }, [isOpen, session, fetchUserSettings]); // Add fetchUserSettings as a dependency
+
+  // Update selected currency when defaultCurrency changes
+  useEffect(() => {
+    if (defaultCurrency?.code) {
+      setSelectedCurrency(defaultCurrency.code);
+    }
+  }, [defaultCurrency]);
 
   const handleSave = async () => {
     setIsSaving(true);

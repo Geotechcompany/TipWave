@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Music, Search, Plus, Trash2, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -11,15 +11,8 @@ export function LibraryPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedSong, setSelectedSong] = useState(null);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchSongs();
-    }
-  }, [session?.user?.id]);
-
-  const fetchSongs = async () => {
+  const fetchSongs = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/dj/${session.user.id}/library`);
@@ -33,7 +26,13 @@ export function LibraryPanel() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchSongs();
+    }
+  }, [fetchSongs, session?.user?.id]);
 
   const handleAddSong = async (songData) => {
     try {

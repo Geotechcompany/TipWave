@@ -1,18 +1,22 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getCollection } from '../../../lib/db';
-import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  if (!clerkId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  if (session.user.role !== 'DJ' && 
+      session.user.role !== 'BOTH' && 
+      session.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden - DJ permissions required' });
   }
 
   if (req.method === 'GET') {
     try {
       const bids = await getCollection('bids');
-      const songs = await getCollection('songs');
       
       // Get the queue with song details
       const queue = await bids.aggregate([

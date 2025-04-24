@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils"
 import { ChevronDown } from "lucide-react"
 
 const Select = React.forwardRef(({ className, children, ...props }, ref) => (
-  <div className="relative w-full">
+  <div className={cn("relative w-full", className)} ref={ref} {...props}>
     {children}
   </div>
 ))

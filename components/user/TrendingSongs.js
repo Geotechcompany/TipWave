@@ -4,6 +4,7 @@ import { Flame as Fire } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 import { DEFAULT_ALBUM_ART } from '@/utils/constants';
+import { Clock } from "lucide-react";
 
 export function TrendingSongs({ stats, isLoading }) {
   const [timeRange, setTimeRange] = useState("day");

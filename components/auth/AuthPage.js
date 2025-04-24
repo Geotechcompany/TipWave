@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Loader2, User, Mail, Lock, AlertTriangle, Users } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Users } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 

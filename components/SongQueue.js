@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Music, Clock, DollarSign } from 'lucide-react';
+import { Music, DollarSign } from 'lucide-react';
 import Image from 'next/image';
-import { useUser } from "@clerk/nextjs";
+// import { useUser } from "@clerk/nextjs";
 import toast from 'react-hot-toast';
-
-const DEFAULT_ALBUM_ART = 'https://i.scdn.co/image/ab67616d0000b273c5716278e04baa78274ff6cc';
+import { DEFAULT_ALBUM_ART } from '@/utils/constants';
 
 export function SongQueue() {
-  const { user } = useUser();
+  // Remove unused user declaration
+  // const { user } = useUser();
   const [queue, setQueue] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 

@@ -1,30 +1,25 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, Calendar, Filter } from "lucide-react";
-import { useState } from "react";
+import { DollarSign, TrendingUp } from "lucide-react";
+// Removed useState since we're not using state variables in this component currently
+// import { useState } from "react";
 
 export function SpendingAnalytics({ stats = {}, isLoading = false }) {
-  const [timeRange, setTimeRange] = useState("month");
-  const [category, setCategory] = useState("all");
+  // Removed unused state variables
+  // const [timeRange, setTimeRange] = useState("month");
+  // const [category, setCategory] = useState("all");
 
-  // Destructure stats with default values
+  // Destructure stats with default values - remove activeBids since it's not used
   const {
     totalSpent = 0,
     totalBids = 0,
-    pastBids = [],
-    activeBids = []
+    pastBids = []
+    // activeBids = []
   } = stats;
 
-  // Mock data for spending chart
-  const spendingData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        data: [150, 220, 180, 290, 210, 320],
-      }
-    ]
-  };
+  // Removed unused spendingData variable
+  // This was likely intended for a chart that hasn't been implemented yet
 
   const spendingStats = [
     {

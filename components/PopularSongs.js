@@ -3,7 +3,7 @@ import { Music, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import BidModal from './BidModal';
 import toast from 'react-hot-toast';
-import { getSpotifyApi } from '../lib/spotify';
+// import { getSpotifyApi } from '../lib/spotify';
 
 const DEFAULT_ALBUM_ART = '/images/default-album-art.jpg';
 

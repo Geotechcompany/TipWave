@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Dialog } from "@headlessui/react";
 import { motion } from "framer-motion";
-import { X, MapPin, Users, Globe, Loader2, Plus } from "lucide-react";
+import { X, Loader2, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 
 export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {

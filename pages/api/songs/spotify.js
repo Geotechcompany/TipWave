@@ -1,13 +1,14 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { spotifyApi, getValidToken } from '../../../lib/spotify';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-  const { id } = req.query;
-
-  if (!clerkId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  const { id } = req.query;
 
   if (!id) {
     return res.status(400).json({ error: "Spotify track ID is required" });

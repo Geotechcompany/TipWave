@@ -1,6 +1,6 @@
 import { Dialog } from "@headlessui/react";
 import { motion } from "framer-motion";
-import { X, Calendar, Clock, MapPin, Users, Link } from "lucide-react";
+import { X, Calendar, Clock, MapPin, Users } from "lucide-react";
 
 export function EventDetailsModal({ isOpen, onClose, event }) {
   if (!event) return null;

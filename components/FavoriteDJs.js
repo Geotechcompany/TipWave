@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useUser } from "@clerk/nextjs";
+// Remove or modify the useUser import if not needed
+// import { useUser } from "@clerk/nextjs"; 
 import { Music, Star, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function FavoriteDJs() {
-  const { user } = useUser();
+  // Remove unused user variable
+  // const { user } = useUser();
   const [favoriteDJs, setFavoriteDJs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 

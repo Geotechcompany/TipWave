@@ -3,7 +3,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Loader2, User, Shield, Users, AlertTriangle, Sparkles } from 'lucide-react';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -171,7 +171,7 @@ export default function UserLogin() {
           </div>
 
           <div className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/auth" className="text-blue-400 hover:underline">
               Register here
             </Link>

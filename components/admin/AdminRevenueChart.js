@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DollarSign, Calendar, TrendingUp, TrendingDown, Download, ArrowRight, Loader2 } from "lucide-react";
 import axios from "axios";
@@ -10,13 +10,7 @@ export default function AdminRevenueChart({ initialStats = null }) {
   const [dateRange, setDateRange] = useState("week"); // week, month, quarter, year
   const [showTooltip, setShowTooltip] = useState(null);
   
-  useEffect(() => {
-    if (!initialStats) {
-      fetchRevenueData();
-    }
-  }, [initialStats, dateRange]);
-  
-  const fetchRevenueData = async () => {
+  const fetchRevenueData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -29,7 +23,13 @@ export default function AdminRevenueChart({ initialStats = null }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateRange]);
+  
+  useEffect(() => {
+    if (!initialStats) {
+      fetchRevenueData();
+    }
+  }, [initialStats, fetchRevenueData]);
   
   // Ensure revenueByDay exists and has data
   const revenueData = stats?.revenueByDay || [];

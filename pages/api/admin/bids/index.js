@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
 
 export default async function handler(req, res) {
   // Check authentication
@@ -49,7 +48,6 @@ export default async function handler(req, res) {
       
       // Search functionality
       if (search) {
-        const songRequests = db.collection("song_requests");
         const songs = db.collection("songs");
         const users = db.collection("users");
         
