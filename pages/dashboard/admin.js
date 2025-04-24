@@ -1,9 +1,9 @@
+"use client";
+
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import AdminDashboard from '@/components/AdminDashboard';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -30,22 +30,4 @@ export default function AdminPage() {
   }
 
   return <AdminDashboard user={session.user} />;
-}
-
-// Add server-side protection as well
-export async function getServerSideProps(context) {
-  const session = await getServerSession(context.req, context.res, authOptions);
-
-  if (!session || session.user.role !== 'ADMIN') {
-    return {
-      redirect: {
-        destination: '/auth/admin',
-        permanent: false,
-      },
-    };
-  }
-
-  return {
-    props: {}
-  };
 }
