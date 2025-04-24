@@ -86,6 +86,14 @@ const Header = () => {
         </Link>
 
         <div className="hidden md:flex items-center space-x-4">
+          {/* Desktop Navigation Links */}
+          <div className="flex items-center space-x-6 mr-4">
+            <a href="#features" className="text-white/80 hover:text-white transition-colors duration-300">Features</a>
+            <a href="#how-it-works" className="text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
+            <a href="#testimonials" className="text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
+          </div>
+          
+          {/* Authentication Buttons */}
           {status === "authenticated" ? (
             <div className="flex items-center space-x-4">
               <Link href="/dashboard/user">
