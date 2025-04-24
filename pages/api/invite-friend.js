@@ -24,12 +24,12 @@ export default async function handler(req, res) {
       secure: process.env.SMTP_SECURE === 'true',
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        pass: process.env.SMTP_PASSWORD,
       },
     });
 
     await transporter.sendMail({
-      from: process.env.SMTP_FROM,
+      from: process.env.EMAIL_FROM,
       to: email,
       subject: 'Join DJ TipSync!',
       html: `
