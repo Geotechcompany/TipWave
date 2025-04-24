@@ -64,6 +64,12 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { data: session, status } = useSession();
   
+  // Add a useEffect to log the session status for debugging
+  useEffect(() => {
+    console.log("Session status:", status);
+    console.log("Session data:", session);
+  }, [session, status]);
+  
   const handleSignIn = () => {
     signIn();
   };
@@ -183,7 +189,7 @@ const Header = () => {
 };
 
 const Hero = () => {
-  // const { data: session } = useSession();
+  const { data: session } = useSession();
   const videoRef = useRef(null);
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
