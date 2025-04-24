@@ -107,7 +107,12 @@ function ActivityItem({ activity, index }) {
   }
 
   return (
-    <div className="flex items-start space-x-3">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="flex items-start space-x-3"
+    >
       <div className={`p-2 ${bgColor} rounded-full`}>
         {icon}
       </div>
@@ -118,6 +123,6 @@ function ActivityItem({ activity, index }) {
           <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 } 
