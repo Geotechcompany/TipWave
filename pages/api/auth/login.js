@@ -14,6 +14,11 @@ export default async function handler(req, res) {
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    // Check if account is deactivated
+    if (user.status === 'inactive') {
+      return res.status(403).json({ error: 'ACCOUNT_DEACTIVATED' });
+    }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {

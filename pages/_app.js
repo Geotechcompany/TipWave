@@ -1,3 +1,4 @@
+import { CurrencyProvider } from '@/context/CurrencyContext';
 import { SessionProvider } from "next-auth/react";
 import { AlertProvider } from "../contexts/AlertContext.js";
 import { useState, useEffect } from 'react';
@@ -15,10 +16,12 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
 
   return (
     <SessionProvider session={session}>
-      <AlertProvider>
-        {isLoading && <AppLoader />}
-        <Component {...pageProps} />
-      </AlertProvider>
+      <CurrencyProvider>
+        <AlertProvider>
+          {isLoading && <AppLoader />}
+          <Component {...pageProps} />
+        </AlertProvider>
+      </CurrencyProvider>
     </SessionProvider>
   );
 }

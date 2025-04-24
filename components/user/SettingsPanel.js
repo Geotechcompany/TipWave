@@ -1,15 +1,15 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { 
-  X, Save, User, Bell, Shield, CreditCard, 
+  Save, User, Bell, Shield, CreditCard, 
   Moon, Sun, Monitor, Smartphone, Globe, Volume2, VolumeX,
-  ChevronLeft, Loader2
+  Loader2, DollarSign
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useUser } from "@clerk/nextjs";
+import { useCurrency } from "@/context/CurrencyContext";
+import { useSession } from "next-auth/react";
 
 export function SettingsPanel({ isOpen, onClose }) {
-  const { user } = useUser();
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("account");
   const [settings, setSettings] = useState({
     darkMode: true,
@@ -23,321 +23,441 @@ export function SettingsPanel({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Currency settings
+  const { 
+    currencies = [], 
+    defaultCurrency = { code: "USD", symbol: "$", name: "US Dollar" }, 
+    setUserCurrency, 
+    isLoading: isCurrencyLoading = false
+  } = useCurrency() || {};
+  
+  const [selectedCurrency, setSelectedCurrency] = useState(
+    defaultCurrency?.code || "USD"
+  );
+
+  // Fetch user settings when panel opens
   useEffect(() => {
-    fetchUserSettings();
-  }, [user?.id]);
+    if (isOpen && session?.user) {
+      fetchUserSettings();
+    }
+  }, [isOpen, session]);
+
+  // Update selected currency when defaultCurrency changes
+  useEffect(() => {
+    if (defaultCurrency?.code) {
+      setSelectedCurrency(defaultCurrency.code);
+    }
+  }, [defaultCurrency]);
 
   const fetchUserSettings = async () => {
-    if (!user?.id) return;
-    
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/users/${user.id}/settings`);
-      if (!response.ok) throw new Error('Failed to fetch settings');
+      // Simulation: replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const data = await response.json();
-      setSettings(data);
+      // Some mock settings loading
+      setSettings({
+        darkMode: true,
+        emailNotifications: true,
+        pushNotifications: false,
+        soundEnabled: true,
+        language: "english",
+        displayMode: "system",
+        privacyMode: "balanced"
+      });
+      
+      // Set selected currency from user profile or default
+      if (defaultCurrency?.code) {
+        setSelectedCurrency(defaultCurrency.code);
+      }
     } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Failed to load settings');
+      console.error("Error loading settings:", error);
+      toast.error("Failed to load settings");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleChange = (setting, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
-  };
-
   const handleSave = async () => {
-    if (!user?.id) return;
-    
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/users/${user.id}/settings`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
+      // Save general settings
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      if (!response.ok) throw new Error('Failed to save settings');
+      // Save currency preference if changed and we have a default to compare against
+      if (defaultCurrency?.code && selectedCurrency !== defaultCurrency.code) {
+        const success = await setUserCurrency(selectedCurrency);
+        if (!success) {
+          throw new Error("Failed to update currency preference");
+        }
+      }
       
       toast.success("Settings saved successfully");
       onClose();
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      console.error("Error saving settings:", error);
+      toast.error("Failed to save settings");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm z-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
-  }
+  const handleCurrencyChange = (e) => {
+    setSelectedCurrency(e.target.value);
+  };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
-          
-          <motion.div
-            initial={{ opacity: 0, y: "100%" }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:transform md:-translate-x-1/2 md:-translate-y-1/2 
-                     w-full md:w-[42rem] max-h-[90vh] md:max-h-[85vh] bg-gray-900 md:rounded-2xl shadow-xl 
-                     border border-gray-800 z-50 overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <div className="flex items-center space-x-3">
-                <button 
-                  onClick={onClose}
-                  className="md:hidden p-2 hover:bg-gray-800/50 rounded-lg"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <h2 className="text-xl font-semibold">Settings</h2>
-              </div>
-              <button 
-                onClick={onClose}
-                className="hidden md:block p-2 hover:bg-gray-800/50 rounded-lg"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-              {/* Tabs - Horizontal scroll on mobile, vertical on desktop */}
-              <div className="flex md:flex-col md:w-48 border-b md:border-b-0 md:border-r border-gray-800 bg-gray-900/50 overflow-x-auto md:overflow-x-visible">
-                <div className="flex md:flex-col p-1 md:p-2 min-w-full md:min-w-0 md:space-y-1">
-                  {[
-                    { id: "account", label: "Account", icon: User },
-                    { id: "notifications", label: "Notifications", icon: Bell },
-                    { id: "privacy", label: "Privacy", icon: Shield },
-                    { id: "billing", label: "Billing", icon: CreditCard }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 p-3 md:px-4 md:py-2.5 rounded-lg whitespace-nowrap transition-colors
-                        ${activeTab === tab.id 
-                          ? "bg-blue-600/20 text-blue-400" 
-                          : "hover:bg-gray-800/50 text-gray-400 hover:text-gray-200"}`}
-                    >
-                      <tab.icon className="h-5 w-5" />
-                      <span className="text-sm">{tab.label}</span>
-                    </button>
-                  ))}
+    <div className="w-full bg-gray-900">
+      {/* Tabs */}
+      <div className="flex border-b border-gray-800">
+        <button
+          onClick={() => setActiveTab("account")}
+          className={`flex-1 py-3 text-sm font-medium border-b-2 ${
+            activeTab === "account" 
+              ? "border-blue-500 text-blue-400" 
+              : "border-transparent text-gray-400 hover:text-gray-300"
+          }`}
+        >
+          Account
+        </button>
+        <button
+          onClick={() => setActiveTab("preferences")}
+          className={`flex-1 py-3 text-sm font-medium border-b-2 ${
+            activeTab === "preferences" 
+              ? "border-blue-500 text-blue-400" 
+              : "border-transparent text-gray-400 hover:text-gray-300"
+          }`}
+        >
+          Preferences
+        </button>
+        <button
+          onClick={() => setActiveTab("payments")}
+          className={`flex-1 py-3 text-sm font-medium border-b-2 ${
+            activeTab === "payments" 
+              ? "border-blue-500 text-blue-400" 
+              : "border-transparent text-gray-400 hover:text-gray-300"
+          }`}
+        >
+          Payments
+        </button>
+      </div>
+      
+      {/* Settings Content */}
+      <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Account Settings */}
+            {activeTab === "account" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <User className="w-5 h-5 mr-2 text-blue-400" />
+                    Personal Information
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-1">
+                        Display Name
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Your display name"
+                        defaultValue={session?.user?.name || ""}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-1">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="your.email@example.com"
+                        defaultValue={session?.user?.email || ""}
+                        disabled
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <Bell className="w-5 h-5 mr-2 text-blue-400" />
+                    Notifications
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Email Notifications</p>
+                        <p className="text-sm text-gray-400">Receive updates via email</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={settings.emailNotifications}
+                          onChange={() => setSettings({
+                            ...settings,
+                            emailNotifications: !settings.emailNotifications
+                          })}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Push Notifications</p>
+                        <p className="text-sm text-gray-400">Receive on device alerts</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={settings.pushNotifications}
+                          onChange={() => setSettings({
+                            ...settings,
+                            pushNotifications: !settings.pushNotifications
+                          })}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Settings Content - Scrollable */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-                {/* Account Settings */}
-                {activeTab === "account" && (
-                  <div className="space-y-6">
-                    <div className="grid gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Display Mode</label>
-                        <div className="grid grid-cols-3 gap-3">
-                          {[
-                            { mode: "light", icon: Sun, label: "Light" },
-                            { mode: "dark", icon: Moon, label: "Dark" },
-                            { mode: "system", icon: Monitor, label: "System" }
-                          ].map((option) => (
-                            <button
-                              key={option.mode}
-                              onClick={() => handleChange('displayMode', option.mode)}
-                              className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-colors
-                                ${settings.displayMode === option.mode
-                                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                                  : 'border-gray-700 hover:border-gray-600 text-gray-400'}`}
-                            >
-                              <option.icon className="h-5 w-5 mb-1" />
-                              <span className="text-sm">{option.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Language</label>
-                        <select 
-                          value={settings.language}
-                          onChange={(e) => handleChange('language', e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            )}
+            
+            {/* Preferences Settings */}
+            {activeTab === "preferences" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <Moon className="w-5 h-5 mr-2 text-blue-400" />
+                    Appearance
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Display Mode
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          className={`p-3 rounded-lg flex flex-col items-center ${
+                            settings.displayMode === "light" 
+                              ? "bg-blue-900/50 border border-blue-500/50" 
+                              : "bg-gray-800 border border-gray-700"
+                          }`}
+                          onClick={() => setSettings({...settings, displayMode: "light"})}
                         >
-                          <option value="english">English</option>
-                          <option value="spanish">Spanish</option>
-                          <option value="french">French</option>
-                          <option value="german">German</option>
-                        </select>
+                          <Sun className="h-5 w-5 mb-1" />
+                          <span className="text-xs">Light</span>
+                        </button>
+                        <button
+                          className={`p-3 rounded-lg flex flex-col items-center ${
+                            settings.displayMode === "dark" 
+                              ? "bg-blue-900/50 border border-blue-500/50" 
+                              : "bg-gray-800 border border-gray-700"
+                          }`}
+                          onClick={() => setSettings({...settings, displayMode: "dark"})}
+                        >
+                          <Moon className="h-5 w-5 mb-1" />
+                          <span className="text-xs">Dark</span>
+                        </button>
+                        <button
+                          className={`p-3 rounded-lg flex flex-col items-center ${
+                            settings.displayMode === "system" 
+                              ? "bg-blue-900/50 border border-blue-500/50" 
+                              : "bg-gray-800 border border-gray-700"
+                          }`}
+                          onClick={() => setSettings({...settings, displayMode: "system"})}
+                        >
+                          <Monitor className="h-5 w-5 mb-1" />
+                          <span className="text-xs">System</span>
+                        </button>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {activeTab === "notifications" && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium">Notification Settings</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">Email Notifications</h4>
-                          <p className="text-sm text-gray-400">Receive notifications via email</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={settings.emailNotifications}
-                            onChange={(e) => handleChange('emailNotifications', e.target.checked)}
-                          />
-                          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">Push Notifications</h4>
-                          <p className="text-sm text-gray-400">Receive push notifications</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={settings.pushNotifications}
-                            onChange={(e) => handleChange('pushNotifications', e.target.checked)}
-                          />
-                          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">Sound Effects</h4>
-                          <p className="text-sm text-gray-400">Play sounds for notifications</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={settings.soundEnabled}
-                            onChange={(e) => handleChange('soundEnabled', e.target.checked)}
-                          />
-                          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {activeTab === "privacy" && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium">Privacy Settings</h3>
-                    <div className="space-y-4">
+                    
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Privacy Mode</label>
-                        <div className="grid grid-cols-3 gap-3 mt-2">
-                          <button
-                            onClick={() => handleChange('privacyMode', 'public')}
-                            className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                              settings.privacyMode === 'public'
-                                ? 'border-blue-500 bg-blue-500/10'
-                                : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                            }`}
-                          >
-                            <Globe className="h-6 w-6 mb-2" />
-                            <span className="text-sm">Public</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => handleChange('privacyMode', 'balanced')}
-                            className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                              settings.privacyMode === 'balanced'
-                                ? 'border-blue-500 bg-blue-500/10'
-                                : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                            }`}
-                          >
-                            <Shield className="h-6 w-6 mb-2" />
-                            <span className="text-sm">Balanced</span>
-                          </button>
-                          
-                          <button
-                            onClick={() => handleChange('privacyMode', 'private')}
-                            className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                              settings.privacyMode === 'private'
-                                ? 'border-blue-500 bg-blue-500/10'
-                                : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                            }`}
-                          >
-                            <Shield className="h-6 w-6 mb-2" />
-                            <span className="text-sm">Private</span>
-                          </button>
+                        <p className="font-medium">Sound Effects</p>
+                        <p className="text-sm text-gray-400">Enable UI sound effects</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={settings.soundEnabled}
+                          onChange={() => setSettings({
+                            ...settings,
+                            soundEnabled: !settings.soundEnabled
+                          })}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <Globe className="w-5 h-5 mr-2 text-blue-400" />
+                    Language & Region
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Language
+                      </label>
+                      <select
+                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                        value={settings.language}
+                        onChange={(e) => setSettings({...settings, language: e.target.value})}
+                      >
+                        <option value="english">English</option>
+                        <option value="spanish">Spanish</option>
+                        <option value="french">French</option>
+                        <option value="german">German</option>
+                        <option value="japanese">Japanese</option>
+                      </select>
+                    </div>
+                    
+                    {/* Currency Settings */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Preferred Currency
+                      </label>
+                      <select 
+                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                        value={selectedCurrency}
+                        onChange={handleCurrencyChange}
+                        disabled={isCurrencyLoading}
+                      >
+                        {currencies.map(currency => (
+                          <option key={currency.code} value={currency.code}>
+                            {currency.name} ({currency.symbol})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        All amounts will be displayed in your preferred currency.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Payments Settings */}
+            {activeTab === "payments" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2 text-blue-400" />
+                    Payment Methods
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="bg-blue-500/20 p-2 rounded-full mr-3">
+                          <CreditCard className="h-5 w-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Card •••• 4242</p>
+                          <p className="text-xs text-gray-400">Expires 12/24</p>
                         </div>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
+                          Edit
+                        </button>
+                        <button className="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 px-2 py-1 rounded">
+                          Remove
+                        </button>
+                      </div>
                     </div>
+                    
+                    <button className="w-full py-2 border border-dashed border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors">
+                      + Add Payment Method
+                    </button>
                   </div>
-                )}
+                </div>
                 
-                {activeTab === "billing" && (
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium">Billing & Payments</h3>
-                    <div className="p-4 border border-gray-700 rounded-lg">
-                      <p className="text-sm text-gray-400">
-                        Manage your subscription and payment methods through our secure payment portal.
-                      </p>
-                      <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">
-                        Manage Subscription
-                      </button>
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2 text-blue-400" />
+                    Billing Preferences
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Auto Top-up</p>
+                        <p className="text-sm text-gray-400">Automatically add funds when balance is low</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={false}
+                          onChange={() => {}}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Receipt Emails</p>
+                        <p className="text-sm text-gray-400">Send email receipts for transactions</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={true}
+                          onChange={() => {}}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-gray-800 p-4 sticky bottom-0 bg-gray-900">
-              <button 
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full flex items-center justify-center space-x-2 px-6 py-3 
-                         bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed
-                         text-white rounded-xl transition-colors"
-              >
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-              </button>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Footer / Save Button */}
+      <div className="border-t border-gray-800 p-4 bg-gray-900">
+        <button 
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full flex items-center justify-center space-x-2 px-6 py-3 
+                   bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed
+                   text-white rounded-xl transition-colors"
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
+        </button>
+      </div>
+    </div>
   );
 } 

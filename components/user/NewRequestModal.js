@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Music, Search, DollarSign, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { searchTracksWithDebounce } from "@/lib/spotify";
-import useDebounce from "@/hooks/useDebounce";
+import { useDebounce } from "@/hooks/useDebounce";
 import toast from "react-hot-toast";
 
 export function NewRequestModal({ isOpen, onClose, onSubmit }) {

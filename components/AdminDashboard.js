@@ -37,6 +37,9 @@ import BidManagement from "./admin/BidManagement";
 import AnalyticsView from "./admin/AnalyticsView";
 import SettingsView from "./admin/SettingsView";
 import { AppLoader } from "./AppLoader";
+import DJApplicationsReview from "./admin/DJApplicationsReview";
+import UserManagement from "./admin/UserManagement";
+import EmailManagement from "./admin/EmailManagement";
 
 export default function AdminDashboard({ user }) {
   const { data: session, status } = useSession();
@@ -64,7 +67,8 @@ export default function AdminDashboard({ user }) {
     revenueByDay: [],
     bidsByStatus: { pending: 0, completed: 0, rejected: 0 },
     notifications: [],
-    events: [] // Add events array initialization
+    events: [],
+    emailStats: { sent: 0, failed: 0, scheduled: 0 }
   });
 
   useEffect(() => {
@@ -198,7 +202,12 @@ export default function AdminDashboard({ user }) {
 
         <div className="flex-1 p-6 ml-16 md:ml-56">
           {activeTab === "dashboard" && (
-            <div className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
               <AdminStats 
                 stats={stats}
                 isLoading={isLoading}
@@ -227,19 +236,10 @@ export default function AdminDashboard({ user }) {
                   isLoading={isLoading}
                 />
               </div>
-            </div>
+            </motion.div>
           )}
           
-          {activeTab === "users" && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold">User Management</h2>
-              <div className="bg-gray-800 rounded-xl p-8 text-center">
-                <Users className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">User management module not available</h3>
-                <p className="text-gray-400">This feature is coming soon.</p>
-              </div>
-            </div>
-          )}
+          {activeTab === "users" && <UserManagement />}
           {activeTab === "songs" && <SongManagement />}
           {activeTab === "bids" && <BidManagement />}
           {activeTab === "analytics" && <AnalyticsView />}
@@ -263,6 +263,17 @@ export default function AdminDashboard({ user }) {
                 <p className="text-gray-400">This feature is coming soon.</p>
               </div>
             </div>
+          )}
+          {activeTab === "djapplications" && <DJApplicationsReview />}
+          {activeTab === "emails" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <EmailManagement stats={stats} refreshData={refreshData} />
+            </motion.div>
           )}
         </div>
       </div>

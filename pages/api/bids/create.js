@@ -1,11 +1,14 @@
-import { getAuth } from "@clerk/nextjs/server";
-import { getCollection } from '../../../lib/db';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]";
+import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-
-  if (!clerkId) {
+  // Check authentication using NextAuth
+  const session = await getServerSession(req, res, authOptions);
+  
+  if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -21,7 +24,9 @@ export default async function handler(req, res) {
     }
 
     // Store song first
-    const songs = await getCollection('songs');
+    const client = await clientPromise;
+    const db = client.db();
+    const songs = db.collection('songs');
     
     // Check if song already exists
     let songDoc = await songs.findOne({ spotifyId: song.id });
@@ -45,9 +50,9 @@ export default async function handler(req, res) {
     }
 
     // Create bid
-    const bids = await getCollection('bids');
+    const bids = db.collection('bids');
     const newBid = {
-      clerkId,
+      userId: session.user.id,
       amount: parseFloat(amount),
       songId: songDoc._id,
       status: 'PENDING',
@@ -56,6 +61,17 @@ export default async function handler(req, res) {
     };
 
     const bidResult = await bids.insertOne(newBid);
+
+    const userEmail = session.user.email;
+    const userName = session.user.name || userEmail.split('@')[0];
+
+    // Send confirmation email
+    await sendNotificationEmail(EmailTypes.BID_CREATED, userEmail, {
+      userName,
+      amount: newBid.amount,
+      songTitle: songDoc.title
+    });
+
     res.status(201).json({ id: bidResult.insertedId });
   } catch (error) {
     console.error('Error creating bid:', error);

@@ -1,10 +1,21 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Music } from "lucide-react";
+import { Music, TrendingUp, Play } from "lucide-react";
 
-export default function AdminSongsList({ stats, isLoading }) {
-  if (isLoading) {
-    return <div>Loading songs...</div>;
+export default function AdminSongsList({ songs = [] }) {
+  if (!songs || songs.length === 0) {
+    return (
+      <div className="rounded-lg border border-gray-700 bg-gray-800/50 overflow-hidden">
+        <div className="bg-gray-800 px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+          <h3 className="font-medium text-gray-200">Top Songs</h3>
+          <span className="text-xs text-gray-400">No songs found</span>
+        </div>
+        <div className="p-6 text-center text-gray-400">
+          <Music className="w-10 h-10 mx-auto mb-2 opacity-50" />
+          <p>No songs to display</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -20,22 +31,31 @@ export default function AdminSongsList({ stats, isLoading }) {
       </div>
       <div className="px-6 divide-y divide-gray-700">
         <div className="space-y-4">
-          {(stats.topSongs || []).map((song, i) => (
+          {songs.map((song, i) => (
             <div key={i} className="space-y-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{song.title || 'Unknown Title'}</p>
+                  <p className="font-medium">{song.title || 'Untitled'}</p>
                   <p className="text-sm text-gray-400">{song.artist || 'Unknown Artist'}</p>
                 </div>
-                <div className="text-sm text-blue-400">
-                  ${(song.totalBids || 0).toLocaleString()}
+                <div className="flex items-center">
+                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors">
+                    <Play size={14} />
+                  </button>
                 </div>
               </div>
-              <div className="mt-2 flex items-center text-xs text-gray-500">
-                <Music className="h-3 w-3 mr-1" />
-                <span>{(song.playCount || 0).toLocaleString()} plays</span>
-                <span className="mx-2">•</span>
-                <span>{(song.requestCount || 0).toLocaleString()} requests</span>
+              <div className="w-full bg-gray-700/50 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                  style={{ width: `${song.popularity || 0}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>{song.plays || 0} plays</span>
+                <span className="flex items-center">
+                  <TrendingUp size={12} className="mr-1" />
+                  {song.trend > 0 ? '+' : ''}{song.trend || 0}%
+                </span>
               </div>
             </div>
           ))}
@@ -44,3 +64,4 @@ export default function AdminSongsList({ stats, isLoading }) {
     </motion.div>
   );
 } 
+ 

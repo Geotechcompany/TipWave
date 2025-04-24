@@ -2,8 +2,30 @@
 
 import { motion } from "framer-motion";
 import { Music, UserCheck, DollarSign, Clock, TrendingUp, Users } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
+import { useState, useEffect } from "react";
 
 export function UserStats({ stats, isLoading }) {
+  const { formatCurrency, formatAndConvert, userCurrency } = useCurrency();
+  const [displayedStats, setDisplayedStats] = useState(stats || {});
+
+  // Convert currency values when stats or currency changes
+  useEffect(() => {
+    if (!stats) return;
+    
+    // Convert values to user's preferred currency if needed
+    setDisplayedStats({
+      ...stats,
+      // Only convert if the stats have a currency that differs from user preference
+      totalSpent: stats.currency && stats.currency !== userCurrency?.code 
+        ? formatAndConvert(stats.totalSpent, stats.currency)
+        : stats.totalSpent,
+      tipsThisMonth: stats.currency && stats.currency !== userCurrency?.code
+        ? formatAndConvert(stats.tipsThisMonth, stats.currency)
+        : stats.tipsThisMonth
+    });
+  }, [stats, userCurrency, formatAndConvert]);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -21,25 +43,29 @@ export function UserStats({ stats, isLoading }) {
     {
       icon: <DollarSign className="h-6 w-6 text-amber-500" />,
       label: "Total Spent",
-      value: `$${stats?.totalSpent?.toFixed(2) || '0.00'}`,
+      value: typeof displayedStats.totalSpent === 'string' 
+        ? displayedStats.totalSpent // Already formatted by formatAndConvert
+        : formatCurrency(displayedStats.totalSpent || 0),
       bgColor: "from-amber-950/30 to-amber-900/20"
     },
     {
       icon: <Music className="h-6 w-6 text-blue-500" />,
       label: "Songs Requested",
-      value: stats?.songsRequested || 0,
+      value: displayedStats.songsRequested || 0,
       bgColor: "from-blue-950/30 to-blue-900/20"
     },
     {
       icon: <Users className="h-6 w-6 text-purple-500" />,
       label: "Favorite DJs",
-      value: stats?.favoriteDJs || 0,
+      value: displayedStats.favoriteDJs || 0,
       bgColor: "from-purple-950/30 to-purple-900/20"
     },
     {
       icon: <TrendingUp className="h-6 w-6 text-green-500" />,
       label: "Tips This Month",
-      value: `$${stats?.tipsThisMonth?.toFixed(2) || '0.00'}`,
+      value: typeof displayedStats.tipsThisMonth === 'string'
+        ? displayedStats.tipsThisMonth // Already formatted
+        : formatCurrency(displayedStats.tipsThisMonth || 0),
       bgColor: "from-green-950/30 to-green-900/20"
     }
   ];

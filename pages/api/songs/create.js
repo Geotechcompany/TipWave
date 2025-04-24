@@ -1,10 +1,12 @@
-import { getAuth } from "@clerk/nextjs/server";
-import { getCollection } from '../../../lib/db';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]";
+import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-
-  if (!clerkId) {
+  // Check authentication using NextAuth
+  const session = await getServerSession(req, res, authOptions);
+  
+  if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -19,7 +21,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const songs = await getCollection('songs');
+    const client = await clientPromise;
+    const db = client.db();
+    const songs = db.collection('songs');
     
     // Check if song already exists
     const existingSong = await songs.findOne({ spotifyId: id });
@@ -36,7 +40,8 @@ export default async function handler(req, res) {
       album: album.name,
       albumArt: album.images[0]?.url,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      createdBy: session.user.id || session.user.email
     };
 
     const result = await songs.insertOne(newSong);

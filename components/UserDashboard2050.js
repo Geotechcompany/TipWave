@@ -12,7 +12,8 @@ import {
   PlusCircle, UserCheck, History, PartyPopper,
   Info, User, Shield, Sun, Moon, Globe, Save,
   CreditCard, Volume2, VolumeX, Monitor, Menu,
-  LogOut
+  LogOut, Wallet, Plus, ArrowDownCircle, ArrowUpCircle,
+  Download, Filter, Loader2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { MyRequests } from "./user/MyRequests";
@@ -33,6 +34,11 @@ import { MobileSidebar } from "./user/MobileSidebar";
 import { useSession, signOut } from 'next-auth/react';
 import { AppLoader } from './AppLoader';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
+import DJApplicationForm from '@/components/DJApplicationForm';
+import { useCurrency } from "@/context/CurrencyContext";
+import { TopUpModal } from "./user/TopUpModal";
+import { WalletTab } from "./user/WalletTab";
 
 export default function UserDashboard() {
   const { data: session, status } = useSession();
@@ -53,19 +59,17 @@ export default function UserDashboard() {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState("account");
-  const [settings, setSettings] = useState({
-    darkMode: true,
-    emailNotifications: true,
-    pushNotifications: false,
-    soundEnabled: true,
-    language: "english",
-    displayMode: "system",
-    privacyMode: "balanced"
-  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activeRequests, setActiveRequests] = useState([]);
+  const [balance, setBalance] = useState(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [transactionType, setTransactionType] = useState("all");
+  const { formatCurrency, defaultCurrency } = useCurrency();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -163,6 +167,102 @@ export default function UserDashboard() {
     }
   };
 
+  useEffect(() => {
+    fetchUserBalance();
+  }, []);
+  
+  useEffect(() => {
+    fetchTransactions();
+  }, [currentPage, transactionType]);
+
+  const fetchUserBalance = async () => {
+    try {
+      setIsLoadingBalance(true);
+      const response = await fetch("/api/user/balance");
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch balance");
+      }
+      
+      const data = await response.json();
+      setBalance(data.balance || 0);
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      toast.error("Failed to load your account balance");
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      setIsLoadingTransactions(true);
+      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
+      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch transactions");
+      }
+      
+      const data = await response.json();
+      setTransactions(data.transactions || []);
+      setTotalPages(data.pagination?.pages || 1);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      toast.error("Failed to load transaction history");
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  const handleTopUpComplete = (newBalance) => {
+    setBalance(newBalance);
+    setShowTopUpModal(false);
+    toast.success("Your account was successfully topped up!");
+    // Refresh transactions to show the new top-up
+    fetchTransactions();
+  };
+  
+  const getTransactionIcon = (type) => {
+    switch (type) {
+      case 'topup':
+        return <ArrowUpCircle className="h-5 w-5 text-green-400" />;
+      case 'withdraw':
+        return <ArrowDownCircle className="h-5 w-5 text-red-400" />;
+      case 'tip':
+        return <CreditCard className="h-5 w-5 text-blue-400" />;
+      default:
+        return <Clock className="h-5 w-5 text-gray-400" />;
+    }
+  };
+  
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+  
+  const getTransactionDescription = (transaction) => {
+    switch (transaction.type) {
+      case 'topup':
+        return `Account Top-up (${transaction.paymentMethod === 'creditCard' ? 'Credit Card' : 'PayPal'})`;
+      case 'withdraw':
+        return 'Withdrawal to Bank Account';
+      case 'tip':
+        return transaction.djName ? `Tip to ${transaction.djName}` : 'Tip to DJ';
+      default:
+        return 'Transaction';
+    }
+  };
+  
+  const handleFilterChange = (type) => {
+    setTransactionType(type);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+
   if (status === "loading" || isLoading) {
     return <AppLoader />;
   }
@@ -218,27 +318,11 @@ export default function UserDashboard() {
   };
 
   const handleChange = (setting, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
+    // This function is no longer used as settings are managed by the SettingsPanel
   };
 
   const handleSave = async () => {
-    try {
-      const response = await fetch('/api/user/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-
-      if (!response.ok) throw new Error('Failed to save settings');
-      
-      toast.success("Settings saved successfully");
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
-    }
+    // This function is no longer used as settings are managed by the SettingsPanel
   };
 
   const handleNewRequest = async (requestData) => {
@@ -356,11 +440,11 @@ export default function UserDashboard() {
             </div>
             
             <div className="relative">
-              <button 
-                className="p-2 rounded-full bg-gray-800/50 backdrop-blur-lg hover:bg-gray-700/50 transition-all duration-200"
+              <button
                 onClick={() => setSelectedView("settings")}
+                className="p-2 rounded-full hover:bg-gray-800"
               >
-                <Settings className="h-5 w-5 text-gray-300" />
+                <Settings className="h-5 w-5 text-gray-400" />
               </button>
             </div>
           </div>
@@ -464,6 +548,30 @@ export default function UserDashboard() {
                       >
                         <Settings className="h-5 w-5" />
                         <span>Settings</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedView("dj-application")}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors duration-200 ${
+                          selectedView === "dj-application"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                        }`}
+                      >
+                        <Music className="h-5 w-5 text-purple-500" />
+                        <span>DJ profile</span>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedView("wallet")}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors duration-200 ${
+                          selectedView === "wallet"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                        }`}
+                      >
+                        <Wallet className="h-5 w-5" />
+                        <span>Wallet</span>
                       </button>
                     </nav>
                   </div>
@@ -789,279 +897,30 @@ export default function UserDashboard() {
             ) : selectedView === "events" ? (
               <EventsTab events={upcomingEvents} />
             ) : selectedView === "settings" ? (
+              <SettingsPanel 
+                isOpen={true} 
+                onClose={() => setSelectedView("dashboard")} 
+              />
+            ) : selectedView === "dj-application" ? (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="pb-8"
+                transition={{ delay: 0.2 }}
+                className="bg-gray-800/30 backdrop-blur-lg rounded-2xl border border-gray-700/50 shadow-lg overflow-hidden"
               >
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold">Settings</h2>
-                  <p className="text-gray-400">Manage your account and preferences</p>
-                </div>
-
-                <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-xl overflow-hidden">
-                  <div className="flex">
-                    {/* Settings Tabs */}
-                    <div className="w-64 border-r border-gray-700 p-4">
-                      <div className="space-y-1">
-                        <button 
-                          onClick={() => setActiveTab("account")}
-                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
-                            activeTab === "account" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
-                          }`}
-                        >
-                          <User className="h-5 w-5" />
-                          <span>Account</span>
-                        </button>
-                        
-                        <button 
-                          onClick={() => setActiveTab("notifications")}
-                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
-                            activeTab === "notifications" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
-                          }`}
-                        >
-                          <Bell className="h-5 w-5" />
-                          <span>Notifications</span>
-                        </button>
-                        
-                        <button 
-                          onClick={() => setActiveTab("privacy")}
-                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
-                            activeTab === "privacy" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
-                          }`}
-                        >
-                          <Shield className="h-5 w-5" />
-                          <span>Privacy</span>
-                        </button>
-                        
-                        <button 
-                          onClick={() => setActiveTab("billing")}
-                          className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors text-left ${
-                            activeTab === "billing" ? "bg-blue-600/20 text-blue-500" : "hover:bg-gray-700/50"
-                          }`}
-                        >
-                          <CreditCard className="h-5 w-5" />
-                          <span>Billing & Payments</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Settings Content */}
-                    <div className="flex-1 p-6">
-                      {activeTab === "account" && (
-                        <div className="space-y-6">
-                          <h3 className="text-lg font-medium">Account Settings</h3>
-                          
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-1">Display Name</label>
-                              <input 
-                                type="text" 
-                                defaultValue={session.user.name}
-                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
-                              <input 
-                                type="email" 
-                                defaultValue={session.user.email}
-                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                disabled
-                              />
-                              <p className="mt-1 text-xs text-gray-400">Email address cannot be changed</p>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-1">Language</label>
-                              <select 
-                                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                                value={settings.language}
-                                onChange={(e) => handleChange('language', e.target.value)}
-                              >
-                                <option value="english">English</option>
-                                <option value="spanish">Spanish</option>
-                                <option value="french">French</option>
-                                <option value="german">German</option>
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-1">Display Mode</label>
-                              <div className="grid grid-cols-3 gap-3 mt-2">
-                                <button
-                                  onClick={() => handleChange('displayMode', 'light')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.displayMode === 'light'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Sun className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">Light</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleChange('displayMode', 'dark')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.displayMode === 'dark'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Moon className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">Dark</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleChange('displayMode', 'system')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.displayMode === 'system'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Monitor className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">System</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {activeTab === "notifications" && (
-                        <div className="space-y-6">
-                          <h3 className="text-lg font-medium">Notification Preferences</h3>
-                          
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium">Email Notifications</h4>
-                                <p className="text-sm text-gray-400">Receive bid updates via email</p>
-                              </div>
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={settings.emailNotifications}
-                                  onChange={(e) => handleChange('emailNotifications', e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                              </label>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium">Push Notifications</h4>
-                                <p className="text-sm text-gray-400">Receive real-time alerts on your device</p>
-                              </div>
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={settings.pushNotifications}
-                                  onChange={(e) => handleChange('pushNotifications', e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                              </label>
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium">Sound Effects</h4>
-                                <p className="text-sm text-gray-400">Play sound when receiving notifications</p>
-                              </div>
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={settings.soundEnabled}
-                                  onChange={(e) => handleChange('soundEnabled', e.target.checked)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {activeTab === "privacy" && (
-                        <div className="space-y-6">
-                          <h3 className="text-lg font-medium">Privacy Settings</h3>
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-1">Privacy Mode</label>
-                              <div className="grid grid-cols-3 gap-3 mt-2">
-                                <button
-                                  onClick={() => handleChange('privacyMode', 'public')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.privacyMode === 'public'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Globe className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">Public</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleChange('privacyMode', 'balanced')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.privacyMode === 'balanced'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Shield className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">Balanced</span>
-                                </button>
-                                
-                                <button
-                                  onClick={() => handleChange('privacyMode', 'private')}
-                                  className={`flex flex-col items-center justify-center p-4 rounded-lg border ${
-                                    settings.privacyMode === 'private'
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-700 bg-gray-800 hover:bg-gray-700/50'
-                                  }`}
-                                >
-                                  <Shield className="h-6 w-6 mb-2" />
-                                  <span className="text-sm">Private</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {activeTab === "billing" && (
-                        <div className="space-y-6">
-                          <h3 className="text-lg font-medium">Billing & Payments</h3>
-                          <div className="p-4 border border-gray-700 rounded-lg">
-                            <p className="text-sm text-gray-400">
-                              Manage your subscription and payment methods through our secure payment portal.
-                            </p>
-                            <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm">
-                              Manage Subscription
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold">DJ Application</h2>
+                      <p className="text-sm text-gray-400">Apply to become a DJ on our platform</p>
                     </div>
                   </div>
                   
-                  <div className="border-t border-gray-700 px-6 py-4 flex justify-end">
-                    <button 
-                      onClick={handleSave}
-                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                      <Save className="h-4 w-4 mr-2 inline-block" />
-                      Save Changes
-                    </button>
-                  </div>
+                  <DJApplicationForm />
                 </div>
               </motion.div>
+            ) : selectedView === "wallet" ? (
+              <WalletTab />
             ) : null}
           </div>
         </div>
@@ -1088,9 +947,6 @@ export default function UserDashboard() {
           Logout
         </button>
       </MobileSidebar>
-      <div className="mt-4 px-4">
-   
-      </div>
     </div>
   );
 }

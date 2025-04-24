@@ -136,7 +136,9 @@ export const authOptions = {
     error: '/auth/error'
   },
   session: {
-    strategy: "jwt"
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
@@ -216,7 +218,20 @@ export const authOptions = {
       }
       return url;
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile, email, credentials }) {
+      // Use your findUserByEmail function instead of Prisma
+      const dbUser = await findUserByEmail(user.email);
+      
+      // Check if user exists
+      if (!dbUser) {
+        return false;
+      }
+      
+      // Check if account is deactivated
+      if (dbUser.status === 'inactive') {
+        throw new Error('ACCOUNT_DEACTIVATED');
+      }
+      
       // For OAuth providers, check if user needs an avatar
       if (account.provider === 'google' || account.provider === 'github') {
         // These providers already have avatars, so we don't need to generate one

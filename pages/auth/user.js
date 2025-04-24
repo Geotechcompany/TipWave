@@ -26,11 +26,30 @@ export default function UserLogin() {
         redirect: false,
         email: credentials.email,
         password: credentials.password,
+        role: 'USER'
       });
       
       if (result?.error) {
-        setError('Invalid email or password');
-        toast.error('Invalid email or password');
+        if (result.error.includes('ACCOUNT_DEACTIVATED')) {
+          toast.error(
+            'Your account has been deactivated. Please contact support for assistance.',
+            {
+              duration: 6000,
+              position: 'top-center',
+              style: {
+                background: '#ff4d4f',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '16px',
+                borderRadius: '10px',
+              },
+              icon: '⚠️',
+            }
+          );
+        } else {
+          setError('Invalid email or password');
+          toast.error('Invalid email or password');
+        }
         return;
       }
       
