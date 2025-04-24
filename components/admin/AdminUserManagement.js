@@ -72,7 +72,7 @@ export default function AdminUserManagement() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, filters, pagination]);
+  }, [filters, pagination]);
 
   useEffect(() => {
     loadUsers();

@@ -232,7 +232,7 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
                       ) : (
                         <div className="flex flex-col items-center justify-center h-[100px] text-center p-4">
                           <Music className="h-8 w-8 text-gray-600 mb-2" />
-                          <p className="text-sm text-gray-400">No songs found for "{songSearch}"</p>
+                          <p className="text-sm text-gray-400">No songs found for &quot;{songSearch}&quot;</p>
                           <p className="text-xs text-gray-500">Try searching with a different term</p>
                         </div>
                       )

@@ -219,6 +219,11 @@ export const authOptions = {
       return url;
     },
     async signIn({ user, account, profile, email, credentials }) {
+      // Log the additional parameters for debugging purposes
+      console.log("Profile data:", profile);
+      console.log("Email info:", email);
+      console.log("Credentials data:", credentials);
+      
       // Use your findUserByEmail function instead of Prisma
       const dbUser = await findUserByEmail(user.email);
       

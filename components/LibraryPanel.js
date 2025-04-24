@@ -135,7 +135,7 @@ export function LibraryPanel() {
   );
 }
 
-function SongCard({ _id, title, artist, album, duration, albumArt, onDelete }) {
+function SongCard({  title, artist, album, duration, albumArt, onDelete }) {
   return (
     <div className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700/50 transition-colors">
       <div className="flex items-center space-x-4">

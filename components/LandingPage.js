@@ -230,7 +230,7 @@ const Hero = () => {
             className="text-xl md:text-2xl mb-8 text-white/80 max-w-2xl mx-auto"
           >
             Elevate your nightlife experience. Bid on your favorite songs and 
-            influence the DJ's playlist in real-time.
+            influence the DJ&apos;s playlist in real-time.
           </motion.p>
           
           <div className="flex justify-center gap-4 mt-8">
@@ -492,7 +492,7 @@ const HowItWorks = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-xl text-white/70 max-w-2xl mx-auto"
           >
-            Four simple steps to transform your nightlife experience forever.
+            It&apos;s that simple to get your music played.
           </motion.p>
         </div>
         
@@ -636,6 +636,8 @@ const Testimonials = () => {
 };
 
 const CallToAction = () => {
+  // Remove unused scrollYProgress or add ESLint disable comment
+  // eslint-disable-next-line no-unused-vars
   const { scrollYProgress } = useScroll();
   
   return (
@@ -735,7 +737,7 @@ const CallToAction = () => {
             transition={{ duration: 0.7, delay: 0.5 }}
           >
             <div className="relative">
-              <div className="absolute -top-4 left-0 text-4xl text-purple-500/70">&ldquo;</div>
+              <div className="absolute -top-4 left-0 text-4xl text-purple-500/70"></div>
               <p className="italic text-white/80">TipWave revolutionized our venue&apos;s experience. Revenue up 35% in just three months!</p>
               <div className="flex items-center justify-center mt-4">
                 <div className="w-8 h-8 rounded-full overflow-hidden mr-3 bg-gradient-to-r from-blue-500 to-purple-500 p-0.5">

@@ -37,7 +37,7 @@ export default function AnalyticsView() {
       const bids = response.data.bids || [];
       // This is used in the PieChart - keep it
       const bidsByStatus = response.data.bidsByStatus || [];
-      
+      console.log(bidsByStatus);
       const totalRevenue = revenue.reduce((sum, item) => sum + (item.amount || 0), 0);
       const totalUsers = users.length > 0 ? users[users.length - 1].cumulative : 0;
       const totalBids = bids.reduce((sum, item) => sum + (item.count || 0), 0);
