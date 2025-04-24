@@ -64,16 +64,32 @@ export default async function handler(req, res) {
     const userEmail = session.user.email;
     const userName = session.user.name || userEmail.split('@')[0];
 
-    // Send confirmation email
-    await sendNotificationEmail(EmailTypes.BID_CREATED, userEmail, {
-      userName,
-      amount: newBid.amount,
-      songTitle: songDoc.title
-    });
+    // Send confirmation email with better error handling
+    try {
+      await sendNotificationEmail({
+        to: userEmail,
+        type: EmailTypes.BID_CONFIRMATION,
+        data: {
+          userName,
+          songTitle: song.name,
+          songArtist: song.artists.map(a => a.name).join(', '),
+          amount: amount,
+          status: 'PENDING'
+        }
+      });
+      console.log(`Bid confirmation email sent to ${userEmail}`);
+    } catch (emailError) {
+      console.error('Failed to send bid confirmation email:', emailError);
+      // Continue with the response even if email fails
+    }
 
-    res.status(201).json({ id: bidResult.insertedId });
+    return res.status(201).json({ 
+      success: true, 
+      bid: { _id: bidResult.insertedId, ...newBid },
+      song: songDoc
+    });
   } catch (error) {
     console.error('Error creating bid:', error);
-    res.status(500).json({ error: 'Error creating bid' });
+    return res.status(500).json({ error: 'Failed to create bid' });
   }
 } 

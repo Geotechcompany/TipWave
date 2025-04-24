@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { getSession } from "next-auth/react";
 import { generateDefaultAvatar } from '@/lib/avatar';
 import clientPromise from '@/lib/mongodb';
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
 
 export const authOptions = {
   providers: [
@@ -257,6 +258,23 @@ export const authOptions = {
         
         // Add image to the user object for this session
         user.image = avatar;
+      }
+      
+      // Send welcome email for new registrations
+      if (account.provider === 'credentials' && credentials?.isRegistering === "true") {
+        try {
+          await sendNotificationEmail({
+            to: user.email,
+            type: EmailTypes.USER_WELCOME,
+            data: {
+              userName: user.name || user.email.split('@')[0]
+            }
+          });
+          console.log(`Welcome email sent to ${user.email}`);
+        } catch (error) {
+          console.error('Failed to send welcome email:', error);
+          // Don't block sign-in if email fails
+        }
       }
       
       return true;

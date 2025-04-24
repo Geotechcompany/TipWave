@@ -1,63 +1,45 @@
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import clientPromise from '@/lib/mongodb';
-import nodemailer from 'nodemailer';
+import { authOptions } from "./auth/[...nextauth]";
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
+  
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  
   try {
-    // Replace Clerk auth with NextAuth
-    const session = await getServerSession(req, res, authOptions);
-    if (!session?.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    // Store the invitation or send an email
-    const client = await clientPromise;
-    const db = client.db();
-    
-    const invitation = {
-      email,
-      invitedBy: session.user.id,
-      status: 'pending',
-      createdAt: new Date()
-    };
-    
-    await db.collection('invitations').insertOne(invitation);
-    
-    // Use environment variables for email configuration
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    });
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+    // Send invitation email with better error handling
+    const result = await sendNotificationEmail({
       to: email,
-      subject: 'Join DJ TipSync!',
-      html: `
-        <h1>You've been invited to DJ TipSync!</h1>
-        <p>Your friend has invited you to join DJ TipSync, the best way to request songs and support your favorite DJs.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/signup">Join Now</a>
-      `,
+      type: EmailTypes.FRIEND_INVITATION,
+      data: {
+        userName: email.split('@')[0],
+        inviterName: session.user.name || 'A friend',
+        inviterEmail: session.user.email,
+        invitationUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/signup?referral=${encodeURIComponent(session.user.email)}`
+      }
     });
-
-    res.status(200).json({ success: true });
+    
+    if (!result.success) {
+      console.error('Email service reported failure:', result.error);
+      throw new Error(result.error || 'Failed to send invitation');
+    }
+    
+    console.log(`Friend invitation email sent to ${email}`);
+    return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error sending invitation:', error);
-    res.status(500).json({ error: 'Failed to send invitation' });
+    return res.status(500).json({ error: 'Failed to send invitation', details: error.message });
   }
 }
