@@ -1,32 +1,42 @@
+"use client";
+
 import { motion } from "framer-motion";
-import { Music, UserCheck, PlusCircle, History } from "lucide-react";
+import { Music, UserCheck, PlusCircle, History, Clock, DollarSign, Calendar } from "lucide-react";
+import useSWR from "swr";
+import { formatDistanceToNow } from "date-fns";
 
-export function ActivityTab({ activities = [] }) {
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'PLAYED':
-        return <Music className="h-4 w-4 text-blue-400" />;
-      case 'REQUEST':
-        return <PlusCircle className="h-4 w-4 text-green-400" />;
-      case 'RECOMMENDATION':
-        return <UserCheck className="h-4 w-4 text-purple-400" />;
-      default:
-        return <Music className="h-4 w-4 text-gray-400" />;
-    }
-  };
+// Fetch function for SWR
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
-  const getActivityBackground = (type) => {
-    switch (type) {
-      case 'PLAYED':
-        return 'bg-blue-500/20';
-      case 'REQUEST':
-        return 'bg-green-500/20';
-      case 'RECOMMENDATION':
-        return 'bg-purple-500/20';
-      default:
-        return 'bg-gray-500/20';
-    }
-  };
+export function ActivityTab({ initialActivities = [] }) {
+  // Use SWR for auto-refreshing data
+  const { data, error, isLoading } = useSWR('/api/user/activities', fetcher, {
+    fallbackData: initialActivities,
+    refreshInterval: 30000, // Refresh every 30 seconds
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div 
+            key={i}
+            className="bg-gray-800/30 backdrop-blur-lg rounded-xl border border-gray-700/50 p-4 animate-pulse h-24"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-900/20 border border-red-700/50 rounded-xl text-red-400">
+        Error loading activities: {error.message || "Failed to load user activities"}
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -35,18 +45,10 @@ export function ActivityTab({ activities = [] }) {
       className="bg-gray-800/30 backdrop-blur-lg rounded-2xl border border-gray-700/50 p-6"
     >
       <h2 className="text-xl font-bold mb-6">Recent Activity</h2>
-      {activities.length > 0 ? (
+      {data && data.length > 0 ? (
         <div className="space-y-4">
-          {activities.map((activity, index) => (
-            <div key={activity._id || index} className="flex items-start space-x-3">
-              <div className={`p-2 ${getActivityBackground(activity.type)} rounded-full`}>
-                {getActivityIcon(activity.type)}
-              </div>
-              <div>
-                <p className="font-medium">{activity.title}</p>
-                <p className="text-sm text-gray-400">{activity.timestamp}</p>
-              </div>
-            </div>
+          {data.map((activity, index) => (
+            <ActivityItem key={activity._id || index} activity={activity} index={index} />
           ))}
         </div>
       ) : (
@@ -65,5 +67,57 @@ export function ActivityTab({ activities = [] }) {
         </motion.div>
       )}
     </motion.div>
+  );
+}
+
+function ActivityItem({ activity, index }) {
+  // Format the date
+  const formattedDate = activity.timestamp 
+    ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })
+    : "Recently";
+
+  // Determine icon based on activity type
+  let icon;
+  let bgColor;
+  
+  switch (activity.type) {
+    case 'PLAYED':
+      icon = <Music className="h-4 w-4 text-blue-400" />;
+      bgColor = 'bg-blue-500/20';
+      break;
+    case 'REQUEST':
+      icon = <PlusCircle className="h-4 w-4 text-green-400" />;
+      bgColor = 'bg-green-500/20';
+      break;
+    case 'RECOMMENDATION':
+      icon = <UserCheck className="h-4 w-4 text-purple-400" />;
+      bgColor = 'bg-purple-500/20';
+      break;
+    case 'PAYMENT':
+      icon = <DollarSign className="h-4 w-4 text-amber-400" />;
+      bgColor = 'bg-amber-500/20';
+      break;
+    case 'EVENT':
+      icon = <Calendar className="h-4 w-4 text-pink-400" />;
+      bgColor = 'bg-pink-500/20';
+      break;
+    default:
+      icon = <Clock className="h-4 w-4 text-gray-400" />;
+      bgColor = 'bg-gray-500/20';
+  }
+
+  return (
+    <div className="flex items-start space-x-3">
+      <div className={`p-2 ${bgColor} rounded-full`}>
+        {icon}
+      </div>
+      <div className="flex-1">
+        <p className="font-medium">{activity.title}</p>
+        <p className="text-sm text-gray-400">{formattedDate}</p>
+        {activity.description && (
+          <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
+        )}
+      </div>
+    </div>
   );
 } 
