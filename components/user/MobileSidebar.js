@@ -118,8 +118,8 @@ export function MobileSidebar({ isOpen, setIsOpen, selectedView, setSelectedView
                 <NavItem
                   icon={<Radio className="w-5 h-5" />}
                   label="Live DJs"
-                  isActive={selectedView === "liveDJs"}
-                  onClick={() => handleNavigation("liveDJs")}
+                  isActive={selectedView === "live"}
+                  onClick={() => handleNavigation("live")}
                   badge="Live"
                   badgeColor="bg-red-500"
                 />
@@ -138,8 +138,8 @@ export function MobileSidebar({ isOpen, setIsOpen, selectedView, setSelectedView
                 <NavItem
                   icon={<FileText className="w-5 h-5" />}
                   label="DJ Application"
-                  isActive={selectedView === "DJApplication"}
-                  onClick={() => handleNavigation("DJApplication")}
+                  isActive={selectedView === "dj-application"}
+                  onClick={() => handleNavigation("dj-application")}
                 />
                 <NavItem
                   icon={<Wallet className="w-5 h-5" />}
