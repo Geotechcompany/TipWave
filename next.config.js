@@ -40,6 +40,15 @@ const nextConfig = {
         path: false,
         os: false,
         crypto: false,
+        // These modules are only needed on the server side
+        kerberos: false,
+        '@mongodb-js/zstd': false,
+        '@aws-sdk/credential-providers': false,
+        'mongodb-client-encryption': false,
+        snappy: false,
+        aws4: false,
+        'gcp-metadata': false,
+        socks: false,
       };
     }
     return config;
