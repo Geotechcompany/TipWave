@@ -1,11 +1,12 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import clientPromise from '@/lib/mongodb';
 import { getCollection } from '../../../lib/db';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-
-  if (!clerkId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   if (req.method === 'GET') {
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
       
       // Get user's favorite DJ IDs
       const userFavorites = await favorites
-        .find({ clerkId })
+        .find({ clerkId: session.user.id })
         .toArray();
       
       const favoriteDjIds = userFavorites.map(fav => fav.djId);

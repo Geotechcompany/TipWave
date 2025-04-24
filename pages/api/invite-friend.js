@@ -1,4 +1,6 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import clientPromise from '@/lib/mongodb';
 import nodemailer from 'nodemailer';
 
 export default async function handler(req, res) {
@@ -6,17 +8,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId } = getAuth(req);
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
   try {
+    // Replace Clerk auth with NextAuth
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Store the invitation or send an email
+    const client = await clientPromise;
+    const db = client.db();
+    
+    const invitation = {
+      email,
+      invitedBy: session.user.id,
+      status: 'pending',
+      createdAt: new Date()
+    };
+    
+    await db.collection('invitations').insertOne(invitation);
+    
     // Use environment variables for email configuration
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -39,9 +55,9 @@ export default async function handler(req, res) {
       `,
     });
 
-    res.status(200).json({ message: 'Invitation sent successfully' });
+    res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Error sending invite:', error);
+    console.error('Error sending invitation:', error);
     res.status(500).json({ error: 'Failed to send invitation' });
   }
 }

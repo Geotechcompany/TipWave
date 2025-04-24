@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
@@ -7,9 +8,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    if (session.user.role !== 'DJ' && 
+        session.user.role !== 'BOTH' && 
+        session.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Forbidden - DJ permissions required' });
     }
 
     const client = await clientPromise;
@@ -17,7 +24,7 @@ export default async function handler(req, res) {
 
     const eventData = {
       ...req.body,
-      djId: userId,
+      djId: session.user.id,
       createdAt: new Date(),
       status: 'upcoming'
     };

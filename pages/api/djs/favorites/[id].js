@@ -1,21 +1,24 @@
-import { getAuth } from "@clerk/nextjs/server";
-import { getCollection } from '../../../../lib/db';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
-  const { userId: clerkId } = getAuth(req);
-  const { id } = req.query;
-
-  if (!clerkId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  const { id } = req.query;
 
   if (req.method === 'DELETE') {
     try {
-      const favorites = await getCollection('favorites');
+      const client = await clientPromise;
+      const db = client.db();
+      const favorites = await db.collection('dj_favorites');
       
       await favorites.deleteOne({
-        clerkId,
+        userId: session.user.id,
         djId: new ObjectId(id)
       });
       
