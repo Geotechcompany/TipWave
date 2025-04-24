@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
 import Link from "next/link"; // Removed unused import: useRouter
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 const LandingPage = () => {
   // Remove unused state variables
@@ -60,12 +61,17 @@ const LandingPage = () => {
 };
 
 const Header = () => {
-  // Modify this component to remove the unused session variable
-  // const { data: session } = useSession();
-  // const router = useRouter();
-  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  const { data: session, status } = useSession();
+  
+  const handleSignIn = () => {
+    signIn();
+  };
+  
+  const handleSignOut = () => {
+    signOut();
+  };
+  
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-lg border-b border-white/10">
       <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -73,13 +79,9 @@ const Header = () => {
           <span className="text-2xl font-bold">TipWave</span>
         </Link>
 
-        <div className="hidden md:flex items-center space-x-8">
-          <a href="#features" className="text-white/80 hover:text-white transition-colors duration-300">Features</a>
-          <a href="#how-it-works" className="text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
-          <a href="#testimonials" className="text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
-          
-          {/* {status === "authenticated" ? (
-            <div className="flex items-center gap-4">
+        <div className="hidden md:flex items-center space-x-4">
+          {status === "authenticated" ? (
+            <div className="flex items-center space-x-4">
               <Link href="/dashboard/user">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -107,7 +109,7 @@ const Header = () => {
             >
               Sign In
             </motion.button>
-          )} */}
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -137,7 +139,7 @@ const Header = () => {
               <a href="#testimonials" className="block text-white/80 hover:text-white transition-colors duration-300">Testimonials</a>
               
               <div className="pt-4">
-                {/* {status === "authenticated" ? (
+                {status === "authenticated" ? (
                   <div className="flex flex-col space-y-3">
                     <Link href="/dashboard/user">
                       <motion.button
@@ -170,7 +172,7 @@ const Header = () => {
                   >
                     Sign In
                   </motion.button>
-                )} */}
+                )}
               </div>
             </div>
           </motion.div>
@@ -234,7 +236,7 @@ const Hero = () => {
           </motion.p>
           
           <div className="flex justify-center gap-4 mt-8">
-            {/* {session ? (
+            {session ? (
               <Link href="/dashboard/user">
                 <motion.button
                   whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
@@ -259,7 +261,7 @@ const Hero = () => {
                   <ChevronRight className="ml-2 h-5 w-5" />
                 </span>
               </motion.button>
-            )} */}
+            )}
           </div>
           
           <motion.div 
