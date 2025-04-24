@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -8,12 +9,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { fanId } = req.query;
+    const { djId, fanId } = req.query;
+    if (djId !== session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const { status } = req.body;
 
     if (!['regular', 'vip', 'blocked'].includes(status)) {
@@ -24,7 +29,7 @@ export default async function handler(req, res) {
     const db = client.db();
 
     await db.collection('fans').updateOne(
-      { _id: new ObjectId(fanId), djId: userId },
+      { _id: new ObjectId(fanId), djId: session.user.id },
       { 
         $set: { 
           status,

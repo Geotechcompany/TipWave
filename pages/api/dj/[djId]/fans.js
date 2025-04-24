@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
@@ -7,16 +8,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { djId } = req.query;
+    if (djId !== session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const { filter = 'all' } = req.query;
     const client = await clientPromise;
     const db = client.db();
 
-    let query = { djId: userId };
+    let query = { djId: djId };
     if (filter === 'vip') {
       query.status = 'vip';
     } else if (filter === 'blocked') {
@@ -29,7 +35,7 @@ export default async function handler(req, res) {
         .sort({ lastActive: -1 })
         .toArray(),
       db.collection('fans').aggregate([
-        { $match: { djId: userId } },
+        { $match: { djId: djId } },
         {
           $group: {
             _id: null,

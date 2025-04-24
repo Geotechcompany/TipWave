@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -8,9 +9,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { djId } = req.query;
+    if (djId !== session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const client = await clientPromise;
@@ -20,7 +26,7 @@ export default async function handler(req, res) {
     const earnings = await db.collection('requests').aggregate([
       { 
         $match: { 
-          djId: userId,
+          djId: djId,
           status: 'completed',
           isWithdrawn: { $ne: true }
         }
@@ -36,7 +42,7 @@ export default async function handler(req, res) {
 
     // Create withdrawal record
     const withdrawal = {
-      djId: userId,
+      djId: djId,
       amount: totalAmount,
       status: 'pending',
       createdAt: new Date(),
@@ -48,7 +54,7 @@ export default async function handler(req, res) {
     // Mark requests as withdrawn
     await db.collection('requests').updateMany(
       { 
-        djId: userId,
+        djId: djId,
         status: 'completed',
         isWithdrawn: { $ne: true }
       },

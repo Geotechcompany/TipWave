@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 
 export default async function handler(req, res) {
@@ -7,9 +8,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { djId } = req.query;
+    if (djId !== session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const { timeframe = 'month' } = req.query;
@@ -36,7 +42,7 @@ export default async function handler(req, res) {
       db.collection('requests').aggregate([
         { 
           $match: { 
-            djId: userId,
+            djId: djId,
             status: 'completed',
             createdAt: { $gte: startDate }
           }
@@ -48,7 +54,7 @@ export default async function handler(req, res) {
       db.collection('requests').aggregate([
         {
           $match: {
-            djId: userId,
+            djId: djId,
             status: 'completed',
             createdAt: { $gte: startDate }
           }
@@ -69,7 +75,7 @@ export default async function handler(req, res) {
       db.collection('requests').aggregate([
         { 
           $match: { 
-            djId: userId,
+            djId: djId,
             status: 'completed'
           }
         },
