@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
-  Save, User, Bell, CreditCard, 
-  Moon, Sun, Monitor, Globe,
-  Loader2, DollarSign
+  Save,  CreditCard, 
+  Moon, Sun, Monitor,
+  Loader2, DollarSign, CheckCircle
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -22,6 +22,8 @@ export function SettingsPanel({ isOpen, onClose }) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
 
   // Currency settings
   const { 
@@ -35,26 +37,35 @@ export function SettingsPanel({ isOpen, onClose }) {
     defaultCurrency?.code || "USD"
   );
 
-  // Memoize fetchUserSettings to maintain a stable reference
+  // Fetch real user settings from database
   const fetchUserSettings = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     setIsLoading(true);
     try {
-      // Simulation: replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch('/api/user/settings');
       
-      // Some mock settings loading
+      if (!response.ok) {
+        throw new Error('Failed to fetch user settings');
+      }
+      
+      const data = await response.json();
+      
+      // Update settings with data from database
       setSettings({
-        darkMode: true,
-        emailNotifications: true,
-        pushNotifications: false,
-        soundEnabled: true,
-        language: "english",
-        displayMode: "system",
-        privacyMode: "balanced"
+        darkMode: data.darkMode ?? true,
+        emailNotifications: data.emailNotifications ?? true,
+        pushNotifications: data.pushNotifications ?? false,
+        soundEnabled: data.soundEnabled ?? true,
+        language: data.language ?? "english",
+        displayMode: data.displayMode ?? "system",
+        privacyMode: data.privacyMode ?? "balanced"
       });
       
       // Set selected currency from user profile or default
-      if (defaultCurrency?.code) {
+      if (data.preferredCurrency) {
+        setSelectedCurrency(data.preferredCurrency);
+      } else if (defaultCurrency?.code) {
         setSelectedCurrency(defaultCurrency.code);
       }
     } catch (error) {
@@ -63,29 +74,44 @@ export function SettingsPanel({ isOpen, onClose }) {
     } finally {
       setIsLoading(false);
     }
-  }, [defaultCurrency?.code, setSelectedCurrency]); // Add dependencies used in the function
+  }, [session?.user?.id, defaultCurrency?.code]); 
 
   // Fetch user settings when panel opens
   useEffect(() => {
     if (isOpen && session?.user) {
       fetchUserSettings();
     }
-  }, [isOpen, session, fetchUserSettings]); // Add fetchUserSettings as a dependency
+  }, [isOpen, session, fetchUserSettings]);
 
   // Update selected currency when defaultCurrency changes
   useEffect(() => {
-    if (defaultCurrency?.code) {
+    if (defaultCurrency?.code && !settings.preferredCurrency) {
       setSelectedCurrency(defaultCurrency.code);
     }
-  }, [defaultCurrency]);
+  }, [defaultCurrency, settings.preferredCurrency]);
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveSuccess(false);
+    
     try {
       // Save general settings
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const response = await fetch('/api/user/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...settings,
+          preferredCurrency: selectedCurrency
+        }),
+      });
       
-      // Save currency preference if changed and we have a default to compare against
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+      
+      // Handle currency preference separately if needed
       if (defaultCurrency?.code && selectedCurrency !== defaultCurrency.code) {
         const success = await setUserCurrency(selectedCurrency);
         if (!success) {
@@ -93,8 +119,16 @@ export function SettingsPanel({ isOpen, onClose }) {
         }
       }
       
+      setSaveSuccess(true);
       toast.success("Settings saved successfully");
-      onClose();
+      
+      // Remove the auto-close timeout
+      // Let the user decide when to close the panel
+      if (autoCloseDelay > 0) {
+        setTimeout(() => {
+          onClose();
+        }, autoCloseDelay);
+      }
     } catch (error) {
       console.error("Error saving settings:", error);
       toast.error("Failed to save settings");
@@ -105,6 +139,13 @@ export function SettingsPanel({ isOpen, onClose }) {
 
   const handleCurrencyChange = (e) => {
     setSelectedCurrency(e.target.value);
+  };
+  
+  const handleSettingChange = (key, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
 
   return (
@@ -143,321 +184,266 @@ export function SettingsPanel({ isOpen, onClose }) {
         </button>
       </div>
       
-      {/* Settings Content */}
-      <div className="p-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+      {/* Content */}
+      <div className="p-4">
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
           </div>
         ) : (
-          <div className="space-y-8">
+          <>
             {/* Account Settings */}
-            {activeTab === "account" && (
-              <div className="space-y-6">
+            <div className={activeTab === "account" ? "block" : "hidden"}>
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <User className="w-5 h-5 mr-2 text-blue-400" />
-                    Personal Information
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Display Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Your display name"
-                        defaultValue={session?.user?.name || ""}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-1">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="your.email@example.com"
-                        defaultValue={session?.user?.email || ""}
-                        disabled
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={session?.user?.name || ''}
+                    disabled={true}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-300 disabled:opacity-60"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Name displayed on your profile and comments
+                  </p>
                 </div>
                 
                 <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Bell className="w-5 h-5 mr-2 text-blue-400" />
-                    Notifications
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Email Notifications</p>
-                        <p className="text-sm text-gray-400">Receive updates via email</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={settings.emailNotifications}
-                          onChange={() => setSettings({
-                            ...settings,
-                            emailNotifications: !settings.emailNotifications
-                          })}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Push Notifications</p>
-                        <p className="text-sm text-gray-400">Receive on device alerts</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={settings.pushNotifications}
-                          onChange={() => setSettings({
-                            ...settings,
-                            pushNotifications: !settings.pushNotifications
-                          })}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={session?.user?.email || ''}
+                    disabled={true}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-300 disabled:opacity-60"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Your account email (contact support to change)
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Privacy Mode
+                  </label>
+                  <select
+                    value={settings.privacyMode}
+                    onChange={(e) => handleSettingChange('privacyMode', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-300"
+                  >
+                    <option value="private">Private - Maximum privacy</option>
+                    <option value="balanced">Balanced - Recommended</option>
+                    <option value="public">Public - Maximum visibility</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Controls visibility of your activity and profile
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
             
             {/* Preferences Settings */}
-            {activeTab === "preferences" && (
-              <div className="space-y-6">
+            <div className={activeTab === "preferences" ? "block" : "hidden"}>
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Moon className="w-5 h-5 mr-2 text-blue-400" />
-                    Appearance
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
-                        Display Mode
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          className={`p-3 rounded-lg flex flex-col items-center ${
-                            settings.displayMode === "light" 
-                              ? "bg-blue-900/50 border border-blue-500/50" 
-                              : "bg-gray-800 border border-gray-700"
-                          }`}
-                          onClick={() => setSettings({...settings, displayMode: "light"})}
-                        >
-                          <Sun className="h-5 w-5 mb-1" />
-                          <span className="text-xs">Light</span>
-                        </button>
-                        <button
-                          className={`p-3 rounded-lg flex flex-col items-center ${
-                            settings.displayMode === "dark" 
-                              ? "bg-blue-900/50 border border-blue-500/50" 
-                              : "bg-gray-800 border border-gray-700"
-                          }`}
-                          onClick={() => setSettings({...settings, displayMode: "dark"})}
-                        >
-                          <Moon className="h-5 w-5 mb-1" />
-                          <span className="text-xs">Dark</span>
-                        </button>
-                        <button
-                          className={`p-3 rounded-lg flex flex-col items-center ${
-                            settings.displayMode === "system" 
-                              ? "bg-blue-900/50 border border-blue-500/50" 
-                              : "bg-gray-800 border border-gray-700"
-                          }`}
-                          onClick={() => setSettings({...settings, displayMode: "system"})}
-                        >
-                          <Monitor className="h-5 w-5 mb-1" />
-                          <span className="text-xs">System</span>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Sound Effects</p>
-                        <p className="text-sm text-gray-400">Enable UI sound effects</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={settings.soundEnabled}
-                          onChange={() => setSettings({
-                            ...settings,
-                            soundEnabled: !settings.soundEnabled
-                          })}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Globe className="w-5 h-5 mr-2 text-blue-400" />
-                    Language & Region
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
-                        Language
-                      </label>
-                      <select
-                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                        value={settings.language}
-                        onChange={(e) => setSettings({...settings, language: e.target.value})}
-                      >
-                        <option value="english">English</option>
-                        <option value="spanish">Spanish</option>
-                        <option value="french">French</option>
-                        <option value="german">German</option>
-                        <option value="japanese">Japanese</option>
-                      </select>
-                    </div>
-                    
-                    {/* Currency Settings */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
-                        Preferred Currency
-                      </label>
-                      <select 
-                        className="w-full p-2 rounded-md bg-gray-800 border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                        value={selectedCurrency}
-                        onChange={handleCurrencyChange}
-                        disabled={isCurrencyLoading}
-                      >
-                        {currencies.map(currency => (
-                          <option key={currency.code} value={currency.code}>
-                            {currency.name} ({currency.symbol})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        All amounts will be displayed in your preferred currency.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Payments Settings */}
-            {activeTab === "payments" && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2 text-blue-400" />
-                    Payment Methods
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="bg-blue-500/20 p-2 rounded-full mr-3">
-                          <CreditCard className="h-5 w-5 text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium">Card •••• 4242</p>
-                          <p className="text-xs text-gray-400">Expires 12/24</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded">
-                          Edit
-                        </button>
-                        <button className="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-400 px-2 py-1 rounded">
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <button className="w-full py-2 border border-dashed border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors">
-                      + Add Payment Method
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Display Mode
+                  </label>
+                  <div className="flex border border-gray-700 rounded-md overflow-hidden">
+                    <button
+                      onClick={() => handleSettingChange('displayMode', 'dark')}
+                      className={`flex-1 flex items-center justify-center py-2 px-3 ${
+                        settings.displayMode === 'dark' 
+                          ? 'bg-gray-700 text-blue-400' 
+                          : 'bg-gray-800 text-gray-400'
+                      }`}
+                    >
+                      <Moon className="h-4 w-4 mr-2" />
+                      <span>Dark</span>
+                    </button>
+                    <button
+                      onClick={() => handleSettingChange('displayMode', 'light')}
+                      className={`flex-1 flex items-center justify-center py-2 px-3 ${
+                        settings.displayMode === 'light' 
+                          ? 'bg-gray-700 text-blue-400' 
+                          : 'bg-gray-800 text-gray-400'
+                      }`}
+                    >
+                      <Sun className="h-4 w-4 mr-2" />
+                      <span>Light</span>
+                    </button>
+                    <button
+                      onClick={() => handleSettingChange('displayMode', 'system')}
+                      className={`flex-1 flex items-center justify-center py-2 px-3 ${
+                        settings.displayMode === 'system' 
+                          ? 'bg-gray-700 text-blue-400' 
+                          : 'bg-gray-800 text-gray-400'
+                      }`}
+                    >
+                      <Monitor className="h-4 w-4 mr-2" />
+                      <span>System</span>
                     </button>
                   </div>
                 </div>
                 
                 <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2 text-blue-400" />
-                    Billing Preferences
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Auto Top-up</p>
-                        <p className="text-sm text-gray-400">Automatically add funds when balance is low</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={false}
-                          onChange={() => {}}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Receipt Emails</p>
-                        <p className="text-sm text-gray-400">Send email receipts for transactions</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={true}
-                          onChange={() => {}}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Language
+                  </label>
+                  <select
+                    value={settings.language}
+                    onChange={(e) => handleSettingChange('language', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-300"
+                  >
+                    <option value="english">English</option>
+                    <option value="spanish">Spanish</option>
+                    <option value="french">French</option>
+                    <option value="german">German</option>
+                    <option value="swahili">Swahili</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.emailNotifications}
+                      onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+                      className="rounded bg-gray-800 border-gray-700 text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="text-sm text-gray-300">Email Notifications</span>
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.pushNotifications}
+                      onChange={(e) => handleSettingChange('pushNotifications', e.target.checked)}
+                      className="rounded bg-gray-800 border-gray-700 text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="text-sm text-gray-300">Push Notifications</span>
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.soundEnabled}
+                      onChange={(e) => handleSettingChange('soundEnabled', e.target.checked)}
+                      className="rounded bg-gray-800 border-gray-700 text-blue-500 focus:ring-blue-400"
+                    />
+                    <span className="text-sm text-gray-300">Sound Effects</span>
+                  </label>
                 </div>
               </div>
+            </div>
+            
+            {/* Payment Settings */}
+            <div className={activeTab === "payments" ? "block" : "hidden"}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Preferred Currency
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <DollarSign className="h-5 w-5 text-gray-500" />
+                    </div>
+                    <select
+                      value={selectedCurrency}
+                      onChange={handleCurrencyChange}
+                      className="block w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-300"
+                      disabled={isCurrencyLoading}
+                    >
+                      {isCurrencyLoading ? (
+                        <option>Loading currencies...</option>
+                      ) : (
+                        currencies.map(curr => (
+                          <option key={curr.code} value={curr.code}>
+                            {curr.name} ({curr.symbol})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Currency used for displaying prices and payments
+                  </p>
+                </div>
+                
+                <div className="pt-4 border-t border-gray-800">
+                  <h3 className="text-sm font-medium text-gray-300 mb-2">
+                    Payment Methods
+                  </h3>
+                  
+                  <div className="bg-gray-800 rounded-md p-3 mb-3">
+                    <div className="flex items-center">
+                      <CreditCard className="h-5 w-5 text-gray-400 mr-3" />
+                      <div>
+                        <div className="text-sm text-gray-300">Visa •••• 4242</div>
+                        <div className="text-xs text-gray-500">Expires 12/25</div>
+                      </div>
+                      <div className="ml-auto">
+                        <span className="text-xs font-medium text-green-500 bg-green-900/20 px-2 py-1 rounded">
+                          Default
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button className="text-sm text-blue-400 hover:text-blue-300">
+                    + Add payment method
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Footer with Save Button */}
+        <div className="mt-6 pt-4 border-t border-gray-800 flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={isLoading || isSaving}
+            className={`flex items-center px-4 py-2 rounded-md ${
+              saveSuccess 
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Settings
+              </>
             )}
+          </button>
+        </div>
+        
+        {saveSuccess && (
+          <div className="mt-4 p-3 bg-green-900/30 border border-green-600 rounded-lg">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+              <span className="text-green-300">Your settings have been successfully saved.</span>
+            </div>
           </div>
         )}
-      </div>
-      
-      {/* Footer / Save Button */}
-      <div className="border-t border-gray-800 p-4 bg-gray-900">
-        <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full flex items-center justify-center space-x-2 px-6 py-3 
-                   bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed
-                   text-white rounded-xl transition-colors"
-        >
-          {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
-        </button>
       </div>
     </div>
   );

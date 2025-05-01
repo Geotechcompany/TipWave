@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Remove or update these invalid options
+    // turbo: false,  // Remove this line
+    // serverComponents: false,  // Remove this line
+  },
   images: {
     domains: [
       "i.scdn.co", 
@@ -51,6 +58,11 @@ const nextConfig = {
         socks: false,
       };
     }
+    // Add this to ensure proper path resolution
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, './')
+    };
     return config;
   }
 };

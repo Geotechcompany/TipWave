@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 import { sendNotificationEmail, EmailTypes } from '@/lib/email';
+import { getWalletByUserId } from '@/lib/models/Wallet';
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   // Check authentication using NextAuth
@@ -22,9 +24,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Store song first
     const client = await clientPromise;
     const db = client.db();
+    
+    // Check if user has sufficient wallet balance using the wallets collection
+    const userId = session.user.id;
+    const bidAmount = parseFloat(amount);
+    
+    // Get wallet and check balance
+    const wallet = await getWalletByUserId(userId);
+    
+    // Check if wallet exists and has sufficient balance
+    if (!wallet || wallet.balance < bidAmount) {
+      return res.status(400).json({ 
+        error: 'Insufficient funds', 
+        currentBalance: wallet?.balance || 0 
+      });
+    }
+    
+    // Store song first
     const songs = db.collection('songs');
     
     // Check if song already exists
@@ -48,48 +66,79 @@ export default async function handler(req, res) {
       songDoc = { _id: result.insertedId, ...newSong };
     }
 
-    // Create bid
-    const bids = db.collection('bids');
-    const newBid = {
-      userId: session.user.id,
-      amount: parseFloat(amount),
-      songId: songDoc._id,
-      status: 'PENDING',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    const bidResult = await bids.insertOne(newBid);
+    // Start a session for transaction
+    const mongoSession = client.startSession();
+    
+    let bidResult;
+    
+    try {
+      await mongoSession.withTransaction(async () => {
+        // Deduct amount from wallet
+        await db.collection('wallets').updateOne(
+          { userId: new ObjectId(userId) },
+          { 
+            $inc: { balance: -bidAmount },
+            $set: { updatedAt: new Date() }
+          },
+          { session: mongoSession }
+        );
+        
+        // Create bid
+        const bids = db.collection('bids');
+        const newBid = {
+          userId: userId,
+          amount: bidAmount,
+          songId: songDoc._id,
+          status: 'PENDING',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        bidResult = await bids.insertOne(newBid, { session: mongoSession });
+        
+        // Create transaction record
+        const transactions = db.collection('transactions');
+        await transactions.insertOne({
+          userId: new ObjectId(userId),
+          type: 'bid',
+          songTitle: song.name,
+          amount: -bidAmount,
+          relatedId: bidResult.insertedId,
+          status: 'COMPLETED',
+          description: `Bid for song: ${song.name}`,
+          createdAt: new Date()
+        }, { session: mongoSession });
+      });
+    } finally {
+      await mongoSession.endSession();
+    }
 
     const userEmail = session.user.email;
-    const userName = session.user.name || userEmail.split('@')[0];
-
-    // Send confirmation email with better error handling
+    
+    // Send email notification about the bid
     try {
       await sendNotificationEmail({
         to: userEmail,
-        type: EmailTypes.BID_CONFIRMATION,
+        type: EmailTypes.BID_CREATED,
         data: {
-          userName,
+          userName: session.user.name || userEmail.split('@')[0],
           songTitle: song.name,
-          songArtist: song.artists.map(a => a.name).join(', '),
-          amount: amount,
-          status: 'PENDING'
+          artistName: song.artists.map(a => a.name).join(', '),
+          bidAmount: amount
         }
       });
-      console.log(`Bid confirmation email sent to ${userEmail}`);
     } catch (emailError) {
-      console.error('Failed to send bid confirmation email:', emailError);
-      // Continue with the response even if email fails
+      console.error('Failed to send bid notification email:', emailError);
+      // Continue processing even if email fails
     }
 
-    return res.status(201).json({ 
-      success: true, 
-      bid: { _id: bidResult.insertedId, ...newBid },
-      song: songDoc
+    return res.status(200).json({
+      success: true,
+      bid: bidResult.insertedId,
+      message: 'Bid created successfully'
     });
   } catch (error) {
     console.error('Error creating bid:', error);
-    return res.status(500).json({ error: 'Failed to create bid' });
+    res.status(500).json({ error: 'Failed to create bid' });
   }
 } 

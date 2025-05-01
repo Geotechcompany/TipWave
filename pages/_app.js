@@ -1,4 +1,4 @@
-import { CurrencyProvider } from '@/context/CurrencyContext';
+import { CurrencyProvider } from '../context/CurrencyContext';
 import { SessionProvider } from "next-auth/react";
 import { AlertProvider } from "../contexts/AlertContext.js";
 import { useState, useEffect } from 'react';

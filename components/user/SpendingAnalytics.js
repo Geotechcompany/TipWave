@@ -2,10 +2,14 @@
 
 import { motion } from "framer-motion";
 import { DollarSign, TrendingUp } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
 // Removed useState since we're not using state variables in this component currently
 // import { useState } from "react";
 
 export function SpendingAnalytics({ stats = {}, isLoading = false }) {
+  // Get currency context
+  const { formatCurrency, currency, isLoading: isCurrencyLoading } = useCurrency();
+
   // Removed unused state variables
   // const [timeRange, setTimeRange] = useState("month");
   // const [category, setCategory] = useState("all");
@@ -24,21 +28,24 @@ export function SpendingAnalytics({ stats = {}, isLoading = false }) {
   const spendingStats = [
     {
       title: "Total Spent",
-      value: `$${totalSpent.toFixed(2)}`,
+      value: formatCurrency(totalSpent),
       change: "+15%",
       icon: <DollarSign className="h-5 w-5 text-green-400" />,
       color: "from-green-500/20 to-green-600/20"
     },
     {
       title: "Average Per Request",
-      value: `$${(totalSpent / (totalBids || 1)).toFixed(2)}`,
+      value: formatCurrency(totalSpent / (totalBids || 1)),
       change: "+8%",
       icon: <TrendingUp className="h-5 w-5 text-blue-400" />,
       color: "from-blue-500/20 to-blue-600/20"
     }
   ];
 
-  if (isLoading) {
+  // Combined loading state
+  const isLoadingData = isLoading || isCurrencyLoading;
+
+  if (isLoadingData) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -117,7 +124,14 @@ export function SpendingAnalytics({ stats = {}, isLoading = false }) {
                     </div>
                   </td>
                   <td className="p-4 text-gray-300">{transaction.djName || 'Unknown DJ'}</td>
-                  <td className="p-4 font-medium">${(transaction.amount || 0).toFixed(2)}</td>
+                  <td className="p-4 font-medium">
+                    {formatCurrency(transaction.amount || 0)}
+                    {currency && currency.code !== 'USD' && (
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({currency.code})
+                      </span>
+                    )}
+                  </td>
                   <td className="p-4">
                     <span className={`
                       inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize

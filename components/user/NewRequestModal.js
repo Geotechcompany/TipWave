@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Music, Search, DollarSign, Loader2 } from "lucide-react";
+import { X, Music, Search, DollarSign, Loader2, Wallet } from "lucide-react";
 import Image from "next/image";
 import { searchTracksWithDebounce } from "@/lib/spotify";
 import { useDebounce } from "@/hooks/useDebounce";
 import toast from "react-hot-toast";
+import { useCurrency } from "@/context/CurrencyContext";
 
 export function NewRequestModal({ isOpen, onClose, onSubmit }) {
   const [songSearch, setSongSearch] = useState("");
@@ -16,12 +17,47 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Add wallet balance states
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [balanceError, setBalanceError] = useState(null);
+  
+  // Add currency context
+  const { formatCurrency, currency, isLoading: isCurrencyLoading } = useCurrency();
+  
   const debouncedSearch = useDebounce(songSearch, 500);
 
   // New state variables for DJ loading
   const [availableDJs, setAvailableDJs] = useState([]);
   const [isDJsLoading, setIsDJsLoading] = useState(true);
   const [djsError, setDJsError] = useState(null);
+
+  // Fetch wallet balance when modal opens
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
+      try {
+        setIsLoadingBalance(true);
+        setBalanceError(null);
+        
+        // Changed from /api/user/wallet to /api/user/balance
+        const response = await fetch('/api/user/balance');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch wallet balance');
+        }
+        
+        const data = await response.json();
+        setWalletBalance(data.balance || 0);
+      } catch (error) {
+        console.error('Error fetching wallet balance:', error);
+        setBalanceError('Could not fetch your wallet balance');
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+    
+    fetchWalletBalance();
+  }, []);
 
   // Fetch DJs with role "DJ" on component mount
   useEffect(() => {
@@ -51,6 +87,9 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
       fetchDJs();
     }
   }, [isOpen]);
+
+  // Check if amount exceeds wallet balance
+  const isAmountExceedingBalance = amount > walletBalance;
 
   useEffect(() => {
     const searchSpotify = async () => {
@@ -281,18 +320,39 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Bid Amount ($)
+                  Bid Amount ({currency?.symbol || '$'})
                 </label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <DollarSign className="h-5 w-5 text-gray-400" />
+                  </div>
                   <input
                     type="number"
+                    min="1"
+                    step="1"
                     value={amount}
                     onChange={(e) => setAmount(Number(e.target.value))}
-                    min="1"
-                    className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    className={`w-full pl-10 p-3 bg-gray-800 border ${
+                      isAmountExceedingBalance ? 'border-red-600' : 'border-gray-700'
+                    } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    placeholder="Amount"
                   />
+                </div>
+                
+                <div className="mt-2 flex items-center text-sm">
+                  <Wallet className="h-4 w-4 mr-1 text-gray-400" />
+                  {isLoadingBalance || isCurrencyLoading ? (
+                    <span className="text-gray-400 flex items-center">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" /> Loading balance...
+                    </span>
+                  ) : balanceError ? (
+                    <span className="text-red-500">{balanceError}</span>
+                  ) : (
+                    <span className={`${isAmountExceedingBalance ? 'text-red-500' : 'text-gray-400'}`}>
+                      Wallet balance: {formatCurrency(walletBalance)}
+                      {isAmountExceedingBalance && ' (Insufficient funds)'}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -311,7 +371,7 @@ export function NewRequestModal({ isOpen, onClose, onSubmit }) {
 
               <button
                 type="submit"
-                disabled={!selectedTrack || !selectedDJ || isSubmitting}
+                disabled={!selectedTrack || !selectedDJ || isSubmitting || isAmountExceedingBalance}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors duration-200"
               >
                 {isSubmitting ? (

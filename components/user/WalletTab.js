@@ -2,29 +2,73 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   Wallet, Plus, ArrowDownCircle, ArrowUpCircle, Clock, 
-  Calendar, Filter, ChevronRight, Download, Loader2, CreditCard, 
-  
+  Calendar, Filter, ChevronRight, Loader2, CreditCard, 
+  Music, RefreshCcw, History
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
-import { TopUpModal } from "./TopUpModal";
+import { TopUpModal } from "./TopUpModal.jsx";
+import { useSession } from "next-auth/react";
+
 
 export function WalletTab() {
+  const { data: session } = useSession();
   const [balance, setBalance] = useState(0);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [transactionType, setTransactionType] = useState("all");
-  const { formatCurrency, defaultCurrency } = useCurrency();
+  const { 
+    formatCurrency
+  } = useCurrency();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Fetch user balance on component mount
+  // Fetch wallet balance and transaction history
+  const fetchWalletData = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      setIsRefreshing(true);
+      
+      // Fetch wallet balance
+      const balanceResponse = await fetch('/api/wallet/balance');
+      if (!balanceResponse.ok) {
+        throw new Error('Failed to fetch wallet balance');
+      }
+      const balanceData = await balanceResponse.json();
+      setBalance(balanceData.balance);
+      
+      // Fetch transaction history
+      const transactionsResponse = await fetch('/api/wallet/transactions?limit=5');
+      if (!transactionsResponse.ok) {
+        throw new Error('Failed to fetch transactions');
+      }
+      const transactionsData = await transactionsResponse.json();
+      setTransactions(transactionsData.transactions || []);
+      
+    } catch (error) {
+      console.error('Error fetching wallet data:', error);
+      toast.error('Could not load wallet data');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [session?.user?.id]);
+
+  // Initial data fetch
   useEffect(() => {
-    fetchUserBalance();
-  }, []);
+    fetchWalletData();
+  }, [session?.user?.id, fetchWalletData]);
   
+  // Refresh wallet data
+  const handleRefresh = () => {
+    fetchWalletData();
+    toast.success('Wallet data refreshed');
+  };
+
   // Fetch transactions when page or filter changes
   const fetchTransactions = useCallback(async () => {
     try {
@@ -51,25 +95,6 @@ export function WalletTab() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const fetchUserBalance = async () => {
-    try {
-      setIsLoadingBalance(true);
-      const response = await fetch("/api/user/balance");
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch balance");
-      }
-      
-      const data = await response.json();
-      setBalance(data.balance || 0);
-    } catch (error) {
-      console.error("Error fetching balance:", error);
-      toast.error("Failed to load your account balance");
-    } finally {
-      setIsLoadingBalance(false);
-    }
-  };
-
   const handleTopUpComplete = (newBalance) => {
     setBalance(newBalance);
     setShowTopUpModal(false);
@@ -86,6 +111,10 @@ export function WalletTab() {
         return <ArrowDownCircle className="h-5 w-5 text-red-400" />;
       case 'tip':
         return <CreditCard className="h-5 w-5 text-blue-400" />;
+      case 'request':
+        return <Music className="h-5 w-5 text-purple-400" />;
+      case 'bid':
+        return <Music className="h-5 w-5 text-indigo-400" />;
       default:
         return <Clock className="h-5 w-5 text-gray-400" />;
     }
@@ -108,6 +137,10 @@ export function WalletTab() {
         return 'Withdrawal to Bank Account';
       case 'tip':
         return transaction.djName ? `Tip to ${transaction.djName}` : 'Tip to DJ';
+      case 'request':
+        return transaction.songTitle ? `Song Request: "${transaction.songTitle}"` : 'Song Request';
+      case 'bid':
+        return transaction.songTitle ? `Song Bid: "${transaction.songTitle}"` : 'Song Bid';
       default:
         return 'Transaction';
     }
@@ -138,49 +171,54 @@ export function WalletTab() {
       </div>
 
       {/* Balance Card */}
-      <div className="bg-gradient-to-br from-blue-900 to-purple-900 rounded-xl p-6 shadow-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-white flex items-center">
-            <Wallet className="h-5 w-5 mr-2" />
-            Account Balance
-          </h3>
-        </div>
-        
-        <div className="flex items-baseline">
-          {isLoadingBalance ? (
-            <div className="flex items-center">
-              <Loader2 className="h-5 w-5 animate-spin mr-2 text-blue-300" />
-              <span className="text-gray-200">Loading balance...</span>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 backdrop-blur-lg rounded-xl border border-blue-500/20 p-6"
+      >
+        <div className="flex justify-between items-start">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-500/20 p-3 rounded-full">
+              <Wallet className="h-6 w-6 text-blue-400" />
             </div>
-          ) : (
-            <>
-              <span className="text-3xl font-bold text-white">
-                {formatCurrency(balance)}
-              </span>
-              <span className="ml-2 text-blue-200">{defaultCurrency.code}</span>
-            </>
-          )}
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">Wallet Balance</h3>
+              <p className="text-3xl font-bold mt-1">
+                {isLoading ? (
+                  <span className="inline-block w-24 h-8 bg-gray-700 rounded animate-pulse"></span>
+                ) : (
+                  formatCurrency(balance)
+                )}
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            <RefreshCcw className={`h-5 w-5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
         
-        {/* Quick Actions */}
-        <div className="mt-6 flex space-x-2">
+        <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowTopUpModal(true)}
-            className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 rounded-lg py-3 px-4 text-white font-medium transition-colors"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-5 w-5" />
             Top Up
           </button>
           
           <button
-            className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
-            onClick={() => toast("Withdraw functionality coming soon!")}
+            className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/10 rounded-lg py-3 px-4 text-white font-medium transition-colors"
           >
-            <Download className="h-4 w-4 mr-1" />
-            Withdraw
+            <History className="h-5 w-5" />
+            View All
           </button>
         </div>
-      </div>
+      </motion.div>
       
       {/* Transaction History */}
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">

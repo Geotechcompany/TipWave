@@ -20,33 +20,36 @@ export default async function handler(req, res) {
     const db = client.db();
     const userId = session.user.id;
 
-    // Handle GET request to fetch user transactions
+    // Handle GET request for retrieving transaction history
     if (req.method === 'GET') {
-      const { limit = 10, page = 1, type } = req.query;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 5;
+      const skip = (page - 1) * limit;
+      const type = req.query.type;
       
       // Build query filter
-      const filter = { userId };
-      if (type) filter.type = type;
+      const filter = { userId: new ObjectId(userId) };
+      if (type && type !== 'all') {
+        filter.type = type;
+      }
       
-      // Fetch transactions with pagination
+      // Get transactions with pagination
       const transactions = await db.collection('transactions')
         .find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit))
+        .limit(limit)
         .toArray();
       
-      const total = await db.collection('transactions').countDocuments(filter);
+      // Get total count for pagination
+      const totalCount = await db.collection('transactions').countDocuments(filter);
+      const totalPages = Math.ceil(totalCount / limit);
       
       return res.status(200).json({
         transactions,
-        pagination: {
-          total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / parseInt(limit))
-        }
+        currentPage: page,
+        totalPages,
+        totalCount
       });
     }
 
@@ -109,7 +112,7 @@ export default async function handler(req, res) {
       });
     }
   } catch (error) {
-    console.error('Error processing transaction:', error);
-    res.status(500).json({ error: 'Failed to process transaction' });
+    console.error('Error with transactions:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 } 

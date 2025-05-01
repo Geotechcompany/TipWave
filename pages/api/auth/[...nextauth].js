@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { findUserByEmail, createUser } from "@/lib/models/user";
+import { findUserByEmail, createUser } from '@/lib/models/user';
 import bcrypt from "bcryptjs";
 import { getSession } from "next-auth/react";
 import { generateDefaultAvatar } from '@/lib/avatar';

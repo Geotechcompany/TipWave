@@ -28,8 +28,9 @@ export default function DJDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState({
     totalRequests: 0,
-    completedRequests: 0,
-    earnings: 0,
+    acceptedRequests: 0,
+    rejectedRequests: 0,
+    totalEarnings: 0,
     upcomingEvents: [],
     topSongs: [],
     completionRate: 0,
@@ -315,7 +316,7 @@ export default function DJDashboard() {
               
               {showNotifications && (
                 <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
-                  <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                  <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
                     <h3 className="font-medium">Notifications</h3>
                     <button
                       onClick={markAllAsRead}
@@ -491,7 +492,7 @@ export default function DJDashboard() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-gray-400 text-sm">Total Requests</p>
-                            <h3 className="text-2xl font-bold mt-1">{stats.totalRequests}</h3>
+                            <h3 className="text-2xl font-bold mt-1">{stats?.totalRequests ?? 0}</h3>
                           </div>
                           <div className="p-3 bg-blue-500/20 text-blue-500 rounded-lg">
                             <Music className="h-5 w-5" />
@@ -499,14 +500,13 @@ export default function DJDashboard() {
                         </div>
                         <div className="mt-3 flex items-center text-xs text-gray-400">
                           <TrendingUp className={`h-3 w-3 mr-1 ${
-                            stats.trends.requests >= 0 ? 'text-green-500' : 'text-red-500'
+                            (stats?.trends?.requests ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
                           }`} />
                           <span className={
-                            stats.trends.requests >= 0 ? 'text-green-500' : 'text-red-500'
+                            (stats?.trends?.requests ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
                           }>
-                            {Math.abs(stats.trends.requests)}%
+                            {(stats?.trends?.requests ?? 0) >= 0 ? '+' : ''}{stats?.trends?.requests ?? 0}% from last month
                           </span>
-                          <span className="ml-1">vs last week</span>
                         </div>
                       </div>
                       
@@ -514,7 +514,7 @@ export default function DJDashboard() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-gray-400 text-sm">Total Earnings</p>
-                            <h3 className="text-2xl font-bold mt-1">${stats.earnings}</h3>
+                            <h3 className="text-2xl font-bold mt-1">${stats?.totalEarnings ?? 0}</h3>
                           </div>
                           <div className="p-3 bg-green-500/20 text-green-500 rounded-lg">
                             <DollarSign className="h-5 w-5" />
@@ -522,14 +522,13 @@ export default function DJDashboard() {
                         </div>
                         <div className="mt-3 flex items-center text-xs text-gray-400">
                           <TrendingUp className={`h-3 w-3 mr-1 ${
-                            stats.trends.earnings >= 0 ? 'text-green-500' : 'text-red-500'
+                            (stats?.trends?.earnings ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
                           }`} />
                           <span className={
-                            stats.trends.earnings >= 0 ? 'text-green-500' : 'text-red-500'
+                            (stats?.trends?.earnings ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
                           }>
-                            {Math.abs(stats.trends.earnings)}%
+                            {(stats?.trends?.earnings ?? 0) >= 0 ? '+' : ''}{stats?.trends?.earnings ?? 0}% from last month
                           </span>
-                          <span className="ml-1">vs last month</span>
                         </div>
                       </div>
                       
@@ -538,8 +537,8 @@ export default function DJDashboard() {
                           <div>
                             <p className="text-gray-400 text-sm">Completion Rate</p>
                             <h3 className="text-2xl font-bold mt-1">
-                              {stats.totalRequests > 0
-                                ? Math.round((stats.completedRequests / stats.totalRequests) * 100)
+                              {(stats?.totalRequests ?? 0) > 0
+                                ? Math.round(((stats?.acceptedRequests ?? 0) / (stats?.totalRequests ?? 0)) * 100)
                                 : 0}%
                             </h3>
                           </div>
@@ -553,8 +552,8 @@ export default function DJDashboard() {
                               className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full"
                               style={{
                                 width: `${
-                                  stats.totalRequests > 0
-                                    ? Math.round((stats.completedRequests / stats.totalRequests) * 100)
+                                  (stats?.totalRequests ?? 0) > 0
+                                    ? Math.round(((stats?.acceptedRequests ?? 0) / (stats?.totalRequests ?? 0)) * 100)
                                     : 0
                                 }%`,
                               }}
@@ -643,7 +642,7 @@ export default function DJDashboard() {
                               <div className="animate-pulse">
                                 <div className="h-[200px] bg-gray-700/50 rounded-lg" />
                               </div>
-                            ) : analytics[`${selectedTimeframe}lyData`]?.length > 0 ? (
+                            ) : analytics?.[`${selectedTimeframe}lyData`]?.length > 0 ? (
                               <div className="h-[200px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <AreaChart
@@ -701,9 +700,9 @@ export default function DJDashboard() {
                                 <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : stats.events.length > 0 ? (
+                          ) : stats?.events?.length > 0 ? (
                             <div className="space-y-4">
-                              {stats.events.map((event, i) => (
+                              {stats?.events?.map((event, i) => (
                                 <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
                                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
                                     <Calendar className="h-6 w-6 text-blue-400" />

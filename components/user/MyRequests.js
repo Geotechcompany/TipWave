@@ -6,12 +6,14 @@ import { NewRequestModal } from "./NewRequestModal";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from 'date-fns';
 import { DEFAULT_ALBUM_ART } from '@/utils/constants';
+import { useCurrency } from '@/context/CurrencyContext';
 
 export function MyRequests() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [requests, setRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { currency, exchangeRates, isLoading: isCurrencyLoading } = useCurrency();
 
   // Fetch user requests
   const fetchRequests = async () => {
@@ -71,6 +73,28 @@ export function MyRequests() {
     r.status === "pending" || r.status === "accepted"
   );
 
+  // Function to convert amounts to the selected currency
+  const convertAmount = (amount) => {
+    if (!amount || isCurrencyLoading || !currency || !exchangeRates) {
+      return amount;
+    }
+    
+    // Assuming amounts are stored in USD by default
+    const baseAmount = parseFloat(amount);
+    if (isNaN(baseAmount)) return amount;
+    
+    const rate = exchangeRates[currency.code] || 1;
+    const convertedAmount = baseAmount * rate;
+    
+    return convertedAmount.toFixed(2);
+  };
+
+  // Get currency symbol
+  const getCurrencySymbol = () => {
+    if (!currency) return '$';
+    return currency.symbol || currency.code;
+  };
+
   return (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
       <div className="flex justify-between items-center mb-6">
@@ -98,7 +122,7 @@ export function MyRequests() {
       />
 
       {/* Requests List */}
-      {isLoading ? (
+      {isLoading || isCurrencyLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         </div>
@@ -136,7 +160,14 @@ export function MyRequests() {
                 <h3 className="font-medium truncate">{request.songTitle}</h3>
                 <p className="text-sm text-gray-400 truncate">{request.songArtist}</p>
                 <div className="flex items-center gap-4 mt-1">
-                  <span className="text-blue-400 text-sm">${request.amount}</span>
+                  <span className="text-blue-400 text-sm">
+                    {getCurrencySymbol()}{convertAmount(request.amount)}
+                    {currency && currency.code !== 'USD' && (
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({currency.code})
+                      </span>
+                    )}
+                  </span>
                   <span className={`text-xs px-2 py-0.5 rounded ${
                     request.status === 'pending' ? 'bg-yellow-900/30 text-yellow-300' :
                     request.status === 'accepted' ? 'bg-green-900/30 text-green-300' :

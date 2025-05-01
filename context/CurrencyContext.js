@@ -5,14 +5,27 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // Create the Currency context
 const CurrencyContext = createContext();
 
+// Export the context so it can be imported directly
+export { CurrencyContext };
+
+// Create a custom hook for easier usage
+export function useCurrency() {
+  const context = useContext(CurrencyContext);
+  if (context === undefined) {
+    throw new Error('useCurrency must be used within a CurrencyProvider');
+  }
+  return context;
+}
+
 export function CurrencyProvider({ children }) {
   const [currencies, setCurrencies] = useState([]);
-  const [defaultCurrency, setDefaultCurrency] = useState({
+  const [currency, setCurrency] = useState({
     code: 'USD',
     symbol: '$',
     name: 'US Dollar',
     exchangeRate: 1
   });
+  const [exchangeRates, setExchangeRates] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -30,10 +43,19 @@ export function CurrencyProvider({ children }) {
         const data = await response.json();
         setCurrencies(data.currencies || []);
         
-        // Set default currency from database if available
-        if (data.defaultCurrency) {
-          setDefaultCurrency(data.defaultCurrency);
+        // Set user's preferred currency or default from database
+        if (data.userCurrency) {
+          setCurrency(data.userCurrency);
+        } else if (data.defaultCurrency) {
+          setCurrency(data.defaultCurrency);
         }
+
+        // Create exchange rates object
+        const rates = {};
+        data.currencies.forEach(curr => {
+          rates[curr.code] = curr.exchangeRate;
+        });
+        setExchangeRates(rates);
       } catch (err) {
         console.error('Error fetching currencies:', err);
         setError(err.message);
@@ -51,13 +73,13 @@ export function CurrencyProvider({ children }) {
     const numericAmount = Number(amount) || 0;
     
     // Get currency by code or use default
-    const currency = currencyCode 
+    const currToUse = currencyCode 
       ? currencies.find(c => c.code === currencyCode) 
-      : defaultCurrency;
+      : currency;
     
-    if (!currency) return `$${numericAmount.toFixed(2)}`;
+    if (!currToUse) return `$${numericAmount.toFixed(2)}`;
     
-    return `${currency.symbol}${numericAmount.toFixed(2)}`;
+    return `${currToUse.symbol}${numericAmount.toFixed(2)}`;
   };
 
   // Convert an amount from one currency to another
@@ -68,11 +90,11 @@ export function CurrencyProvider({ children }) {
     // Get source and target currencies
     const from = fromCurrency 
       ? currencies.find(c => c.code === fromCurrency) 
-      : defaultCurrency;
+      : currency;
       
     const to = toCurrency 
       ? currencies.find(c => c.code === toCurrency) 
-      : defaultCurrency;
+      : currency;
     
     if (!from || !to) return numericAmount;
     
@@ -103,7 +125,7 @@ export function CurrencyProvider({ children }) {
         throw new Error('Failed to update currency preference');
       }
       
-      setDefaultCurrency(currency);
+      setCurrency(currency);
       return true;
     } catch (error) {
       console.error('Error setting currency:', error);
@@ -111,10 +133,10 @@ export function CurrencyProvider({ children }) {
     }
   };
 
-  // Context value
   const value = {
     currencies,
-    defaultCurrency,
+    currency,
+    exchangeRates,
     isLoading,
     error,
     formatCurrency,
@@ -127,13 +149,4 @@ export function CurrencyProvider({ children }) {
       {children}
     </CurrencyContext.Provider>
   );
-}
-
-// Custom hook to use the currency context
-export function useCurrency() {
-  const context = useContext(CurrencyContext);
-  if (context === undefined) {
-    throw new Error('useCurrency must be used within a CurrencyProvider');
-  }
-  return context;
 } 

@@ -208,7 +208,7 @@ const Hero = () => {
       className="relative min-h-screen flex flex-col justify-center items-center text-center px-4 py-16 overflow-hidden"
       id="hero"
     >
-      {/* Background video with improved overlay */}
+      {/* Background video with overlay */}
       <motion.div style={{ scale }} className="absolute inset-0 z-0">
         <video
           ref={videoRef}
@@ -224,7 +224,56 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/90"></div>
       </motion.div>
       
-      {/* Hero content with improved spacing and no blur */}
+      {/* SVG Decorative Elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Circular audio wave SVG */}
+        <svg className="absolute -left-20 top-1/4 w-64 h-64 text-blue-500/10" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="5,5" />
+          <circle cx="100" cy="100" r="60" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3,3" />
+          <circle cx="100" cy="100" r="40" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="2,2" />
+        </svg>
+        
+        {/* Sound wave SVG */}
+        <svg className="absolute right-10 bottom-1/4 w-96 h-32 text-purple-500/10" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+          {[...Array(20)].map((_, i) => (
+            <motion.rect 
+              key={i} 
+              x={i * 10} 
+              y="25" 
+              width="4" 
+              height="0"
+              fill="currentColor"
+              animate={{ 
+                height: [10, Math.random() * 30 + 10, 10],
+                y: [25, 25 - (Math.random() * 15 + 5), 25]
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                delay: i * 0.1,
+                ease: "easeInOut"
+              }}
+            />
+          ))}
+        </svg>
+        
+        {/* Geometric dots pattern */}
+        <svg className="absolute left-1/2 bottom-32 w-80 h-80 text-blue-500/5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          {[...Array(10)].map((_, row) => (
+            [...Array(10)].map((_, col) => (
+              <circle 
+                key={`${row}-${col}`} 
+                cx={row * 10 + 5} 
+                cy={col * 10 + 5} 
+                r="1.5" 
+                fill="currentColor" 
+              />
+            ))
+          ))}
+        </svg>
+      </div>
+      
+      {/* Hero content */}
       <div className="relative z-10 max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -232,17 +281,17 @@ const Hero = () => {
           transition={{ duration: 0.7, delay: 0.2 }}
           className="flex flex-col items-center"
         >
-          {/* Main heading with adjusted spacing and no blur */}
+          {/* Main heading with proper spacing */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
-            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 pb-3">
+            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 pb-2">
               Shape the Night
             </span>
-            <span className="block text-white md:leading-tight">
+            <span className="block text-white pb-4">
               with TipWave
             </span>
           </h1>
           
-          {/* Subtitle with proper spacing for descenders */}
+          {/* Subtitle with proper spacing */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -250,24 +299,22 @@ const Hero = () => {
             className="text-xl md:text-2xl text-white/80 max-w-2xl pb-3 leading-relaxed"
           >
             Elevate your nightlife experience with AI-powered song bidding.
-            Influence the DJ's playlist in real-time.
+            Influence the DJ&apos;s playlist in real-time.
           </motion.p>
           
-          {/* CTA buttons with proper spacing */}
+          {/* CTA buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.5 }}
             className="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto justify-center"
           >
-            {/* Primary button remains the same */}
             {session ? (
-              <Link href="/dashboard">
+              <Link href="/dashboard/user">
                 <motion.button
                   whileHover={{ 
                     scale: 1.05, 
-                    boxShadow: "0 0 30px rgba(139, 92, 246, 0.5)",
-                    textShadow: "0 0 8px rgba(255, 255, 255, 0.5)"
+                    boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)"
                   }}
                   whileTap={{ scale: 0.98 }}
                   className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
@@ -276,7 +323,6 @@ const Hero = () => {
                     Go to Dashboard
                     <ChevronRight className="ml-2 h-5 w-5" />
                   </span>
-                  <span className="absolute inset-0 h-full w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500"></span>
                 </motion.button>
               </Link>
             ) : (
@@ -284,8 +330,7 @@ const Hero = () => {
                 onClick={() => signIn()}
                 whileHover={{ 
                   scale: 1.05, 
-                  boxShadow: "0 0 30px rgba(139, 92, 246, 0.5)",
-                  textShadow: "0 0 8px rgba(255, 255, 255, 0.5)"
+                  boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)"
                 }}
                 whileTap={{ scale: 0.98 }}
                 className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
@@ -294,11 +339,9 @@ const Hero = () => {
                   Start Bidding Now
                   <ChevronRight className="ml-2 h-5 w-5" />
                 </span>
-                <span className="absolute inset-0 h-full w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500"></span>
               </motion.button>
             )}
             
-            {/* Secondary button */}
             <motion.button
               whileHover={{ 
                 scale: 1.05,
@@ -314,12 +357,12 @@ const Hero = () => {
             </motion.button>
           </motion.div>
           
-          {/* Stats section with proper spacing and 3D hover effect */}
+          {/* Stats section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.5 }}
-            className="pt-20 flex flex-wrap justify-center gap-8 sm:gap-12 md:gap-20 text-center"
+            className="pt-16 md:pt-20 flex flex-wrap justify-center gap-8 sm:gap-12 md:gap-20 text-center"
           >
             {[
               { value: '12,500+', label: 'ACTIVE USERS', color: 'from-blue-400 to-blue-600' },
@@ -328,8 +371,8 @@ const Hero = () => {
             ].map((stat, index) => (
               <motion.div 
                 key={index}
-                whileHover={{ y: -5, scale: 1.05, rotateX: 10, z: 20 }}
-                className="flex flex-col items-center group perspective-500"
+                whileHover={{ y: -5, scale: 1.05 }}
+                className="flex flex-col items-center group"
               >
                 <motion.span 
                   className={`text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${stat.color}`}
@@ -343,40 +386,11 @@ const Hero = () => {
                 <span className="text-white/60 text-xs uppercase tracking-widest mt-2 group-hover:text-white/90 transition-all duration-300">
                   {stat.label}
                 </span>
-                <motion.div 
-                  className="h-0.5 w-0 bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:w-full transition-all duration-300 mt-1 rounded-full"
-                  initial={{ width: 0 }}
-                  whileHover={{ width: "100%" }}
-                />
               </motion.div>
             ))}
           </motion.div>
         </motion.div>
       </div>
-      
-      {/* Improved scroll indicator */}
-      <motion.div 
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5, duration: 0.5 }}
-      >
-        <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-        >
-          <a href="#features" className="flex flex-col items-center text-white/60 hover:text-white/90 transition-colors">
-            <span className="text-xs uppercase tracking-widest mb-2 font-light">Discover More</span>
-            <div className="w-6 h-10 rounded-full border border-white/20 p-1">
-              <motion.div 
-                className="w-1 h-1 bg-white/60 rounded-full mx-auto"
-                animate={{ y: [0, 14, 0] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-              />
-            </div>
-          </a>
-        </motion.div>
-      </motion.div>
     </motion.section>
   );
 };
@@ -388,7 +402,7 @@ const Features = () => {
   const features = [
     {
       title: "Real-time Bidding",
-      description: "Place bids on songs you want to hear next and watch as the DJ's playlist updates in real-time.",
+      description: "Place bids on songs you want to hear next and watch as the DJ&apos;s playlist updates in real-time.",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

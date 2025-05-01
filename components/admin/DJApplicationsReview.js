@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { 
   Card, CardContent, CardDescription, 
   CardFooter, CardHeader, CardTitle 
-} from "@/components/ui/card";
+} from "../../components/ui/card";
 import {
   Loader2, CheckCircle, XCircle, ExternalLink,
   Instagram, Globe, Music, 
 } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 import toast from 'react-hot-toast';
 
 export default function DJApplicationsReview() {
