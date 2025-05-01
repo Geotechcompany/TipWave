@@ -1,8 +1,6 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import Link from "next/link"; // Removed unused import: useRouter
+import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -31,10 +29,11 @@ const LandingPage = () => {
       <div className="fixed inset-0 z-0 opacity-40">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-black"></div>
         <div ref={parallaxRef} className="w-full h-full">
-          <Image src="https://images.unsplash.com/photo-1484417894907-623942c8ee29?q=80&w=2940&auto=format&fit=crop"
+          <Image 
+            src="https://images.unsplash.com/photo-1484417894907-623942c8ee29?q=80&w=2940&auto=format&fit=crop"
             alt="Neural Network"
-            layout="fill"
-            objectFit="cover"
+            fill
+            style={{ objectFit: "cover" }}
             quality={100}
             className="opacity-20"
           />
@@ -202,14 +201,14 @@ const Hero = () => {
   const { scrollYProgress } = useScroll();
   const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 0.3], [1, 1.1]);
-  const yPosAnim = useTransform(scrollYProgress, [0, 0.3], [0, 100]);
   
   return (
     <motion.section
       style={{ opacity }}
-      className="relative h-screen flex flex-col justify-center items-center text-center p-6 overflow-hidden"
+      className="relative min-h-screen flex flex-col justify-center items-center text-center px-4 py-16 overflow-hidden"
       id="hero"
     >
+      {/* Background video with improved overlay */}
       <motion.div style={{ scale }} className="absolute inset-0 z-0">
         <video
           ref={videoRef}
@@ -222,103 +221,162 @@ const Hero = () => {
           <source src="/banner.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/90"></div>
       </motion.div>
-
-      <div className="relative z-10 max-w-4xl mx-auto">
+      
+      {/* Hero content with improved spacing and no blur */}
+      <div className="relative z-10 max-w-5xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          style={{ y: yPosAnim }}
-          className="space-y-8"
+          transition={{ duration: 0.7, delay: 0.2 }}
+          className="flex flex-col items-center"
         >
-          <motion.h1
-            className="text-5xl md:text-7xl font-bold mb-6 leading-tight"
-          >
-            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">
+          {/* Main heading with adjusted spacing and no blur */}
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
+            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 pb-3">
               Shape the Night
             </span>
-            <span className="block">with TipWave</span>
-          </motion.h1>
+            <span className="block text-white md:leading-tight">
+              with TipWave
+            </span>
+          </h1>
           
+          {/* Subtitle with proper spacing for descenders */}
           <motion.p
-            className="text-xl md:text-2xl mb-8 text-white/80 max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
+            className="text-xl md:text-2xl text-white/80 max-w-2xl pb-3 leading-relaxed"
           >
-            Elevate your nightlife experience. Bid on your favorite songs and 
-            influence the DJ&apos;s playlist in real-time.
+            Elevate your nightlife experience with AI-powered song bidding.
+            Influence the DJ's playlist in real-time.
           </motion.p>
           
-          <div className="flex justify-center gap-4 mt-8">
+          {/* CTA buttons with proper spacing */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto justify-center"
+          >
+            {/* Primary button remains the same */}
             {session ? (
-              <Link href="/dashboard/user">
+              <Link href="/dashboard">
                 <motion.button
-                  whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
-                  whileTap={{ scale: 0.95 }}
-                  className="relative group px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden"
+                  whileHover={{ 
+                    scale: 1.05, 
+                    boxShadow: "0 0 30px rgba(139, 92, 246, 0.5)",
+                    textShadow: "0 0 8px rgba(255, 255, 255, 0.5)"
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
                 >
-                  <span className="relative flex items-center justify-center">
+                  <span className="relative flex items-center justify-center z-10">
                     Go to Dashboard
                     <ChevronRight className="ml-2 h-5 w-5" />
                   </span>
+                  <span className="absolute inset-0 h-full w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500"></span>
                 </motion.button>
               </Link>
             ) : (
               <motion.button
                 onClick={() => signIn()}
-                whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(139, 92, 246, 0.7)" }}
-                whileTap={{ scale: 0.95 }}
-                className="relative group px-8 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden"
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: "0 0 30px rgba(139, 92, 246, 0.5)",
+                  textShadow: "0 0 8px rgba(255, 255, 255, 0.5)"
+                }}
+                whileTap={{ scale: 0.98 }}
+                className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
               >
-                <span className="relative flex items-center justify-center">
+                <span className="relative flex items-center justify-center z-10">
                   Start Bidding Now
                   <ChevronRight className="ml-2 h-5 w-5" />
                 </span>
+                <span className="absolute inset-0 h-full w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500"></span>
               </motion.button>
             )}
-          </div>
+            
+            {/* Secondary button */}
+            <motion.button
+              whileHover={{ 
+                scale: 1.05,
+                backgroundColor: "rgba(255, 255, 255, 0.1)"
+              }}
+              whileTap={{ scale: 0.98 }}
+              className="px-10 py-4 bg-white/5 border border-white/10 rounded-full text-white/90 font-medium text-lg transition-all duration-300 w-full sm:w-auto"
+              onClick={() => {
+                document.getElementById('features')?.scrollIntoView({behavior: 'smooth'});
+              }}
+            >
+              Explore Features
+            </motion.button>
+          </motion.div>
           
+          {/* Stats section with proper spacing and 3D hover effect */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.5 }}
-            className="pt-20 flex flex-wrap justify-center gap-12 text-center"
+            transition={{ delay: 0.9, duration: 0.5 }}
+            className="pt-20 flex flex-wrap justify-center gap-8 sm:gap-12 md:gap-20 text-center"
           >
-            <div className="flex flex-col items-center">
-              <span className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">
-                {new Intl.NumberFormat().format(12500)}+
-              </span>
-              <span className="text-white/60 text-sm uppercase tracking-wider mt-2">Active Users</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-purple-600">
-                {new Intl.NumberFormat().format(74600)}+
-              </span>
-              <span className="text-white/60 text-sm uppercase tracking-wider mt-2">Songs Played</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-pink-600">
-                {new Intl.NumberFormat().format(850)}+
-              </span>
-              <span className="text-white/60 text-sm uppercase tracking-wider mt-2">Partner DJs</span>
-            </div>
+            {[
+              { value: '12,500+', label: 'ACTIVE USERS', color: 'from-blue-400 to-blue-600' },
+              { value: '74,600+', label: 'SONGS PLAYED', color: 'from-purple-400 to-purple-600' },
+              { value: '850+', label: 'PARTNER DJS', color: 'from-pink-400 to-pink-600' }
+            ].map((stat, index) => (
+              <motion.div 
+                key={index}
+                whileHover={{ y: -5, scale: 1.05, rotateX: 10, z: 20 }}
+                className="flex flex-col items-center group perspective-500"
+              >
+                <motion.span 
+                  className={`text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${stat.color}`}
+                  initial={{ scale: 0.9 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ type: "spring", stiffness: 200, delay: index * 0.1 }}
+                >
+                  {stat.value}
+                </motion.span>
+                <span className="text-white/60 text-xs uppercase tracking-widest mt-2 group-hover:text-white/90 transition-all duration-300">
+                  {stat.label}
+                </span>
+                <motion.div 
+                  className="h-0.5 w-0 bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:w-full transition-all duration-300 mt-1 rounded-full"
+                  initial={{ width: 0 }}
+                  whileHover={{ width: "100%" }}
+                />
+              </motion.div>
+            ))}
           </motion.div>
         </motion.div>
       </div>
       
-      <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 z-10">
+      {/* Improved scroll indicator */}
+      <motion.div 
+        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5, duration: 0.5 }}
+      >
         <motion.div
           animate={{ y: [0, 10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
         >
           <a href="#features" className="flex flex-col items-center text-white/60 hover:text-white/90 transition-colors">
-            <span className="text-xs uppercase tracking-widest mb-2">Discover More</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
+            <span className="text-xs uppercase tracking-widest mb-2 font-light">Discover More</span>
+            <div className="w-6 h-10 rounded-full border border-white/20 p-1">
+              <motion.div 
+                className="w-1 h-1 bg-white/60 rounded-full mx-auto"
+                animate={{ y: [0, 14, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+              />
+            </div>
           </a>
         </motion.div>
-      </div>
+      </motion.div>
     </motion.section>
   );
 };
@@ -336,7 +394,7 @@ const Features = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      image: "https://images.unsplash.com/photo-1642078834515-ec885ec26fa6?q=80&w=2400&auto=format&fit=crop"
+      image: "https://images.unsplash.com/photo-1438557068880-c5f474830377?q=80&w=2400&auto=format&fit=crop"
     },
     {
       title: "Smart DJ Analytics",
@@ -346,7 +404,7 @@ const Features = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       ),
-      image: "https://images.unsplash.com/photo-1624384562382-1f8ed7b97e65?q=80&w=2370&auto=format&fit=crop"
+      image: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?q=80&w=2370&auto=format&fit=crop"
     },
     {
       title: "Secure Payments",
@@ -356,7 +414,7 @@ const Features = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
       ),
-      image: "https://images.unsplash.com/photo-1604594849809-dfedbc827105?q=80&w=2370&auto=format&fit=crop"
+      image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?q=80&w=2370&auto=format&fit=crop"
     }
   ];
   
@@ -479,7 +537,7 @@ const HowItWorks = () => {
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-black via-purple-900/10 to-black"></div>
         <Image
-          src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2370&auto=format&fit=crop"
+          src="https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=2370&auto=format&fit=crop"
           alt="DJ Background"
           layout="fill"
           objectFit="cover"
@@ -546,7 +604,7 @@ const HowItWorks = () => {
                 <div className="md:w-1/2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
                   <div className="h-64 relative">
                     <Image
-                      src={`https://images.unsplash.com/photo-${index === 0 ? '1540039155733-5bb30b53aa14' : index === 1 ? '1429962714451-bb934ecdc4ec' : index === 2 ? '1516873240891-996f09f3cd2e' : '1496307042754-b4aa456c4a2d'}?q=80&w=800&auto=format&fit=crop`}
+                      src={`https://images.unsplash.com/photo-${index === 0 ? '1540039155733-5bb30b53aa14' : index === 1 ? '1429962714451-bb934ecdc4ec' : index === 2 ? '1517457373958-b7bdd4587205' : '1496307042754-b4aa456c4a2d'}?q=80&w=800&auto=format&fit=crop`}
                       alt={`Step ${step.number}`}
                       layout="fill"
                       objectFit="cover"
