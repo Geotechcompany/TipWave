@@ -1,5 +1,7 @@
 import clientPromise from '@/lib/mongodb';
 
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -28,6 +30,7 @@ export default async function handler(req, res) {
     });
     
     if (!pendingTx) {
+      console.error('Transaction not found:', CheckoutRequestID);
       return res.status(404).json({ error: 'Transaction not found' });
     }
     
@@ -78,7 +81,7 @@ export default async function handler(req, res) {
           }
         );
         
-        // Update pending transaction status
+        // Update the pending transaction status
         await db.collection('pendingTransactions').updateOne(
           { checkoutRequestId: CheckoutRequestID },
           { 
@@ -92,10 +95,32 @@ export default async function handler(req, res) {
         );
         
         await mongoSession.commitTransaction();
+        
+        // Get user details for the email
+        const user = await db.collection('users').findOne(
+          { _id: pendingTx.userId }
+        );
+        
+        if (user && user.email) {
+          // Send success email notification
+          await sendNotificationEmail({
+            type: EmailTypes.WALLET_TOPUP,
+            recipient: user.email,
+            data: {
+              userName: user.name || 'Valued Customer',
+              amount: amount || pendingTx.amount,
+              currency: pendingTx.currency || 'KES',
+              transactionId: mpesaReceiptNumber,
+              date: new Date().toLocaleDateString(),
+              paymentMethod: 'M-Pesa'
+            }
+          });
+          
+          console.log(`Payment success email sent to ${user.email}`);
+        }
       } catch (error) {
         await mongoSession.abortTransaction();
         console.error('Error processing M-Pesa callback:', error);
-        throw error;
       } finally {
         await mongoSession.endSession();
       }
@@ -120,4 +145,4 @@ export default async function handler(req, res) {
     // Still respond with success to M-Pesa to prevent retries
     res.status(200).json({ success: true });
   }
-} 
+}

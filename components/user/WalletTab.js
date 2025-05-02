@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   Wallet, Plus, ArrowDownCircle, ArrowUpCircle, Clock, 
-  Calendar, Filter, ChevronRight, Loader2, CreditCard, 
-  Music, RefreshCcw, History
+  Calendar, Filter,  Loader2, CreditCard, 
+  Music, RefreshCcw, History, Badge
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
@@ -25,6 +25,8 @@ export function WalletTab() {
     formatCurrency
   } = useCurrency();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const [pendingTransactions, setPendingTransactions] = useState([]);
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -48,6 +50,13 @@ export function WalletTab() {
       }
       const transactionsData = await transactionsResponse.json();
       setTransactions(transactionsData.transactions || []);
+      
+      // Add this code to fetch pending transactions
+      const pendingResponse = await fetch('/api/payments/mpesa/pending');
+      if (pendingResponse.ok) {
+        const pendingData = await pendingResponse.json();
+        setPendingTransactions(pendingData.transactions || []);
+      }
       
     } catch (error) {
       console.error('Error fetching wallet data:', error);
@@ -74,6 +83,8 @@ export function WalletTab() {
     try {
       setIsLoadingTransactions(true);
       const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
+      
+      // Get regular transactions
       const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
       
       if (!response.ok) {
@@ -81,7 +92,36 @@ export function WalletTab() {
       }
       
       const data = await response.json();
-      setTransactions(data.transactions || []);
+      let allTransactions = data.transactions || [];
+      
+      // Get pending transactions if we're looking at all or topup transactions
+      if (transactionType === "all" || transactionType === "topup") {
+        const pendingResponse = await fetch(`/api/payments/mpesa/pending`);
+        if (pendingResponse.ok) {
+          const pendingData = await pendingResponse.json();
+          
+          // Format pending transactions to match regular transactions
+          const formattedPending = pendingData.transactions.map(pt => ({
+            _id: pt._id || pt.checkoutRequestId,
+            type: 'topup',
+            amount: pt.amount,
+            currency: pt.currency || 'KES',
+            paymentMethod: 'mpesa',
+            status: 'pending',
+            description: 'M-Pesa wallet top-up (pending)',
+            details: {
+              checkoutRequestId: pt.checkoutRequestId
+            },
+            createdAt: pt.createdAt
+          }));
+          
+          // Combine and sort all transactions by date
+          allTransactions = [...allTransactions, ...formattedPending]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
+      }
+      
+      setTransactions(allTransactions || []);
       setTotalPages(data.totalPages || 1);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -95,12 +135,17 @@ export function WalletTab() {
     fetchTransactions();
   }, [fetchTransactions]);
 
-  const handleTopUpComplete = (newBalance) => {
-    setBalance(newBalance);
+  const handleTopUpComplete = (data) => {
+    if (data?.CheckoutRequestID) {
+      toast.success("M-Pesa payment initiated. Checking status...");
+      
+      setTimeout(() => {
+        checkPaymentStatus(data.CheckoutRequestID);
+      }, 5000);
+    }
+    
     setShowTopUpModal(false);
-    toast.success("Your account was successfully topped up!");
-    // Refresh transactions to show the new top-up
-    fetchTransactions();
+    fetchWalletData();
   };
   
   const getTransactionIcon = (type) => {
@@ -130,25 +175,106 @@ export function WalletTab() {
   };
   
   const getTransactionDescription = (transaction) => {
+    const isPending = (transaction.status || '').toLowerCase() === 'pending';
+    const pendingText = isPending ? ' (Pending)' : '';
+    
     switch (transaction.type) {
       case 'topup':
-        return `Account Top-up (${transaction.paymentMethod === 'creditCard' ? 'Credit Card' : 'PayPal'})`;
+        return `Wallet top-up via ${transaction.paymentMethod || 'payment'}${pendingText}`;
       case 'withdraw':
-        return 'Withdrawal to Bank Account';
+        return `Withdrawal${pendingText}`;
       case 'tip':
-        return transaction.djName ? `Tip to ${transaction.djName}` : 'Tip to DJ';
+        return `Tip to ${transaction.recipientName || 'creator'}${pendingText}`;
       case 'request':
-        return transaction.songTitle ? `Song Request: "${transaction.songTitle}"` : 'Song Request';
+        return `Song request: ${transaction.songTitle || 'Unknown'}${pendingText}`;
       case 'bid':
-        return transaction.songTitle ? `Song Bid: "${transaction.songTitle}"` : 'Song Bid';
+        return `Song bid: ${transaction.songTitle || 'Unknown'}${pendingText}`;
       default:
-        return 'Transaction';
+        return `${transaction.description || 'Transaction'}${pendingText}`;
     }
   };
   
   const handleFilterChange = (type) => {
     setTransactionType(type);
     setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  const checkPaymentStatus = useCallback(async (checkoutRequestId) => {
+    try {
+      setCheckingPayment(true);
+      const res = await fetch(`/api/payments/mpesa/confirm/${checkoutRequestId}`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (data.status === "COMPLETED") {
+          toast.success("Payment completed successfully!");
+          fetchWalletData();
+          return true;
+        } else if (data.status === "FAILED") {
+          toast.error("Payment failed. Please try again.");
+          fetchWalletData();
+          return true;
+        } else {
+          toast.info("Payment is still being processed. Please wait.");
+        }
+      }
+      return false; // Still pending
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      return false;
+    } finally {
+      setCheckingPayment(false);
+    }
+  }, [fetchWalletData]);
+
+  useEffect(() => {
+    // Check if there are any pending transactions
+    const hasPendingTransaction = transactions.some(tx => 
+      tx.status === 'pending' || 
+      (tx.type === 'topup' && tx.paymentMethod === 'mpesa')
+    );
+    
+    let intervalId;
+    if (hasPendingTransaction) {
+      // Poll for updates every 10 seconds if we have pending transactions
+      intervalId = setInterval(() => {
+        // Find pending M-Pesa transactions
+        const pendingMpesa = transactions.find(tx => 
+          tx.status === 'pending' && 
+          tx.paymentMethod === 'mpesa' && 
+          tx.details?.checkoutRequestId
+        );
+        
+        if (pendingMpesa?.details?.checkoutRequestId) {
+          checkPaymentStatus(pendingMpesa.details.checkoutRequestId);
+        } else {
+          fetchWalletData();
+        }
+      }, 10000);
+    }
+    
+    // Also refresh when the component mounts
+    fetchWalletData();
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [transactions, checkPaymentStatus, fetchWalletData]);
+
+  const getTransactionStatus = (transaction) => {
+    // Convert status to lowercase for consistent comparison
+    const status = (transaction.status || 'pending').toLowerCase();
+    
+    switch (status) {
+      case 'completed':
+        return { text: 'Completed', color: 'text-green-500' };
+      case 'pending':
+        return { text: 'Pending', color: 'text-yellow-500' };
+      case 'failed':
+        return { text: 'Failed', color: 'text-red-500' };
+      default:
+        return { text: status.charAt(0).toUpperCase() + status.slice(1), color: 'text-gray-500' };
+    }
   };
 
   return (
@@ -265,42 +391,55 @@ export function WalletTab() {
             </div>
           ) : (
             <>
-              {transactions.map((transaction) => (
-                <div key={transaction._id} className="p-4 hover:bg-gray-700/30 transition-colors">
-                  <div className="flex items-center">
-                    <div className="p-2 rounded-full bg-gray-700 mr-3">
-                      {getTransactionIcon(transaction.type)}
-                    </div>
-                    
-                    <div className="flex-grow">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-200">
-                            {getTransactionDescription(transaction)}
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            {formatDate(transaction.createdAt)}
-                          </p>
+              {transactions.map((transaction) => {
+                const status = getTransactionStatus(transaction);
+                return (
+                  <div key={transaction._id} className="border-b border-gray-100 dark:border-gray-800 py-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center">
+                        <div className="mr-3">
+                          {getTransactionIcon(transaction.type)}
                         </div>
-                        
-                        <div className="text-right">
-                          <p className={`font-semibold ${
-                            transaction.type === 'topup' ? 'text-green-400' : 'text-red-400'
-                          }`}>
-                            {transaction.type === 'topup' ? '+' : '-'} 
-                            {formatCurrency(transaction.amount, transaction.currencyCode)}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {transaction.status === 'completed' ? 'Completed' : transaction.status}
-                          </p>
+                        <div>
+                          <p className="font-medium">{getTransactionDescription(transaction)}</p>
+                          <div className="flex items-center text-xs text-gray-500 mt-1">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            <span>{formatDate(transaction.createdAt)}</span>
+                            
+                            <span className={`ml-3 ${status.color}`}>• {status.text}</span>
+                          </div>
                         </div>
                       </div>
+                      <div className="text-right">
+                        <p className={`font-semibold ${transaction.type === 'topup' ? 'text-green-500' : 'text-red-500'}`}>
+                          {transaction.type === 'topup' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        </p>
+                        
+                        {transaction.status === 'pending' && 
+                         transaction.paymentMethod === 'mpesa' && 
+                         transaction.details?.checkoutRequestId && (
+                          <button 
+                            onClick={() => checkPaymentStatus(transaction.details.checkoutRequestId)}
+                            disabled={checkingPayment}
+                            className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center justify-end ml-auto">
+                            {checkingPayment ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                <span>Checking...</span>
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCcw className="h-3 w-3 mr-1" />
+                                <span>Check Status</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    
-                    <ChevronRight className="h-4 w-4 text-gray-500 ml-2" />
                   </div>
-                </div>
-              ))}
+                );
+              })}
               
               {/* Pagination Controls */}
               {totalPages > 1 && (
@@ -330,6 +469,42 @@ export function WalletTab() {
           )}
         </div>
       </div>
+      
+      {/* Add this after your regular transactions list */}
+      {pendingTransactions.length > 0 && (
+        <div className="mt-6 border-t pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Pending Transactions</h3>
+            <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+              {pendingTransactions.length} pending
+            </Badge>
+          </div>
+          
+          <div className="space-y-2">
+            {pendingTransactions.map((tx) => (
+              <div key={tx._id || tx.checkoutRequestId} className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 text-yellow-500 mr-2" />
+                    <div>
+                      <p className="font-medium">M-Pesa Payment (Pending)</p>
+                      <p className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{tx.currency || 'KES'} {tx.amount}</p>
+                    <button 
+                      onClick={() => checkPaymentStatus(tx.checkoutRequestId)}
+                      className="text-xs text-blue-600 hover:text-blue-800">
+                      Check Status
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* Top Up Modal */}
       <TopUpModal 

@@ -23,6 +23,8 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
    * (currently only set, future implementation will use this for transaction lookup)
    */
   const [_transactionId, setTransactionId] = useState(null);
+  const [attempts, setAttempts] = useState(0);
+  const [verificationInterval, setVerificationInterval] = useState(null);
 
   useEffect(() => {
     const fetchCurrency = async () => {
@@ -41,6 +43,14 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
     
     fetchCurrency();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (verificationInterval) {
+        clearInterval(verificationInterval);
+      }
+    };
+  }, [verificationInterval]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -111,41 +121,78 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   };
   
   const verifyMpesaPayment = async (CheckoutRequestID) => {
-    // Implement polling to check payment status
-    let attempts = 0;
+    // Reset attempts counter when starting verification
+    setAttempts(0);
+    let localAttempts = 0;
     const maxAttempts = 10;
+    
     const intervalId = setInterval(async () => {
       try {
-        attempts++;
+        localAttempts++;
+        setAttempts(localAttempts); // Update state with current attempt count
         
         const response = await fetch(`/api/payments/mpesa/confirm/${CheckoutRequestID}`);
-        const data = await response.json();
-        
-        // If payment is successful
-        if (data.ResultCode === "0") {
-          clearInterval(intervalId);
-          setIsVerifying(false);
-          setIsSubmitting(false);
-          
-          // Fetch updated balance
-          const balanceResponse = await fetch('/api/user/wallet');
-          const balanceData = await balanceResponse.json();
-          
-          onComplete(balanceData.balance);
-          toast.success("M-Pesa payment confirmed. Your balance has been updated!");
+        if (!response.ok) {
+          throw new Error("Failed to verify payment");
         }
         
-        // If we've reached max attempts, stop polling
-        if (attempts >= maxAttempts) {
+        const data = await response.json();
+        
+        // If payment is completed or failed, close the modal and notify
+        if (data.status === "COMPLETED") {
           clearInterval(intervalId);
           setIsVerifying(false);
           setIsSubmitting(false);
-          toast.error("Could not confirm M-Pesa payment. Please check your account later.");
+          
+          // Send the data to parent component
+          onComplete(data);
+          
+          // Close modal immediately
+          onClose();
+          
+          // Show success message
+          toast.success("Payment completed successfully! Your balance has been updated.");
+          return;
+        } 
+        
+        if (data.status === "FAILED") {
+          clearInterval(intervalId);
+          setIsVerifying(false);
+          setIsSubmitting(false);
+          
+          // Send failure info to parent
+          onComplete(data);
+          
+          // Close modal
+          onClose();
+          
+          // Show error message
+          toast.error("Payment failed. Please try again.");
+          return;
+        }
+        
+        // If we've reached max attempts, stop polling but allow user to close manually
+        if (localAttempts >= maxAttempts) {
+          clearInterval(intervalId);
+          setIsVerifying(false);
+          
+          // Update UI to show "Check status later" button instead of spinner
+          setIsSubmitting(false);
+          toast.info("Payment is still processing. You can close this window and check your account later.");
         }
       } catch (error) {
         console.error("Error verifying payment:", error);
+        
+        // On error after several attempts, allow user to close modal
+        if (localAttempts >= 3) {
+          setIsVerifying(false);
+          toast.error("Couldn't verify payment status. Please check your account later.");
+        }
       }
     }, 5000); // Check every 5 seconds
+    
+    // Save interval ID to state so we can clear it if user closes modal manually
+    setVerificationInterval(intervalId);
   };
 
   // JSX - adding M-Pesa option
@@ -279,21 +326,45 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
               )}
               
               <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || amount <= 0 || (selectedPaymentMethod === "mpesa" && !phoneNumber)}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors duration-200"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center">
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                      {isVerifying ? "Verifying payment..." : "Processing..."}
-                    </span>
-                  ) : (
-                    `Top Up ${formatCurrency(amount)}`
-                  )}
-                </button>
+                {isSubmitting ? (
+                  <button
+                    type="button"
+                    className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center"
+                    disabled={isVerifying}
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Verifying payment...
+                      </>
+                    ) : (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3.5 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center"
+                  >
+                    <DollarSign className="h-5 w-5 mr-2" />
+                    Top Up {localCurrency.symbol}{amount.toFixed(2)}
+                  </button>
+                )}
               </div>
+
+              {/* Add a cancel button when verifying for too long */}
+              {isVerifying && attempts > 5 && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full mt-3 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
+                >
+                  Check Status Later
+                </button>
+              )}
             </form>
 
             {/* Show transaction reference in verifying state */}

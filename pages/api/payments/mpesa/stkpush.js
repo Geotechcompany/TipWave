@@ -41,10 +41,11 @@ export default async function handler(req, res) {
     }
     
     const userId = session.user.id;
-    const { amount, phone, currency = 'KES', Order_ID } = req.body;
+    const { amount, phone, currency = 'KES' } = req.body;
     
-    if (!amount || !phone) {
-      return res.status(400).json({ error: 'Amount and phone number are required' });
+    // Validate request data
+    if (!amount || amount <= 0 || !phone) {
+      return res.status(400).json({ error: 'Invalid amount or phone number' });
     }
     
     // Format phone number (ensure it has the country code)
@@ -68,9 +69,13 @@ export default async function handler(req, res) {
       `${businessShortCode}${passkey}${timestamp}`
     ).toString('base64');
     
+    // Fix the callback URL formation
+    const callback_url = process.env.MPESA_CALLBACK_URL;
+    
+    console.log('Using M-Pesa callback URL:', callback_url);
+    
     // Initiate STK push
     const url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
-    const callback_url = process.env.MPESA_CALLBACK_URL || `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/mpesa/callback`;
     
     const stkPushResponse = await axios.post(
       url,
@@ -84,8 +89,8 @@ export default async function handler(req, res) {
         PartyB: businessShortCode,
         PhoneNumber: formattedPhone,
         CallBackURL: callback_url,
-        AccountReference: "TipWave Wallet",
-        TransactionDesc: "Top up wallet"
+        AccountReference: "TipWave Wallet TopUp",
+        TransactionDesc: "Top up your TipWave wallet"
       },
       {
         headers: {
@@ -94,6 +99,9 @@ export default async function handler(req, res) {
         }
       }
     );
+    
+    // Log the STK push response for debugging
+    console.log('M-Pesa STK push response:', JSON.stringify(stkPushResponse.data, null, 2));
     
     // If STK push is successful
     if (stkPushResponse.data.ResponseCode === "0") {
@@ -108,13 +116,15 @@ export default async function handler(req, res) {
         amount: Number(amount),
         phone: formattedPhone,
         currency,
-        type: 'topup',
         status: 'pending',
-        orderId: Order_ID,
         createdAt: new Date()
       });
       
-      return res.status(200).json(stkPushResponse.data);
+      return res.status(200).json({
+        success: true,
+        CheckoutRequestID: stkPushResponse.data.CheckoutRequestID,
+        MerchantRequestID: stkPushResponse.data.MerchantRequestID
+      });
     } else {
       return res.status(400).json({ 
         error: 'Failed to initiate M-Pesa payment',
@@ -123,6 +133,10 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Error initiating M-Pesa payment:', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to initiate payment',
+      details: error.message 
+    });
   }
-} 
+}
