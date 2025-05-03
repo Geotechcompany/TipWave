@@ -434,7 +434,7 @@ const Features = () => {
   
   return (
     <motion.section
-      style={{ opacity }}
+    
       id="features"
       className="py-24 px-6 relative"
     >
