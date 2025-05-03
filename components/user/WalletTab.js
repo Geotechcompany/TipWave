@@ -5,7 +5,7 @@ import {
   Calendar, Filter,  Loader2, CreditCard, 
   Music, RefreshCcw, History,  
   ChevronLeft, ChevronRight, Circle, Hash, CheckCircle, XCircle, 
-  RepeatIcon, ChevronDown
+  RepeatIcon, ChevronDown, AlertTriangle
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
@@ -33,7 +33,11 @@ export function WalletTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTransactions, setAllTransactions] = useState([]);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  const [ setNotification] = useState({ show: false, message: '', type: '' });
+  const [bannerToast, setBannerToast] = useState({
+    show: false,
+    message: '',
+    type: '', // 'success' or 'error'
+  });
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -67,7 +71,7 @@ export function WalletTab() {
       
     } catch (error) {
       console.error('Error fetching wallet data:', error);
-      toast.error('Could not load wallet data');
+      showBannerToast('Could not load wallet data', 'error');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -82,7 +86,7 @@ export function WalletTab() {
   // Refresh wallet data
   const handleRefresh = () => {
     fetchWalletData();
-    toast.success('Wallet data refreshed');
+    showBannerToast('Wallet data refreshed');
   };
 
   // Fetch transactions when page or filter changes
@@ -132,7 +136,7 @@ export function WalletTab() {
       setTotalPages(data.totalPages || 1);
     } catch (error) {
       console.error("Error fetching transactions:", error);
-      toast.error("Failed to load transaction history");
+      showBannerToast("Failed to load transaction history", "error");
     } finally {
       setIsLoadingTransactions(false);
     }
@@ -467,14 +471,9 @@ export function WalletTab() {
       const result = await response.json();
       
       if (result.success) {
-        setNotification({
-          show: true,
-          message: "M-Pesa payment request sent. Please check your phone.",
-          type: "success"
-        });
-        
-        // Auto-hide notification after 5 seconds
-        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+        showBannerToast("M-Pesa payment request sent. Please check your phone.");
+      } else {
+        showBannerToast(result.error || "Failed to process payment request", "error");
       }
       
       // Refresh data after a short delay
@@ -488,6 +487,20 @@ export function WalletTab() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Add this function to show a banner toast
+  const showBannerToast = (message, type = 'success') => {
+    setBannerToast({
+      show: true,
+      message,
+      type
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setBannerToast({ show: false, message: '', type: '' });
+    }, 5000);
   };
 
   return (
@@ -845,6 +858,44 @@ export function WalletTab() {
         onComplete={handleTopUpComplete}
         currentBalance={balance}
       />
+
+      {/* Banner Toast */}
+      {bannerToast.show && (
+        <div className={`fixed top-16 right-4 left-4 md:left-auto md:w-96 p-4 rounded-lg shadow-lg z-50 
+                        ${bannerToast.type === 'success' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-red-600 text-white'} 
+                        transform transition-all duration-300 ease-in-out`}
+             style={{ animation: 'slide-in-right 0.5s ease-out' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {bannerToast.type === 'success' 
+                ? <CheckCircle className="h-5 w-5 mr-2" /> 
+                : <AlertTriangle className="h-5 w-5 mr-2" />}
+              <p className="font-medium">{bannerToast.message}</p>
+            </div>
+            <button 
+              onClick={() => setBannerToast({ show: false, message: '', type: '' })}
+              className="ml-4 text-white/80 hover:text-white"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
-} 
+}
+
+<style jsx>{`
+  @keyframes slide-in-right {
+    0% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+`}</style> 

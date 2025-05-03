@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, Music, Clock, DollarSign,
   Settings, X, ChevronRight, Calendar, 
-  Users, TrendingUp, Radio, Share2, FileText, Wallet
+  Users, TrendingUp, Radio, Share2, FileText, Wallet,
+  LogOut
 } from "lucide-react";
 /* eslint-enable no-unused-vars */
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -18,6 +19,11 @@ export function MobileSidebar({ isOpen, setIsOpen, selectedView, setSelectedView
   const handleNavigation = (view) => {
     setSelectedView(view);
     setIsOpen(false);
+  };
+  
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await signOut({ callbackUrl: '/' });
   };
   
   return (
@@ -168,6 +174,17 @@ export function MobileSidebar({ isOpen, setIsOpen, selectedView, setSelectedView
                   Send Feedback
                 </button>
               </Link>
+              
+              {/* Add the logout button */}
+              {session && (
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 transition-colors mt-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+              )}
             </div>
           </motion.div>
         </>

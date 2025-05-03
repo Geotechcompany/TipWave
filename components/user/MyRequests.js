@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Music, Clock, PlusCircle, Loader2 } from "lucide-react";
+import { Music, Clock, PlusCircle, Loader2, XCircle, AlertTriangle, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { NewRequestModal } from "./NewRequestModal";
 import toast from "react-hot-toast";
@@ -16,6 +16,14 @@ export function MyRequests() {
   const { currency, exchangeRates, isLoading: isCurrencyLoading } = useCurrency();
   const [djs, setDjs] = useState({});
   const [loadingDjs, setLoadingDjs] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [requestToCancel, setRequestToCancel] = useState(null);
+  const [bannerToast, setBannerToast] = useState({
+    show: false,
+    message: '',
+    type: '', // 'success' or 'error'
+  });
 
   // Fetch user requests
   const fetchRequests = async () => {
@@ -146,6 +154,79 @@ export function MyRequests() {
     }
   }, [requests]);
 
+  // Add the function to show toast notifications
+  const showBannerToast = (message, type = 'success') => {
+    setBannerToast({
+      show: true,
+      message,
+      type
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setBannerToast({ show: false, message: '', type: '' });
+    }, 5000);
+  };
+
+  // Add the function to handle request cancellation
+  const handleCancelRequest = async (requestId) => {
+    setCancellingId(requestId);
+    
+    try {
+      const response = await fetch(`/api/requests/${requestId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel request');
+      }
+
+      // Show success message and refresh the requests
+      showBannerToast('Song request cancelled successfully');
+      fetchRequests();
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+      showBannerToast('Failed to cancel request. Please try again.', 'error');
+    } finally {
+      setCancellingId(null);
+      setShowConfirmation(false);
+      setRequestToCancel(null);
+    }
+  };
+
+  // Update the ConfirmationDialog component for better mobile support
+  const ConfirmationDialog = ({ isOpen, onClose, onConfirm, request }) => {
+    if (!isOpen || !request) return null;
+    
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+        <div className="bg-gray-800 rounded-lg p-5 sm:p-6 max-w-md w-full border border-gray-700">
+          <h3 className="text-base sm:text-lg font-medium mb-2">Cancel Song Request</h3>
+          <p className="text-sm sm:text-base text-gray-300 mb-4">
+            Are you sure you want to cancel your request for &ldquo;{request.songTitle}&rdquo; by {request.songArtist}?
+          </p>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:space-x-3">
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto order-2 sm:order-1 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors text-sm"
+            >
+              Keep Request
+            </button>
+            <button
+              onClick={() => onConfirm(request._id)}
+              className="w-full sm:w-auto order-1 sm:order-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors text-sm"
+            >
+              Cancel Request
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
       <div className="flex justify-between items-center mb-6">
@@ -194,10 +275,10 @@ export function MyRequests() {
               key={request._id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700"
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-gray-800/50 p-4 rounded-lg border border-gray-700"
             >
-              {/* Album Art */}
-              <div className="h-16 w-16 relative rounded-md overflow-hidden flex-shrink-0">
+              {/* Album Art - Responsive sizing */}
+              <div className="h-14 w-14 sm:h-16 sm:w-16 relative rounded-md overflow-hidden flex-shrink-0">
                 <Image
                   src={request.albumArt || DEFAULT_ALBUM_ART}
                   alt={request.songTitle}
@@ -206,12 +287,12 @@ export function MyRequests() {
                 />
               </div>
               
-              {/* Song Info */}
-              <div className="flex-1 min-w-0">
+              {/* Song Info - Modified for better mobile layout */}
+              <div className="flex-1 min-w-0 w-full">
                 <h3 className="font-medium truncate">{request.songTitle}</h3>
                 <p className="text-sm text-gray-400 truncate">{request.songArtist}</p>
-                <div className="flex items-center gap-4 mt-1">
-                  <span className="text-blue-400 text-sm">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="text-blue-400 text-sm whitespace-nowrap">
                     {getCurrencySymbol()}{convertAmount(request.amount)}
                     {currency && currency.code !== 'USD' && (
                       <span className="text-xs text-gray-500 ml-1">
@@ -230,14 +311,40 @@ export function MyRequests() {
                 </div>
               </div>
               
-              {/* Request Time & DJ */}
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-gray-400">
+              {/* Request Time & DJ - Improved for mobile */}
+              <div className="w-full sm:w-auto text-left sm:text-right mt-2 sm:mt-0">
+                <div className="flex flex-wrap items-center gap-2 text-gray-400 text-sm">
                   <Clock className="h-4 w-4" />
-                  <span>{getDjName(request)}</span>
-                  <span className="inline-block mx-1">•</span>
-                  <span>{formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</span>
+                  <span className="truncate max-w-[120px]">{getDjName(request)}</span>
+                  <span className="hidden sm:inline-block mx-1">•</span>
+                  <span className="whitespace-nowrap">{formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</span>
                 </div>
+                
+                {/* Cancel button - Responsive improvements */}
+                {request.status === 'pending' && (
+                  <button
+                    onClick={() => {
+                      setRequestToCancel(request);
+                      setShowConfirmation(true);
+                    }}
+                    disabled={cancellingId === request._id}
+                    className="mt-2 text-xs px-3 py-1.5 bg-red-500/10 text-red-400 rounded-full 
+                             hover:bg-red-500/20 transition-colors duration-200 flex items-center 
+                             space-x-1 border border-red-500/20 w-full sm:w-auto justify-center sm:justify-start"
+                  >
+                    {cancellingId === request._id ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Cancelling...</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3 w-3" />
+                        <span>Cancel Request</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
@@ -255,6 +362,53 @@ export function MyRequests() {
           </button>
         </div>
       )}
+
+      {/* Improve the confirmation dialog for mobile */}
+      <ConfirmationDialog
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onConfirm={handleCancelRequest}
+        request={requestToCancel}
+      />
+
+      {/* Banner Toast */}
+      {bannerToast.show && (
+        <div className={`fixed top-16 right-4 left-4 md:left-auto md:w-96 p-4 rounded-lg shadow-lg z-50 
+                       ${bannerToast.type === 'success' 
+                         ? 'bg-green-600 text-white' 
+                         : 'bg-red-600 text-white'} 
+                       transform transition-all duration-300 ease-in-out`}
+             style={{ animation: 'slide-in-right 0.5s ease-out' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {bannerToast.type === 'success' 
+                ? <CheckCircle className="h-5 w-5 mr-2" /> 
+                : <AlertTriangle className="h-5 w-5 mr-2" />}
+              <p className="font-medium">{bannerToast.message}</p>
+            </div>
+            <button 
+              onClick={() => setBannerToast({ show: false, message: '', type: '' })}
+              className="ml-4 text-white/80 hover:text-white"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for animation */}
+      <style jsx>{`
+        @keyframes slide-in-right {
+          0% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 } 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, Phone } from "lucide-react";
+import { X, Loader2, Phone, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
 
@@ -24,6 +24,11 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   const [_transactionId, setTransactionId] = useState(null);
   const [attempts, setAttempts] = useState(0);
   const [verificationInterval, setVerificationInterval] = useState(null);
+  const [bannerToast, setBannerToast] = useState({
+    show: false,
+    message: '',
+    type: '', // 'success' or 'error'
+  });
 
   useEffect(() => {
     const fetchCurrency = async () => {
@@ -50,6 +55,19 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       }
     };
   }, [verificationInterval]);
+
+  const showBannerToast = (message, type = 'success') => {
+    setBannerToast({
+      show: true,
+      message,
+      type
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setBannerToast({ show: false, message: '', type: '' });
+    }, 5000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -93,14 +111,14 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       // Process M-Pesa payment
       setTransactionId(data.CheckoutRequestID);
       console.log(`M-Pesa transaction reference: ${data.CheckoutRequestID}`);
-      toast.success("M-Pesa request sent. Please check your phone to complete payment.");
+      showBannerToast("M-Pesa request sent. Please check your phone to complete payment.");
       setIsVerifying(true);
       
       // Poll for payment confirmation
       verifyMpesaPayment(data.CheckoutRequestID);
     } catch (error) {
       console.error("Error processing payment:", error);
-      toast.error("Payment failed. Please try again.");
+      showBannerToast("Payment failed. Please try again.", "error");
       setIsSubmitting(false);
     }
   };
@@ -136,7 +154,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
           onClose();
           
           // Show success message
-          toast.success("Payment completed successfully! Your balance has been updated.");
+          showBannerToast("Payment completed successfully! Your balance has been updated.");
           return;
         } 
         
@@ -152,7 +170,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
           onClose();
           
           // Show error message
-          toast.error("Payment failed. Please try again.");
+          showBannerToast("Payment failed. Please try again.", "error");
           return;
         }
         
@@ -163,7 +181,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
           
           // Update UI to show "Check status later" button instead of spinner
           setIsSubmitting(false);
-          toast.info("Payment is still processing. You can close this window and check your account later.");
+          showBannerToast("Payment is still processing. You can close this window and check your account later.");
         }
       } catch (error) {
         console.error("Error verifying payment:", error);
@@ -171,7 +189,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
         // On error after several attempts, allow user to close modal
         if (localAttempts >= 3) {
           setIsVerifying(false);
-          toast.error("Couldn't verify payment status. Please check your account later.");
+          showBannerToast("Couldn't verify payment status. Please check your account later.", "error");
         }
       }
     }, 5000); // Check every 5 seconds
@@ -292,6 +310,45 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
           </motion.div>
         </motion.div>
       )}
+
+      {/* Banner Toast */}
+      {bannerToast.show && (
+        <div className={`fixed top-16 right-4 left-4 md:left-auto md:w-96 p-4 rounded-lg shadow-lg z-[100] 
+                       ${bannerToast.type === 'success' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-red-600 text-white'} 
+                       transform transition-all duration-300 ease-in-out`}
+             style={{ animation: 'slide-in-right 0.5s ease-out' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {bannerToast.type === 'success' 
+                ? <CheckCircle className="h-5 w-5 mr-2" /> 
+                : <AlertTriangle className="h-5 w-5 mr-2" />}
+              <p className="font-medium">{bannerToast.message}</p>
+            </div>
+            <button 
+              onClick={() => setBannerToast({ show: false, message: '', type: '' })}
+              className="ml-4 text-white/80 hover:text-white"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add CSS for animation */}
+      <style jsx>{`
+        @keyframes slide-in-right {
+          0% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </AnimatePresence>
   );
 } 

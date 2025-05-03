@@ -9,29 +9,44 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { to, template, customData } = req.body;
+    const { to, type, data } = req.body;
     
-    if (!to || !template) {
-      return res.status(400).json({ message: 'Missing required fields' });
+    console.log("API received:", { to, type, data });
+    
+    if (!to || !type) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Send test email
-    const result = await sendNotificationEmail(template, to, customData);
+    // Call sendNotificationEmail with the correct structure
+    const result = await sendNotificationEmail({ 
+      to, 
+      type, 
+      data
+    });
     
-    if (result.success) {
+    if (result && result.success) {
       // Log the email in the database
       // This would be implemented in a production environment
       
-      return res.status(200).json({ message: 'Test email sent successfully' });
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Test email sent successfully' 
+      });
     } else {
-      return res.status(500).json({ message: 'Failed to send test email', error: result.error });
+      return res.status(500).json({ 
+        error: 'Failed to send email', 
+        details: result?.error || 'Unknown error' 
+      });
     }
   } catch (error) {
     console.error('Error sending test email:', error);
-    return res.status(500).json({ message: 'Failed to send test email', error: error.message });
+    return res.status(500).json({ 
+      error: 'Failed to send test email', 
+      details: error.message 
+    });
   }
 } 

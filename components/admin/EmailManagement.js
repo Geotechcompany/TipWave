@@ -15,7 +15,6 @@ import { Button } from "../ui/button";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { EmailTypes } from "@/lib/emailTypes";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Label } from "../ui/label";
 
 export default function EmailManagement({ stats, refreshData }) {
@@ -45,6 +44,24 @@ export default function EmailManagement({ stats, refreshData }) {
     }
   });
   
+  // First, add this state at the top of your component
+  const [bannerToast, setBannerToast] = useState({
+    show: false,
+    message: '',
+    type: '', // 'success' or 'error'
+  });
+  
+  // Create a local array of email templates based on EmailTypes
+  const emailTemplateOptions = [
+    { id: EmailTypes.USER_WELCOME, name: "User Welcome" },
+    { id: EmailTypes.BID_CREATED, name: "Bid Created" },
+    { id: EmailTypes.BID_CONFIRMATION, name: "Bid Confirmation" },
+    { id: EmailTypes.WALLET_TOPUP, name: "Wallet Top-up" },
+    { id: EmailTypes.PAYMENT_STATUS, name: "Payment Status" },
+    { id: EmailTypes.SONG_REQUEST, name: "Song Request" },
+    // Add any other templates you need
+  ];
+  
   // Fetch email logs on component mount
   useEffect(() => {
     fetchEmailLogs();
@@ -54,17 +71,18 @@ export default function EmailManagement({ stats, refreshData }) {
   
   const fetchEmailLogs = async () => {
     try {
-      setIsLoading(true);
+      console.log("Fetching email logs...");
       const response = await fetch('/api/admin/emails/logs');
-      if (response.ok) {
-        const data = await response.json();
-        setEmailLogs(data.logs);
+      if (!response.ok) {
+        console.error("Failed to fetch email logs:", response.statusText);
+        return;
       }
+      
+      const data = await response.json();
+      console.log("Email logs fetched:", data);
+      setEmailLogs(data.logs || []);
     } catch (error) {
-      console.error('Failed to fetch email logs:', error);
-      toast.error('Failed to fetch email logs');
-    } finally {
-      setIsLoading(false);
+      console.error("Error fetching email logs:", error);
     }
   };
   
@@ -98,32 +116,56 @@ export default function EmailManagement({ stats, refreshData }) {
     }
   };
   
+  // Add this function to show a banner toast
+  const showBannerToast = (message, type = 'success') => {
+    setBannerToast({
+      show: true,
+      message,
+      type
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setBannerToast({ show: false, message: '', type: '' });
+    }, 5000);
+  };
+  
+  // Then replace the toast calls in sendTestEmail function
   const sendTestEmail = async () => {
     if (!testEmail.to) {
-      toast.error('Please enter a recipient email');
+      showBannerToast('Please enter a recipient email', 'error');
       return;
     }
     
     try {
       setIsLoading(true);
+      console.log("Sending test email with data:", testEmail);
+      
       const response = await fetch('/api/admin/emails/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(testEmail),
+        body: JSON.stringify({
+          to: testEmail.to,
+          type: testEmail.template,
+          data: testEmail.customData
+        }),
       });
       
+      const responseData = await response.json();
+      console.log("API response:", responseData);
+      
       if (response.ok) {
-        toast.success('Test email sent successfully');
-        fetchEmailLogs();
+        showBannerToast('Test email sent successfully');
+        setIsLoading(false);
+        await fetchEmailLogs();
       } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to send test email');
+        showBannerToast(responseData.message || responseData.error || 'Failed to send test email', 'error');
       }
     } catch (error) {
       console.error('Error sending test email:', error);
-      toast.error('Failed to send test email');
+      showBannerToast('Failed to send test email: ' + error.message, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -176,15 +218,6 @@ export default function EmailManagement({ stats, refreshData }) {
       setIsLoading(false);
     }
   };
-  
-  // Update the template selection with proper debugging
-  const handleTemplateChange = (value) => {
-    console.log("Template selected:", value);
-    setTestEmail(prev => ({
-      ...prev,
-      template: value
-    }));
-  };
 
   // Add this for debugging
   useEffect(() => {
@@ -199,6 +232,18 @@ export default function EmailManagement({ stats, refreshData }) {
 
   return (
     <div className="space-y-6">
+      <style jsx>{`
+        @keyframes slide-in-right {
+          0% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Email Management</h1>
@@ -283,27 +328,25 @@ export default function EmailManagement({ stats, refreshData }) {
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="template">Template</Label>
-                <Select 
-                  value={testEmail.template} 
-                  onValueChange={handleTemplateChange}
+              <div className="mb-4">
+                <Label htmlFor="template" className="block text-sm font-medium text-gray-200 mb-1">
+                  Template
+                </Label>
+                <select 
+                  id="template"
+                  className="w-full bg-gray-800 border-gray-700 rounded-md px-3 py-2 text-white"
+                  value={testEmail.template}
+                  onChange={(e) => {
+                    console.log("Template selected:", e.target.value);
+                    setTestEmail(prev => ({...prev, template: e.target.value}));
+                  }}
                 >
-                  <SelectTrigger id="template" className="w-full bg-gray-800 border-gray-700">
-                    <SelectValue placeholder="Select email template" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {templates && templates.length > 0 ? (
-                      templates.map(template => (
-                        <SelectItem key={template.id} value={template.id} className="text-white hover:bg-gray-700">
-                          {template.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>No templates available</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                  {emailTemplateOptions.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div className="space-y-2">
@@ -407,40 +450,34 @@ export default function EmailManagement({ stats, refreshData }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="template">Template</Label>
-                <Select 
+                <Label htmlFor="scheduleTemplate">Template</Label>
+                <select
+                  id="scheduleTemplate"
+                  className="w-full bg-gray-800 border-gray-700 rounded-md px-3 py-2 text-white"
                   value={scheduledEmail.template}
-                  onValueChange={value => setScheduledEmail({...scheduledEmail, template: value})}
+                  onChange={(e) => setScheduledEmail({...scheduledEmail, template: e.target.value})}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select email template" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map(template => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {emailTemplateOptions.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="recipientType">Recipients</Label>
-                <Select 
+                <select
+                  id="recipientType"
+                  className="w-full bg-gray-800 border-gray-700 rounded-md px-3 py-2 text-white"
                   value={scheduledEmail.recipientType}
-                  onValueChange={value => setScheduledEmail({...scheduledEmail, recipientType: value})}
+                  onChange={(e) => setScheduledEmail({...scheduledEmail, recipientType: e.target.value})}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select recipients" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-users">All Users</SelectItem>
-                    <SelectItem value="djs-only">DJs Only</SelectItem>
-                    <SelectItem value="new-users">New Users (Last 30 days)</SelectItem>
-                    <SelectItem value="inactive-users">Inactive Users</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="all-users">All Users</option>
+                  <option value="djs-only">DJs Only</option>
+                  <option value="new-users">New Users (Last 30 days)</option>
+                  <option value="inactive-users">Inactive Users</option>
+                </select>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -604,6 +641,31 @@ export default function EmailManagement({ stats, refreshData }) {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Banner Toast */}
+      {bannerToast.show && (
+        <div className={`fixed top-16 right-4 left-4 md:left-auto md:w-96 p-4 rounded-lg shadow-lg z-50 
+                        ${bannerToast.type === 'success' 
+                           ? 'bg-green-600 text-white' 
+                           : 'bg-red-600 text-white'} 
+                        transform transition-all duration-300 ease-in-out`}
+             style={{ animation: 'slide-in-right 0.5s ease-out' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {bannerToast.type === 'success' 
+                ? <CheckCircle className="h-5 w-5 mr-2" /> 
+                : <AlertTriangle className="h-5 w-5 mr-2" />}
+              <p className="font-medium">{bannerToast.message}</p>
+            </div>
+            <button 
+              onClick={() => setBannerToast({ show: false, message: '', type: '' })}
+              className="ml-4 text-white/80 hover:text-white"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
