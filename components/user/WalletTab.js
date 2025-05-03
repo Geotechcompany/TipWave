@@ -11,6 +11,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
 import { TopUpModal } from "./TopUpModal.jsx";
 import { useSession } from "next-auth/react";
+import 'tailwindcss/tailwind.css';
 
 
 export function WalletTab() {
@@ -31,6 +32,8 @@ export function WalletTab() {
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTransactions, setAllTransactions] = useState([]);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [ setNotification] = useState({ show: false, message: '', type: '' });
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -88,8 +91,8 @@ export function WalletTab() {
       setIsLoadingTransactions(true);
       const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
       
-      // Get regular transactions
-      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=5${typeParam}`);
+      // Update to use itemsPerPage instead of hardcoded limit
+      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}${typeParam}`);
       
       if (!response.ok) {
         throw new Error("Failed to fetch transactions");
@@ -125,7 +128,7 @@ export function WalletTab() {
         }
       }
       
-      setTransactions(allTransactions || []);
+      setAllTransactions(allTransactions || []); // Use setAllTransactions instead
       setTotalPages(data.totalPages || 1);
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -133,7 +136,7 @@ export function WalletTab() {
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [currentPage, transactionType]);
+  }, [currentPage, transactionType, itemsPerPage]); // Add itemsPerPage as dependency
 
   useEffect(() => {
     fetchTransactions();
@@ -265,6 +268,65 @@ export function WalletTab() {
     };
   }, [transactions, checkPaymentStatus, fetchWalletData]);
 
+  const getTransactionStatus = (transaction) => {
+    // Convert status to lowercase for consistent comparison
+    const status = (transaction.status || 'pending').toLowerCase();
+    
+    switch (status) {
+      case 'completed':
+        return { text: 'Completed', color: 'text-green-500' };
+      case 'pending':
+        return { text: 'Pending', color: 'text-yellow-500' };
+      case 'failed':
+        return { text: 'Failed', color: 'text-red-500' };
+      default:
+        return { text: status.charAt(0).toUpperCase() + status.slice(1), color: 'text-gray-500' };
+    }
+  };
+
+  // Add this function to manually expire a specific transaction
+  const handleExpireTransaction = async (checkoutRequestId) => {
+    try {
+      setCheckingPayment(true);
+      
+      console.log('Expiring transaction:', checkoutRequestId);
+      
+      // Check if the API endpoint exists
+      if (!checkoutRequestId) {
+        toast.error("No transaction ID to cancel");
+        return;
+      }
+      
+      const response = await fetch('/api/payments/mpesa/expire-pending', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          transactionId: checkoutRequestId
+        })
+      });
+      
+      // Handle response
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Transaction cancel response:', data);
+        
+        toast.success("Transaction marked as failed");
+        fetchWalletData();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Error response:", response.status, errorData);
+        toast.error(`Could not cancel: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Error expiring transaction:", error);
+      toast.error("Failed to cancel transaction");
+    } finally {
+      setCheckingPayment(false);
+    }
+  };
+
   // Helper function to determine if a pending transaction has been waiting too long
   const isPendingTooLong = (createdAtString) => {
     const createdAt = new Date(createdAtString).getTime();
@@ -298,36 +360,36 @@ export function WalletTab() {
     }
   };
 
-  // Enhanced status badge
+  // Modified getStatusBadge function
   const getStatusBadge = (transaction) => {
-    const status = getTransactionStatusType(transaction);
+    const status = getTransactionStatus(transaction);
     
-    switch (status) {
+    switch (status.text.toLowerCase()) {
       case 'completed':
         return (
-          <span className="inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-400 border border-green-500/20">
+          <span className={`inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium ${status.color} border border-green-500/20`}>
             <CheckCircle className="h-3 w-3 mr-1" />
-            Completed
+            {status.text}
           </span>
         );
       case 'pending':
         return (
-          <span className="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-xs font-medium text-yellow-400 border border-yellow-500/20">
+          <span className={`inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-xs font-medium ${status.color} border border-yellow-500/20`}>
             <Clock className="h-3 w-3 mr-1" />
-            Pending
+            {status.text}
           </span>
         );
       case 'failed':
         return (
-          <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-500/20">
+          <span className={`inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium ${status.color} border border-red-500/20`}>
             <XCircle className="h-3 w-3 mr-1" />
-            Failed
+            {status.text}
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center rounded-full bg-gray-500/10 px-2.5 py-0.5 text-xs font-medium text-gray-400 border border-gray-500/20">
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+          <span className={`inline-flex items-center rounded-full bg-gray-500/10 px-2.5 py-0.5 text-xs font-medium ${status.color} border border-gray-500/20`}>
+            {status.text}
           </span>
         );
     }
@@ -402,12 +464,18 @@ export function WalletTab() {
         throw new Error("Failed to retry payment");
       }
       
-      const data = await response.json();
+      const result = await response.json();
       
-      toast.success(`M-Pesa payment #${data.CheckoutRequestID} sent. Please check your phone.`, {
-        duration: 5000,
-        icon: '💸'
-      });
+      if (result.success) {
+        setNotification({
+          show: true,
+          message: "M-Pesa payment request sent. Please check your phone.",
+          type: "success"
+        });
+        
+        // Auto-hide notification after 5 seconds
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 5000);
+      }
       
       // Refresh data after a short delay
       setTimeout(() => {
@@ -483,6 +551,13 @@ export function WalletTab() {
           </button>
           
           <button
+            onClick={() => {
+              setCurrentPage(1);
+              setTransactionType("all");
+              setItemsPerPage(10); // Show more items
+              fetchTransactions();
+              toast.success("Showing all transactions");
+            }}
             className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/10 rounded-lg py-3 px-4 text-white font-medium transition-colors"
           >
             <History className="h-5 w-5" />
@@ -500,22 +575,45 @@ export function WalletTab() {
               Transaction History
             </h3>
             
-            {/* Modern Filter Control */}
-            <div className="relative w-full sm:w-auto">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Filter className="h-4 w-4 text-purple-400" />
+            {/* Controls for filtering and page size */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              {/* Transaction type filter */}
+              <div className="relative w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter className="h-4 w-4 text-purple-400" />
+                </div>
+                <select 
+                  value={transactionType}
+                  onChange={(e) => handleFilterChange(e.target.value)}
+                  className="w-full sm:w-auto pl-10 pr-10 py-2 bg-gray-700/50 text-gray-200 text-sm rounded-xl border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 backdrop-blur-md appearance-none"
+                >
+                  <option value="all">All Transactions</option>
+                  <option value="topup">Top Ups</option>
+                  <option value="tip">Tips to DJs</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </div>
               </div>
-              <select 
-                value={transactionType}
-                onChange={(e) => handleFilterChange(e.target.value)}
-                className="w-full sm:w-auto pl-10 pr-10 py-2 bg-gray-700/50 text-gray-200 text-sm rounded-xl border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 backdrop-blur-md appearance-none"
-              >
-                <option value="all">All Transactions</option>
-                <option value="topup">Top Ups</option>
-                <option value="tip">Tips to DJs</option>
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+              
+              {/* Items per page selector */}
+              <div className="relative w-full sm:w-auto">
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page when changing page size
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-700/50 text-gray-200 text-sm rounded-xl border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 backdrop-blur-md appearance-none"
+                >
+                  <option value={5}>5 per page</option>
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                </div>
               </div>
             </div>
           </div>
@@ -559,35 +657,39 @@ export function WalletTab() {
                     transition={{ duration: 0.3, delay: index * 0.05 }}
                     className="group hover:bg-gray-800/30 transition-colors duration-200"
                   >
-                    <div className="px-6 py-4">
-                      <div className="flex items-start justify-between">
-                        {/* Transaction Info */}
-                        <div className="flex items-center space-x-4">
-                          <div className={`rounded-full p-3 ${getTransactionIconBackground(transaction.type)}`}>
+                    <div className="px-3 sm:px-6 py-3 sm:py-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                        {/* Transaction Info - Stack on mobile, side-by-side on desktop */}
+                        <div className="flex items-start space-x-3 sm:space-x-4 mb-2 sm:mb-0">
+                          <div className={`rounded-full p-2.5 sm:p-3 flex-shrink-0 ${getTransactionIconBackground(transaction.type)}`}>
                             {getTransactionIcon(transaction.type)}
                           </div>
                           
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <p className="font-medium text-gray-200">{getTransactionDescription(transaction)}</p>
+                          <div className="min-w-0"> {/* Prevent flex child from growing too large */}
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                              <p className="font-medium text-sm sm:text-base text-gray-200 break-words">
+                                {getTransactionDescription(transaction)}
+                              </p>
                               {getStatusBadge(transaction)}
                             </div>
                             
-                            <div className="flex items-center text-xs text-gray-500 mt-1.5">
-                              <Calendar className="h-3 w-3 mr-1.5" />
-                              <span>{formatDate(transaction.createdAt)}</span>
+                            <div className="flex flex-wrap items-center text-xs text-gray-500 mt-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                              <span className="flex items-center flex-shrink-0">
+                                <Calendar className="h-3 w-3 mr-1.5" />
+                                <span>{formatDate(transaction.createdAt)}</span>
+                              </span>
                               
                               {transaction.paymentMethod && (
-                                <span className="ml-3 flex items-center">
+                                <span className="ml-2 sm:ml-3 flex items-center flex-shrink-0">
                                   <Circle className="h-1.5 w-1.5 mr-1.5" />
-                                  {transaction.paymentMethod.toUpperCase()}
+                                  <span>{transaction.paymentMethod.toUpperCase()}</span>
                                 </span>
                               )}
                               
                               {transaction.details?.checkoutRequestId && (
-                                <span className="ml-3 flex items-center overflow-hidden">
-                                  <Hash className="h-3 w-3 mr-1.5 flex-shrink-0" />
-                                  <span className="truncate max-w-[100px]">
+                                <span className="ml-2 sm:ml-3 flex items-center flex-shrink-0 overflow-hidden">
+                                  <Hash className="h-3 w-3 mr-1.5" />
+                                  <span className="truncate max-w-[80px] sm:max-w-[100px]">
                                     {transaction.details.checkoutRequestId.substring(0, 8)}...
                                   </span>
                                 </span>
@@ -596,15 +698,15 @@ export function WalletTab() {
                           </div>
                         </div>
                         
-                        {/* Amount and Actions */}
-                        <div className="text-right flex flex-col items-end space-y-2">
-                          <p className={`font-semibold text-lg ${transaction.type === 'topup' ? 'text-green-400' : 'text-gray-200'} transition-colors`}>
+                        {/* Amount and Actions - Right aligned on larger screens, below on mobile */}
+                        <div className="flex justify-between items-center sm:flex-col sm:items-end sm:space-y-2 mt-2 sm:mt-0">
+                          <p className={`font-semibold text-base sm:text-lg ${transaction.type === 'topup' ? 'text-green-400' : 'text-gray-200'} transition-colors`}>
                             {transaction.type === 'topup' ? '+' : '-'}
                             {formatCurrency(transaction.amount, transaction.currency)}
                           </p>
                           
                           {/* Action buttons with improved styling */}
-                          <div className="flex space-x-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2 opacity-90 sm:opacity-80 group-hover:opacity-100 transition-opacity">
                             {isPending && (
                               <button
                                 onClick={() => transaction.details?.checkoutRequestId && 

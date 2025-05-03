@@ -396,9 +396,7 @@ const Hero = () => {
 };
 
 const Features = () => {
-  const { scrollYProgress } = useScroll();
-  const opacity = useTransform(scrollYProgress, [0.1, 0.2, 0.3, 0.4], [0, 1, 1, 0]);
-  
+ 
   const features = [
     {
       title: "Real-time Bidding",
@@ -724,10 +722,6 @@ const Testimonials = () => {
 };
 
 const CallToAction = () => {
-  // Remove unused scrollYProgress or add ESLint disable comment
-  // eslint-disable-next-line no-unused-vars
-  const { scrollYProgress } = useScroll();
-  
   return (
     <section className="relative py-24 overflow-hidden">
       {/* Dynamic background with particles and gradient */}

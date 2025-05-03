@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Loader2, User, Mail, Lock, Users } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Users} from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -12,9 +12,42 @@ export default function AuthPage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: ''
+    password: '',
+    passwordConfirmation: ''
   });
   const [errors, setErrors] = useState({});
+  const [registrationStep, setRegistrationStep] = useState('idle'); // 'idle', 'registering', 'emailing', 'redirecting'
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    message: 'Too weak',
+    color: 'bg-red-500'
+  });
+
+  const calculatePasswordStrength = (password) => {
+    if (!password) {
+      return { score: 0, message: 'Too weak', color: 'bg-red-500' };
+    }
+    
+    let score = 0;
+    
+    if (password.length >= 8) score += 1;
+    if (password.length >= 12) score += 1;
+    
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+    
+    if (score <= 2) {
+      return { score, message: 'Too weak', color: 'bg-red-500' };
+    } else if (score <= 4) {
+      return { score, message: 'Could be stronger', color: 'bg-yellow-500' };
+    } else if (score <= 6) {
+      return { score, message: 'Strong password', color: 'bg-green-500' };
+    } else {
+      return { score, message: 'Very strong password', color: 'bg-green-600' };
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -23,6 +56,14 @@ export default function AuthPage() {
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
     if (!formData.password) newErrors.password = 'Password is required';
     else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    
+    if (formData.password !== formData.passwordConfirmation) {
+      newErrors.passwordConfirmation = 'Passwords do not match';
+    }
+    
+    if (passwordStrength.score < 3) {
+      newErrors.password = 'Please create a stronger password';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -34,6 +75,7 @@ export default function AuthPage() {
     if (!validateForm()) return;
     
     setIsLoading(true);
+    setRegistrationStep('registering');
     
     try {
       // Register the user
@@ -46,7 +88,8 @@ export default function AuthPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          role: 'USER' // Default role
+          role: 'USER',
+          sendWelcomeEmail: true
         }),
       });
 
@@ -54,6 +97,27 @@ export default function AuthPage() {
       
       if (!registerResponse.ok) {
         throw new Error(registerData.error || 'Registration failed');
+      }
+      
+      setRegistrationStep('emailing');
+      
+      // Send welcome email
+      const emailResponse = await fetch('/api/email/welcome', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+        }),
+      });
+      
+      if (!emailResponse.ok) {
+        console.warn('Welcome email may not have been sent:', 
+                    await emailResponse.text());
+      } else {
+        console.log('Welcome email initiated');
       }
       
       toast.success('Account created successfully!');
@@ -71,12 +135,23 @@ export default function AuthPage() {
         return;
       }
       
-      // Redirect to user dashboard
-      router.push('/dashboard/user');
+      setRegistrationStep('redirecting');
+      
+      // Show a welcome toast with instructions
+      toast.success(
+        'Welcome to our app! Check your email for usage instructions.',
+        { duration: 5000 }
+      );
+      
+      // Redirect to user dashboard with a slight delay to let the toast be seen
+      setTimeout(() => {
+        router.push('/dashboard/user');
+      }, 1500);
     } catch (error) {
       console.error('Registration error:', error);
       toast.error(error.message || 'Failed to create account');
       setIsLoading(false);
+      setRegistrationStep('idle');
     }
   };
 
@@ -87,7 +162,10 @@ export default function AuthPage() {
       [name]: value
     });
     
-    // Clear specific error when user starts typing
+    if (name === 'password') {
+      setPasswordStrength(calculatePasswordStrength(value));
+    }
+    
     if (errors[name]) {
       setErrors({
         ...errors,
@@ -204,29 +282,115 @@ export default function AuthPage() {
                   {errors.password && (
                     <p className="mt-2 text-sm text-red-500">{errors.password}</p>
                   )}
+                  
+                  {formData.password.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="h-2 w-full bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${passwordStrength.color} transition-all duration-300`} 
+                            style={{ width: `${Math.min(100, (passwordStrength.score / 7) * 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <p className={`text-xs ${
+                        passwordStrength.color === 'bg-red-500' ? 'text-red-400' : 
+                        passwordStrength.color === 'bg-yellow-500' ? 'text-yellow-400' : 'text-green-400'
+                      }`}>
+                        {passwordStrength.message}
+                      </p>
+                      
+                      <div className="grid grid-cols-2 gap-1 text-xs">
+                        <p className={formData.password.length >= 8 ? "text-green-400" : "text-gray-400"}>
+                          ✓ At least 8 characters
+                        </p>
+                        <p className={/[A-Z]/.test(formData.password) ? "text-green-400" : "text-gray-400"}>
+                          ✓ Uppercase letter
+                        </p>
+                        <p className={/[a-z]/.test(formData.password) ? "text-green-400" : "text-gray-400"}>
+                          ✓ Lowercase letter
+                        </p>
+                        <p className={/[0-9]/.test(formData.password) ? "text-green-400" : "text-gray-400"}>
+                          ✓ Number
+                        </p>
+                        <p className={/[^A-Za-z0-9]/.test(formData.password) ? "text-green-400" : "text-gray-400"}>
+                          ✓ Special character
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="passwordConfirmation" className="block text-sm font-medium text-gray-300">
+                    Confirm Password
+                  </label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="passwordConfirmation"
+                      name="passwordConfirmation"
+                      type="password"
+                      autoComplete="new-password"
+                      value={formData.passwordConfirmation}
+                      onChange={handleChange}
+                      className={`block w-full pl-10 pr-3 py-2 rounded-md bg-gray-700 border ${
+                        errors.passwordConfirmation ? 'border-red-500' : 'border-gray-600'
+                      } text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  {errors.passwordConfirmation && (
+                    <p className="mt-2 text-sm text-red-500">{errors.passwordConfirmation}</p>
+                  )}
+                  {formData.password && formData.passwordConfirmation && 
+                   formData.password === formData.passwordConfirmation && (
+                    <p className="mt-2 text-sm text-green-500">Passwords match ✓</p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-teal-500 px-4 py-3 rounded-lg text-white font-medium transition-all hover:from-blue-600 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex justify-center items-center"
+                  className="w-full bg-gradient-to-r from-blue-500 to-teal-500 px-4 py-3 rounded-lg 
+                             text-white font-medium transition-all duration-300
+                             hover:from-blue-600 hover:to-teal-600 
+                             focus:outline-none focus:ring-2 focus:ring-blue-500 
+                             disabled:opacity-50 flex justify-center items-center
+                             transform hover:-translate-y-0.5 hover:shadow-lg"
                 >
                   {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      <span>
+                        {registrationStep === 'registering' && "Creating account..."}
+                        {registrationStep === 'emailing' && "Sending welcome email..."}
+                        {registrationStep === 'redirecting' && "Redirecting to dashboard..."}
+                      </span>
+                    </>
                   ) : (
-                    "Create Account"
+                    <>
+                      <Users className="h-5 w-5 mr-2" />
+                      <span>Create Account</span>
+                    </>
                   )}
                 </button>
               </form>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <Link
+              <div className="mt-6 grid grid-cols-1 gap-3">
+                {/* <Link
                   href="/auth/dj"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="w-full flex justify-center items-center py-2 px-4 rounded-md text-sm font-medium
+                  bg-gradient-to-r from-purple-500 to-indigo-600 text-white
+                  hover:from-purple-600 hover:to-indigo-700 
+                  transition-all duration-200 transform hover:-translate-y-0.5
+                  focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 focus:ring-offset-gray-800"
                 >
-                  DJ Account
-                </Link>
-             
+                  <Music className="w-4 h-4 mr-2" />
+                  Create DJ Account
+                </Link> */}
               </div>
             </div>
           </div>
