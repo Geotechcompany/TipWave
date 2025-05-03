@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
-  Save,  CreditCard, 
+  Save, 
   Moon, Sun, Monitor,
   Loader2, DollarSign, CheckCircle
 } from "lucide-react";
@@ -59,7 +59,8 @@ export function SettingsPanel({ isOpen, onClose }) {
         soundEnabled: data.soundEnabled ?? true,
         language: data.language ?? "english",
         displayMode: data.displayMode ?? "system",
-        privacyMode: data.privacyMode ?? "balanced"
+        privacyMode: data.privacyMode ?? "balanced",
+        preferredCurrency: data.preferredCurrency
       });
       
       // Set selected currency from user profile or default
@@ -85,10 +86,14 @@ export function SettingsPanel({ isOpen, onClose }) {
 
   // Update selected currency when defaultCurrency changes
   useEffect(() => {
-    if (defaultCurrency?.code && !settings.preferredCurrency) {
+    if (defaultCurrency?.code && !selectedCurrency) {
       setSelectedCurrency(defaultCurrency.code);
+      setSettings(prev => ({
+        ...prev,
+        preferredCurrency: defaultCurrency.code
+      }));
     }
-  }, [defaultCurrency, settings.preferredCurrency]);
+  }, [defaultCurrency, selectedCurrency]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -138,7 +143,14 @@ export function SettingsPanel({ isOpen, onClose }) {
   };
 
   const handleCurrencyChange = (e) => {
-    setSelectedCurrency(e.target.value);
+    const currencyCode = e.target.value;
+    setSelectedCurrency(currencyCode);
+    
+    // Also update it in the settings object
+    setSettings(prev => ({
+      ...prev,
+      preferredCurrency: currencyCode
+    }));
   };
   
   const handleSettingChange = (key, value) => {
@@ -377,7 +389,7 @@ export function SettingsPanel({ isOpen, onClose }) {
                   </p>
                 </div>
                 
-                <div className="pt-4 border-t border-gray-800">
+                {/* <div className="pt-4 border-t border-gray-800">
                   <h3 className="text-sm font-medium text-gray-300 mb-2">
                     Payment Methods
                   </h3>
@@ -400,7 +412,7 @@ export function SettingsPanel({ isOpen, onClose }) {
                   <button className="text-sm text-blue-400 hover:text-blue-300">
                     + Add payment method
                   </button>
-                </div>
+                </div> */}
               </div>
             </div>
           </>

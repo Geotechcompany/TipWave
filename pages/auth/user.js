@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Loader2, User, Shield, Users, AlertTriangle, Sparkles } from 'lucide-react';
+import { Loader2, User,  Users, AlertTriangle, Sparkles } from 'lucide-react';
 
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -161,12 +161,7 @@ export default function UserLogin() {
                 </div>
               </Link>
               
-              <Link href="/auth/admin" className="flex items-center justify-center gap-2 px-4 py-2.5 border border-blue-500/30 rounded-lg text-blue-400 hover:bg-blue-500/10 transition-colors">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  <span>Admin Login</span>
-                </div>
-              </Link>
+      
             </div>
           </div>
 

@@ -226,12 +226,7 @@ export default function AuthPage() {
                 >
                   DJ Account
                 </Link>
-                <Link
-                  href="/auth/admin"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Admin Account
-                </Link>
+             
               </div>
             </div>
           </div>

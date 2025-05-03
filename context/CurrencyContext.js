@@ -68,18 +68,19 @@ export function CurrencyProvider({ children }) {
   }, []);
 
   // Format currency based on locale and currency code
-  const formatCurrency = (amount, currencyCode) => {
+  const formatCurrency = (amount, includeSymbol = true) => {
     // Ensure amount is a number
     const numericAmount = Number(amount) || 0;
     
     // Get currency by code or use default
-    const currToUse = currencyCode 
-      ? currencies.find(c => c.code === currencyCode) 
-      : currency;
+    const currToUse = currency;
     
     if (!currToUse) return `$${numericAmount.toFixed(2)}`;
     
-    return `${currToUse.symbol}${numericAmount.toFixed(2)}`;
+    if (includeSymbol) {
+      return `${currToUse.symbol}${numericAmount.toFixed(2)}`;
+    }
+    return numericAmount.toFixed(2);
   };
 
   // Convert an amount from one currency to another

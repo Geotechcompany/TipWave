@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { 
   Wallet, Plus, ArrowDownCircle, ArrowUpCircle, Clock, 
   Calendar, Filter,  Loader2, CreditCard, 
-  Music, RefreshCcw, History, Badge
+  Music, RefreshCcw, History,  
+  ChevronLeft, ChevronRight, Circle, Hash, CheckCircle, XCircle, 
+  RepeatIcon, ChevronDown
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
@@ -27,6 +29,8 @@ export function WalletTab() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [pendingTransactions, setPendingTransactions] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [allTransactions, setAllTransactions] = useState([]);
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -261,19 +265,160 @@ export function WalletTab() {
     };
   }, [transactions, checkPaymentStatus, fetchWalletData]);
 
-  const getTransactionStatus = (transaction) => {
-    // Convert status to lowercase for consistent comparison
+  // Helper function to determine if a pending transaction has been waiting too long
+  const isPendingTooLong = (createdAtString) => {
+    const createdAt = new Date(createdAtString).getTime();
+    const currentTime = Date.now();
+    const fifteenMinutesMs = 15 * 60 * 1000;
+    
+    return (currentTime - createdAt) > fifteenMinutesMs;
+  };
+
+  // Helper function to get transaction status type
+  const getTransactionStatusType = (transaction) => {
     const status = (transaction.status || 'pending').toLowerCase();
+    return status;
+  };
+
+  // Helper function to get transaction icon background
+  const getTransactionIconBackground = (type) => {
+    switch (type) {
+      case 'topup':
+        return 'bg-green-500/10 text-green-400';
+      case 'withdraw':
+        return 'bg-red-500/10 text-red-400';
+      case 'tip':
+        return 'bg-blue-500/10 text-blue-400';
+      case 'request':
+        return 'bg-purple-500/10 text-purple-400';
+      case 'bid':
+        return 'bg-indigo-500/10 text-indigo-400';
+      default:
+        return 'bg-gray-500/10 text-gray-400';
+    }
+  };
+
+  // Enhanced status badge
+  const getStatusBadge = (transaction) => {
+    const status = getTransactionStatusType(transaction);
     
     switch (status) {
       case 'completed':
-        return { text: 'Completed', color: 'text-green-500' };
+        return (
+          <span className="inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-400 border border-green-500/20">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Completed
+          </span>
+        );
       case 'pending':
-        return { text: 'Pending', color: 'text-yellow-500' };
+        return (
+          <span className="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-xs font-medium text-yellow-400 border border-yellow-500/20">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </span>
+        );
       case 'failed':
-        return { text: 'Failed', color: 'text-red-500' };
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400 border border-red-500/20">
+            <XCircle className="h-3 w-3 mr-1" />
+            Failed
+          </span>
+        );
       default:
-        return { text: status.charAt(0).toUpperCase() + status.slice(1), color: 'text-gray-500' };
+        return (
+          <span className="inline-flex items-center rounded-full bg-gray-500/10 px-2.5 py-0.5 text-xs font-medium text-gray-400 border border-gray-500/20">
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </span>
+        );
+    }
+  };
+
+  // Combined transactions list
+  useEffect(() => {
+    // Combine regular and pending transactions into a single list
+    const combined = [...transactions];
+    
+    // Only add pending transactions that aren't already in the transactions list
+    pendingTransactions.forEach(pendingTx => {
+      const exists = combined.some(tx => 
+        tx.details?.checkoutRequestId === pendingTx.checkoutRequestId
+      );
+      
+      if (!exists) {
+        combined.push({
+          _id: pendingTx._id || pendingTx.checkoutRequestId,
+          type: 'topup',
+          amount: pendingTx.amount,
+          currency: pendingTx.currency || 'KES',
+          paymentMethod: 'mpesa',
+          status: 'pending',
+          description: 'M-Pesa wallet top-up',
+          details: {
+            checkoutRequestId: pendingTx.checkoutRequestId
+          },
+          createdAt: pendingTx.createdAt
+        });
+      }
+    });
+    
+    // Sort by date, newest first
+    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    setAllTransactions(combined);
+  }, [transactions, pendingTransactions]);
+
+  const handleRetryTransaction = async (transaction) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Only allow retrying M-Pesa transactions
+      if (transaction.paymentMethod !== 'mpesa') {
+        toast.error("Only M-Pesa transactions can be retried");
+        return;
+      }
+      
+      // Get the phone number from the original transaction
+      let phoneNumber = transaction.details?.phoneNumber || '';
+      if (!phoneNumber) {
+        // If no phone number in details, prompt user
+        phoneNumber = window.prompt("Please enter your M-Pesa phone number to retry payment:", "");
+        if (!phoneNumber) return; // User cancelled
+      }
+      
+      // Create a new payment request
+      const response = await fetch('/api/payments/mpesa/stkpush', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: transaction.amount,
+          phone: phoneNumber,
+          currency: transaction.currency || 'KES'
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to retry payment");
+      }
+      
+      const data = await response.json();
+      
+      toast.success(`M-Pesa payment #${data.CheckoutRequestID} sent. Please check your phone.`, {
+        duration: 5000,
+        icon: '💸'
+      });
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchWalletData();
+      }, 5000);
+      
+    } catch (error) {
+      console.error("Error retrying transaction:", error);
+      toast.error("Failed to retry payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -346,165 +491,250 @@ export function WalletTab() {
         </div>
       </motion.div>
       
-      {/* Transaction History */}
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
-        <div className="p-5 border-b border-gray-700">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium text-white flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-purple-400" />
+      {/* Transaction History - Modern Redesign */}
+      <div className="bg-gradient-to-b from-gray-800/80 to-gray-900/80 backdrop-blur-lg border border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-gray-700/50">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h3 className="text-xl font-semibold text-white flex items-center">
+              <Calendar className="h-5 w-5 mr-3 text-purple-400" />
               Transaction History
             </h3>
             
-            {/* Transaction Type Filter */}
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-gray-400" />
+            {/* Modern Filter Control */}
+            <div className="relative w-full sm:w-auto">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Filter className="h-4 w-4 text-purple-400" />
+              </div>
               <select 
                 value={transactionType}
                 onChange={(e) => handleFilterChange(e.target.value)}
-                className="bg-gray-700 text-gray-200 text-sm rounded-md px-2 py-1 border border-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full sm:w-auto pl-10 pr-10 py-2 bg-gray-700/50 text-gray-200 text-sm rounded-xl border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 backdrop-blur-md appearance-none"
               >
                 <option value="all">All Transactions</option>
                 <option value="topup">Top Ups</option>
                 <option value="tip">Tips to DJs</option>
               </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Transaction List */}
-        <div className="divide-y divide-gray-700">
+        {/* Transaction List - Unified with pending transactions */}
+        <div className="divide-y divide-gray-800/50">
           {isLoadingTransactions ? (
             <div className="flex justify-center items-center py-10">
-              <Loader2 className="h-6 w-6 text-purple-500 animate-spin mr-3" />
-              <span className="text-gray-400">Loading transactions...</span>
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-8 w-8 text-purple-500 animate-spin mb-3" />
+                <span className="text-gray-400">Loading transactions...</span>
+              </div>
             </div>
-          ) : transactions.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-gray-400 mb-2">No transactions found</p>
+          ) : allTransactions.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="bg-gray-800/30 rounded-full p-4 inline-flex mb-4">
+                <History className="h-8 w-8 text-gray-500" />
+              </div>
+              <p className="text-gray-400 mb-4">No transactions found</p>
               <button
                 onClick={() => setShowTopUpModal(true)}
-                className="mt-2 inline-flex items-center px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm"
+                className="mt-2 inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-sm font-medium shadow-lg hover:shadow-purple-500/20 transition-all duration-200 transform hover:-translate-y-0.5"
               >
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus className="h-4 w-4 mr-2" />
                 Add Funds
               </button>
             </div>
           ) : (
             <>
-              {transactions.map((transaction) => {
-                const status = getTransactionStatus(transaction);
+              {allTransactions.map((transaction, index) => {
+                const statusType = getTransactionStatusType(transaction);
+                const isPending = statusType === 'pending';
+                const isFailed = statusType === 'failed';
+                
                 return (
-                  <div key={transaction._id} className="border-b border-gray-100 dark:border-gray-800 py-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center">
-                        <div className="mr-3">
-                          {getTransactionIcon(transaction.type)}
-                        </div>
-                        <div>
-                          <p className="font-medium">{getTransactionDescription(transaction)}</p>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            <span>{formatDate(transaction.createdAt)}</span>
+                  <motion.div
+                    key={transaction._id || transaction.checkoutRequestId || index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    className="group hover:bg-gray-800/30 transition-colors duration-200"
+                  >
+                    <div className="px-6 py-4">
+                      <div className="flex items-start justify-between">
+                        {/* Transaction Info */}
+                        <div className="flex items-center space-x-4">
+                          <div className={`rounded-full p-3 ${getTransactionIconBackground(transaction.type)}`}>
+                            {getTransactionIcon(transaction.type)}
+                          </div>
+                          
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium text-gray-200">{getTransactionDescription(transaction)}</p>
+                              {getStatusBadge(transaction)}
+                            </div>
                             
-                            <span className={`ml-3 ${status.color}`}>• {status.text}</span>
+                            <div className="flex items-center text-xs text-gray-500 mt-1.5">
+                              <Calendar className="h-3 w-3 mr-1.5" />
+                              <span>{formatDate(transaction.createdAt)}</span>
+                              
+                              {transaction.paymentMethod && (
+                                <span className="ml-3 flex items-center">
+                                  <Circle className="h-1.5 w-1.5 mr-1.5" />
+                                  {transaction.paymentMethod.toUpperCase()}
+                                </span>
+                              )}
+                              
+                              {transaction.details?.checkoutRequestId && (
+                                <span className="ml-3 flex items-center overflow-hidden">
+                                  <Hash className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                  <span className="truncate max-w-[100px]">
+                                    {transaction.details.checkoutRequestId.substring(0, 8)}...
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Amount and Actions */}
+                        <div className="text-right flex flex-col items-end space-y-2">
+                          <p className={`font-semibold text-lg ${transaction.type === 'topup' ? 'text-green-400' : 'text-gray-200'} transition-colors`}>
+                            {transaction.type === 'topup' ? '+' : '-'}
+                            {formatCurrency(transaction.amount, transaction.currency)}
+                          </p>
+                          
+                          {/* Action buttons with improved styling */}
+                          <div className="flex space-x-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                            {isPending && (
+                              <button
+                                onClick={() => transaction.details?.checkoutRequestId && 
+                                               checkPaymentStatus(transaction.details.checkoutRequestId)}
+                                disabled={checkingPayment}
+                                className="text-xs px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-full hover:bg-blue-500/20 
+                                         transition-colors duration-200 flex items-center space-x-1 border border-blue-500/20"
+                              >
+                                {checkingPayment ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Checking...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCcw className="h-3 w-3" />
+                                    <span>Check Status</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            
+                            {isFailed && transaction.paymentMethod === 'mpesa' && (
+                              <button
+                                onClick={() => handleRetryTransaction(transaction)}
+                                disabled={isSubmitting}
+                                className="text-xs px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-full hover:bg-purple-500/20 
+                                         transition-colors duration-200 flex items-center space-x-1 border border-purple-500/20"
+                              >
+                                {isSubmitting ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Processing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RepeatIcon className="h-3 w-3" />
+                                    <span>Retry Payment</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            
+                            {isPending && isPendingTooLong(transaction.createdAt) && (
+                              <button
+                                onClick={() => {
+                                  // Make sure we're using the right ID and the function is available
+                                  if (transaction.details?.checkoutRequestId) {
+                                    // Log for debugging
+                                    console.log('Cancelling transaction:', transaction.details.checkoutRequestId);
+                                    handleExpireTransaction(transaction.details.checkoutRequestId);
+                                  } else if (transaction.checkoutRequestId) {
+                                    // Alternative ID location
+                                    console.log('Cancelling transaction (alt):', transaction.checkoutRequestId);
+                                    handleExpireTransaction(transaction.checkoutRequestId);
+                                  } else {
+                                    toast.error("Cannot cancel: Missing transaction ID");
+                                  }
+                                }}
+                                disabled={checkingPayment}
+                                className="text-xs px-3 py-1.5 bg-red-500/10 text-red-400 rounded-full hover:bg-red-500/20 
+                                         transition-colors duration-200 flex items-center space-x-1 border border-red-500/20"
+                              >
+                                <XCircle className="h-3 w-3" />
+                                <span>Cancel</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${transaction.type === 'topup' ? 'text-green-500' : 'text-red-500'}`}>
-                          {transaction.type === 'topup' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                        </p>
-                        
-                        {transaction.status === 'pending' && 
-                         transaction.paymentMethod === 'mpesa' && 
-                         transaction.details?.checkoutRequestId && (
-                          <button 
-                            onClick={() => checkPaymentStatus(transaction.details.checkoutRequestId)}
-                            disabled={checkingPayment}
-                            className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center justify-end ml-auto">
-                            {checkingPayment ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                <span>Checking...</span>
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCcw className="h-3 w-3 mr-1" />
-                                <span>Check Status</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
               
-              {/* Pagination Controls */}
+              {/* Modern Pagination Controls */}
               {totalPages > 1 && (
-                <div className="flex justify-between items-center p-4 border-t border-gray-700">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 text-sm bg-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  
-                  <span className="text-sm text-gray-400">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-sm bg-gray-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
+                <div className="flex justify-center items-center p-6">
+                  <div className="flex items-center space-x-1 bg-gray-800/50 rounded-xl p-1 backdrop-blur-sm">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Logic to show pages around current page
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm transition-all ${
+                            currentPage === pageNum 
+                              ? 'bg-purple-500 text-white font-medium' 
+                              : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
             </>
           )}
         </div>
       </div>
-      
-      {/* Add this after your regular transactions list */}
-      {pendingTransactions.length > 0 && (
-        <div className="mt-6 border-t pt-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Pending Transactions</h3>
-            <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-              {pendingTransactions.length} pending
-            </Badge>
-          </div>
-          
-          <div className="space-y-2">
-            {pendingTransactions.map((tx) => (
-              <div key={tx._id || tx.checkoutRequestId} className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 text-yellow-500 mr-2" />
-                    <div>
-                      <p className="font-medium">M-Pesa Payment (Pending)</p>
-                      <p className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{tx.currency || 'KES'} {tx.amount}</p>
-                    <button 
-                      onClick={() => checkPaymentStatus(tx.checkoutRequestId)}
-                      className="text-xs text-blue-600 hover:text-blue-800">
-                      Check Status
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       
       {/* Top Up Modal */}
       <TopUpModal 

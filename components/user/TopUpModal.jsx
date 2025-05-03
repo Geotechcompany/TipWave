@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CreditCard, Loader2, DollarSign, Phone } from "lucide-react";
+import { X, Loader2, Phone } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
 
@@ -10,7 +10,6 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   const { 
     formatCurrency, 
   } = useCurrency();
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("creditCard");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [localCurrency, setLocalCurrency] = useState({ 
     code: 'KES', 
@@ -60,8 +59,8 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       return;
     }
     
-    // Validate phone number for M-Pesa
-    if (selectedPaymentMethod === "mpesa" && !phoneNumber) {
+    // Validate phone number
+    if (!phoneNumber) {
       toast.error("Please enter your M-Pesa phone number");
       return;
     }
@@ -69,18 +68,13 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
     setIsSubmitting(true);
     
     try {
-      let endpoint = '/api/user/wallet/topup';
-      let body = { amount, paymentMethod: selectedPaymentMethod };
-      
-      // If M-Pesa is selected, use the M-Pesa specific endpoint
-      if (selectedPaymentMethod === "mpesa") {
-        endpoint = '/api/payments/mpesa/stkpush';
-        body = { 
-          amount, 
-          phone: phoneNumber,
-          currency: localCurrency.code
-        };
-      }
+      // Always use M-Pesa endpoint
+      const endpoint = '/api/payments/mpesa/stkpush';
+      const body = { 
+        amount, 
+        phone: phoneNumber,
+        currency: localCurrency.code
+      };
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -96,27 +90,18 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       
       const data = await response.json();
       
-      if (selectedPaymentMethod === "mpesa") {
-        // For M-Pesa, we need to verify the payment
-        setTransactionId(data.CheckoutRequestID);
-        console.log(`M-Pesa transaction reference: ${data.CheckoutRequestID}`);
-        toast.success("M-Pesa request sent. Please check your phone to complete payment.");
-        setIsVerifying(true);
-        
-        // Poll for payment confirmation
-        verifyMpesaPayment(data.CheckoutRequestID);
-      } else {
-        // For other payment methods
-        toast.success("Payment successful!");
-        onComplete(data.newBalance || amount);
-      }
+      // Process M-Pesa payment
+      setTransactionId(data.CheckoutRequestID);
+      console.log(`M-Pesa transaction reference: ${data.CheckoutRequestID}`);
+      toast.success("M-Pesa request sent. Please check your phone to complete payment.");
+      setIsVerifying(true);
+      
+      // Poll for payment confirmation
+      verifyMpesaPayment(data.CheckoutRequestID);
     } catch (error) {
       console.error("Error processing payment:", error);
       toast.error("Payment failed. Please try again.");
-    } finally {
-      if (selectedPaymentMethod !== "mpesa") {
-        setIsSubmitting(false);
-      }
+      setIsSubmitting(false);
     }
   };
   
@@ -226,8 +211,8 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
               <div className="mb-4">
                 <label className="block text-gray-400 mb-2 text-sm">Current Balance</label>
                 <div className="text-2xl font-bold flex items-center">
-                  <DollarSign className="h-5 w-5 opacity-70 mr-1" />
-                  {formatCurrency(currentBalance || 0)}
+                  <span className="opacity-70 mr-1">{localCurrency.symbol}</span>
+                  {formatCurrency(currentBalance || 0, false)}
                 </div>
               </div>
               
@@ -235,7 +220,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
                 <label className="block text-gray-400 mb-2 text-sm">Amount to Add</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <DollarSign className="h-5 w-5 text-gray-400" />
+                    <span className="text-gray-400">{localCurrency.symbol}</span>
                   </div>
                   <input
                     type="number"
@@ -247,112 +232,42 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
                 </div>
               </div>
               
+              {/* Show phone number input when M-Pesa is selected */}
               <div className="mb-4">
-                <label className="block text-gray-400 mb-2 text-sm">Payment Method</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div 
-                    className={`cursor-pointer p-3 rounded-lg border ${
-                      selectedPaymentMethod === "creditCard" 
-                        ? "border-blue-500 bg-blue-900/20" 
-                        : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
-                    }`}
-                    onClick={() => setSelectedPaymentMethod("creditCard")}
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <CreditCard className={`h-6 w-6 ${
-                        selectedPaymentMethod === "creditCard" ? "text-blue-400" : "text-gray-400"
-                      }`} />
-                      <span className="text-sm">Card</span>
-                    </div>
+                <label className="block text-gray-400 mb-2 text-sm">M-Pesa Phone Number</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
                   </div>
-                  
-                  <div 
-                    className={`cursor-pointer p-3 rounded-lg border ${
-                      selectedPaymentMethod === "paypal" 
-                        ? "border-blue-500 bg-blue-900/20" 
-                        : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
-                    }`}
-                    onClick={() => setSelectedPaymentMethod("paypal")}
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <svg className={`h-6 w-6 ${
-                        selectedPaymentMethod === "paypal" ? "text-blue-400" : "text-gray-400"
-                      }`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 11l4-7h6l-1 7h-9z" />
-                        <path d="M4 20l3-9h10l-1 9H4z" />
-                      </svg>
-                      <span className="text-sm">PayPal</span>
-                    </div>
-                  </div>
-                  
-                  {/* New M-Pesa option */}
-                  <div 
-                    className={`cursor-pointer p-3 rounded-lg border ${
-                      selectedPaymentMethod === "mpesa" 
-                        ? "border-green-500 bg-green-900/20" 
-                        : "border-gray-700 hover:border-gray-600 bg-gray-800/50"
-                    }`}
-                    onClick={() => setSelectedPaymentMethod("mpesa")}
-                  >
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <Phone className={`h-6 w-6 ${
-                        selectedPaymentMethod === "mpesa" ? "text-green-400" : "text-gray-400"
-                      }`} />
-                      <span className="text-sm">M-Pesa</span>
-                    </div>
-                  </div>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="e.g. 254712345678"
+                    className="bg-gray-800 border border-gray-700 pl-10 pr-3 py-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    disabled={isSubmitting}
+                  />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code (254)</p>
               </div>
               
-              {/* Show phone number input when M-Pesa is selected */}
-              {selectedPaymentMethod === "mpesa" && (
-                <div className="mb-4">
-                  <label className="block text-gray-400 mb-2 text-sm">M-Pesa Phone Number</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="e.g. 254712345678"
-                      className="bg-gray-800 border border-gray-700 pl-10 pr-3 py-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code (254)</p>
-                </div>
-              )}
-              
               <div className="pt-4">
-                {isSubmitting ? (
-                  <button
-                    type="button"
-                    className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center"
-                    disabled={isVerifying}
-                  >
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Verifying payment...
-                      </>
-                    ) : (
-                      <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3.5 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center"
-                  >
-                    <DollarSign className="h-5 w-5 mr-2" />
-                    Top Up {localCurrency.symbol}{amount.toFixed(2)}
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center">
+                      <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                      Processing...
+                    </span>
+                  ) : (
+                    <>
+                      Top Up {localCurrency.symbol}{amount.toFixed(2)}
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Add a cancel button when verifying for too long */}

@@ -14,6 +14,8 @@ export function MyRequests() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { currency, exchangeRates, isLoading: isCurrencyLoading } = useCurrency();
+  const [djs, setDjs] = useState({});
+  const [loadingDjs, setLoadingDjs] = useState(false);
 
   // Fetch user requests
   const fetchRequests = async () => {
@@ -94,6 +96,55 @@ export function MyRequests() {
     if (!currency) return '$';
     return currency.symbol || currency.code;
   };
+
+  // Add this function to fetch DJ information
+  const fetchDjInfo = async (djIds) => {
+    if (!djIds.length) return;
+    
+    setLoadingDjs(true);
+    try {
+      const response = await fetch(`/api/djs/info?ids=${djIds.join(',')}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch DJ information');
+      }
+      
+      const data = await response.json();
+      
+      // Create a map of DJ IDs to names
+      const djMap = {};
+      data.djs.forEach(dj => {
+        djMap[dj._id] = dj.name || dj.username || 'Unnamed DJ';
+      });
+      
+      setDjs(djMap);
+    } catch (error) {
+      console.error('Error fetching DJ info:', error);
+    } finally {
+      setLoadingDjs(false);
+    }
+  };
+
+  // Update the getDjName function to use loadingDjs
+  const getDjName = (request) => {
+    if (!request.djId) return 'No DJ Assigned';
+    if (loadingDjs && !djs[request.djId]) return 'Loading DJ...';
+    return djs[request.djId] || request.djName || 'Unknown DJ';
+  };
+
+  // Add this useEffect to fetch DJ info when requests change
+  useEffect(() => {
+    if (requests.length > 0) {
+      // Get unique DJ IDs from requests
+      const djIds = [...new Set(requests
+        .filter(req => req.djId)
+        .map(req => req.djId))];
+      
+      if (djIds.length > 0) {
+        fetchDjInfo(djIds);
+      }
+    }
+  }, [requests]);
 
   return (
     <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
@@ -181,14 +232,11 @@ export function MyRequests() {
               
               {/* Request Time & DJ */}
               <div className="text-right">
-                <p className="text-sm text-gray-400">
-                  {request.djName || 'Unknown DJ'}
-                </p>
-                <div className="flex items-center justify-end gap-1 text-xs text-gray-500 mt-1">
-                  <Clock className="h-3 w-3" />
-                  {request.createdAt && 
-                    formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })
-                  }
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Clock className="h-4 w-4" />
+                  <span>{getDjName(request)}</span>
+                  <span className="inline-block mx-1">•</span>
+                  <span>{formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</span>
                 </div>
               </div>
             </motion.div>
