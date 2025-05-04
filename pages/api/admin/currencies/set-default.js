@@ -1,16 +1,29 @@
-import { checkAdminAuth } from '../emails/auth-middleware';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
-  // Check admin authentication
-  const authResult = await checkAdminAuth(req, res);
-  if (!authResult.isAuthorized) {
-    return res.status(authResult.statusCode).json({ message: authResult.message });
+  // Check authentication
+  const session = await getServerSession(req, res, authOptions);
+  
+  // Check admin privileges
+  if (!session) {
+    return res.status(401).json({ error: "Unauthorized - No session" });
+  }
+  
+  const isAdmin = 
+    session.user.isAdmin === true || 
+    session.user.role === "admin" || 
+    session.user.role === "ADMIN" ||
+    (session.user.permissions && session.user.permissions.includes("admin"));
+  
+  if (!isAdmin) {
+    return res.status(401).json({ error: "Unauthorized - Not an admin" });
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { currencyId } = req.body;

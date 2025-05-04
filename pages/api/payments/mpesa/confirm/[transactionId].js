@@ -1,8 +1,8 @@
-
 import clientPromise from '@/lib/mongodb';
 import axios from 'axios';
 import { getTimestamp } from '@/lib/utils';
 import { sendNotificationEmail, EmailTypes } from '@/lib/email';
+import { decryptData } from '@/utils/encryption';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -34,10 +34,25 @@ export default async function handler(req, res) {
     }
 
     // If payment not found, check M-Pesa status
+    // Get the active M-PESA payment method
+    const mpesaMethod = await db.collection('paymentMethods').findOne({
+      code: 'mpesa',
+      isActive: true
+    });
+
+    if (!mpesaMethod) {
+      return res.status(400).json({ error: 'M-PESA payment method not available' });
+    }
+
+    // Re-use the credentials from the payment processor utility
+    const { credentials } = mpesaMethod;
+    const consumerKey = credentials.consumerKey ? decryptData(credentials.consumerKey) : null;
+    const consumerSecret = credentials.consumerSecret ? decryptData(credentials.consumerSecret) : null;
+    const passKey = credentials.passKey ? decryptData(credentials.passKey) : null;
+    const businessShortCode = credentials.businessShortCode ? decryptData(credentials.businessShortCode) : null;
+
     // Generate token for M-Pesa API
-    const auth = Buffer.from(
-      `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`
-    ).toString('base64');
+    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
     
     const tokenResponse = await axios.get(
       'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
@@ -51,7 +66,7 @@ export default async function handler(req, res) {
     // Query transaction status from M-Pesa
     const timestamp = getTimestamp();
     const password = Buffer.from(
-      `${process.env.MPESA_BUSINESS_SHORT_CODE}${process.env.MPESA_PASS_KEY}${timestamp}`
+      `${businessShortCode}${passKey}${timestamp}`
     ).toString('base64');
     
     try {
@@ -106,7 +121,7 @@ export default async function handler(req, res) {
       const statusResponse = await axios.post(
         'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
         {
-          BusinessShortCode: process.env.MPESA_BUSINESS_SHORT_CODE,
+          BusinessShortCode: businessShortCode,
           Password: password,
           Timestamp: timestamp,
           CheckoutRequestID: transactionId

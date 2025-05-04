@@ -36,7 +36,7 @@ export default function UserManagement() {
   const fetchUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/admin/users?filter=${activeFilter}`);
+      const response = await fetch('/api/admin/users?limit=100'); // Increase limit to get more users
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
       setUsers(data.users);
@@ -46,7 +46,7 @@ export default function UserManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeFilter]);
+  }, []);
 
   useEffect(() => {
     fetchUsers();
@@ -67,27 +67,35 @@ export default function UserManagement() {
 
   const handleUserAction = async (userId, action) => {
     try {
+      setIsUpdating(true);
+      
+      const status = action === 'activate' ? 'active' : 'inactive';
+      
       const response = await fetch(`/api/admin/users/${userId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: action === 'activate' ? 'active' : 'inactive' }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
       });
       
       if (!response.ok) {
         throw new Error('Failed to update user status');
       }
       
-      // Update local state to reflect the change
-      setUsers(users.map(user => 
-        user._id === userId ? { ...user, status: action === 'activate' ? 'active' : 'inactive' } : user
-      ));
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === userId 
+            ? { ...user, status, isActive: status === 'active' } 
+            : user
+        )
+      );
       
-      toast.success(`User ${action === 'activate' ? 'activated' : 'deactivated'} successfully`);
+      toast.success(`User ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       console.error('Error updating user status:', error);
       toast.error('Failed to update user status');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -172,8 +180,13 @@ export default function UserManagement() {
     }
   };
 
-  const handleEditUser = async (e) => {
+  const handleUpdateUser = async (e) => {
     e.preventDefault();
+    
+    if (!selectedUser?._id) {
+      toast.error("No user selected");
+      return;
+    }
     
     try {
       setIsUpdating(true);
@@ -183,7 +196,12 @@ export default function UserManagement() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          name: editForm.name,
+          email: editForm.email,
+          role: editForm.role,
+          status: editForm.status
+        }),
       });
       
       if (!response.ok) {
@@ -191,12 +209,23 @@ export default function UserManagement() {
       }
       
       // Update local state
-      setUsers(users.map(user => 
-        user._id === selectedUser._id ? { ...user, ...editForm } : user
-      ));
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === selectedUser._id 
+            ? { 
+                ...user, 
+                name: editForm.name,
+                email: editForm.email,
+                role: editForm.role,
+                status: editForm.status,
+                isActive: editForm.status === 'active'
+              } 
+            : user
+        )
+      );
       
-      toast.success(`User updated successfully`);
       setIsEditModalOpen(false);
+      toast.success('User updated successfully');
     } catch (error) {
       console.error('Error updating user:', error);
       toast.error('Failed to update user');
@@ -386,85 +415,86 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="py-3">{getRoleBadge(user.role)}</td>
-                      <td className="py-3">
-                        <Badge 
-                          variant={user.status === 'active' ? 'success' : 'destructive'}
-                          className="w-fit"
-                        >
-                          {user.status === 'active' ? 'active' : 'inactive'}
+                      <td className="py-3 px-4">
+                        <Badge className={
+                          (user.status === 'active' || user.isActive === true) 
+                          ? 'bg-green-500/20 text-green-500' 
+                          : 'bg-red-500/20 text-red-500'
+                        }>
+                          {(user.status === 'active' || user.isActive === true) ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
                       <td className="py-3 text-sm text-gray-400">
                         {new Date(user.createdAt || Date.now()).toLocaleDateString()}
                       </td>
-                      <td className="py-3 text-right relative pr-4">
-                        <button
-                          onClick={() => setDropdownOpen(dropdownOpen === user._id ? null : user._id)}
-                          className="p-1 hover:bg-gray-700 rounded"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
+                      <td className="py-3 px-4 relative">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => setDropdownOpen(dropdownOpen === user._id ? null : user._id)}
+                            className="text-gray-400 hover:text-white focus:outline-none"
+                          >
+                            <MoreVertical className="h-5 w-5" />
+                          </button>
+                        </div>
                         
                         {dropdownOpen === user._id && (
                           <div 
                             ref={dropdownRef}
-                            className="absolute right-4 mt-1 w-48 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600"
+                            className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-50 py-1 border border-gray-700"
                           >
-                            <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setEditForm({
+                                  name: user.name || "",
+                                  email: user.email || "",
+                                  role: user.role || "USER",
+                                  status: user.status || "active"
+                                });
+                                setIsEditModalOpen(true);
+                                setDropdownOpen(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit User
+                            </button>
+                            
+                            {user.status === 'active' ? (
                               <button
-                                className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
                                 onClick={() => {
-                                  setSelectedUser(user);
-                                  setEditForm({
-                                    name: user.name || "",
-                                    email: user.email || "",
-                                    role: user.role || "USER",
-                                    status: user.status || "active"
-                                  });
-                                  setIsEditModalOpen(true);
+                                  handleUserAction(user._id, 'deactivate');
                                   setDropdownOpen(null);
                                 }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
                               >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit User
+                                <XCircle className="h-4 w-4 mr-2 text-red-400" />
+                                Deactivate
                               </button>
-                              
-                              {user.status === 'active' ? (
-                                <button
-                                  className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                  onClick={() => {
-                                    handleUserAction(user._id, 'deactivate');
-                                    setDropdownOpen(null);
-                                  }}
-                                >
-                                  <XCircle className="mr-2 h-4 w-4 text-red-400" />
-                                  Deactivate
-                                </button>
-                              ) : (
-                                <button
-                                  className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                                  onClick={() => {
-                                    handleUserAction(user._id, 'activate');
-                                    setDropdownOpen(null);
-                                  }}
-                                >
-                                  <CheckCircle className="mr-2 h-4 w-4 text-green-400" />
-                                  Activate
-                                </button>
-                              )}
-                              
+                            ) : (
                               <button
-                                className="flex items-center w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
                                 onClick={() => {
-                                  setSelectedUser(user);
-                                  setIsDeleteModalOpen(true);
+                                  handleUserAction(user._id, 'activate'); 
                                   setDropdownOpen(null);
                                 }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
                               >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete User
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-400" />
+                                Activate
                               </button>
-                            </div>
+                            )}
+                            
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setIsDeleteModalOpen(true);
+                                setDropdownOpen(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete User
+                            </button>
                           </div>
                         )}
                       </td>
@@ -479,81 +509,85 @@ export default function UserManagement() {
 
       {/* Edit User Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <motion.div 
-            className="bg-gray-800 rounded-lg w-full max-w-md p-6 shadow-lg"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-          >
-            <h3 className="text-xl font-bold mb-4">Edit User</h3>
-            <form onSubmit={handleEditUser} className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-semibold mb-4 text-white">Edit User</h2>
+            
+            <form onSubmit={handleUpdateUser}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editForm.name}
                     onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                    required
                   />
                 </div>
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
                   <input
                     type="email"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editForm.email}
                     onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                    required
                   />
                 </div>
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Role</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
                   <select
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editForm.role}
                     onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                   >
                     <option value="USER">User</option>
                     <option value="DJ">DJ</option>
                     <option value="ADMIN">Admin</option>
-                    <option value="BOTH">User + DJ</option>
                   </select>
                 </div>
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
                   <select
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={editForm.status}
                     onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
               </div>
+              
               <div className="mt-6 flex justify-end space-x-3">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <button
+                  type="button"
                   onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500"
                 >
                   Cancel
-                </Button>
-                <Button 
-                  type="submit" 
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500"
                   disabled={isUpdating}
                 >
                   {isUpdating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : "Save Changes"}
-                </Button>
+                    <span className="flex items-center">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
               </div>
             </form>
-          </motion.div>
+          </div>
         </div>
       )}
 

@@ -1,31 +1,8 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import clientPromise from '@/lib/mongodb';
+import { processMpesaPayment } from '@/utils/paymentProcessors';
 import { ObjectId } from 'mongodb';
-import axios from 'axios';
-import { getTimestamp } from '@/lib/utils';
-
-// Helper function to get OAuth token
-async function getAccessToken() {
-  try {
-    const consumer_key = process.env.MPESA_CONSUMER_KEY;
-    const consumer_secret = process.env.MPESA_CONSUMER_SECRET;
-    const url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
-    
-    const auth = Buffer.from(`${consumer_key}:${consumer_secret}`).toString('base64');
-    
-    const response = await axios.get(url, {
-      headers: {
-        "Authorization": `Basic ${auth}`
-      }
-    });
-    
-    return response.data.access_token;
-  } catch (error) {
-    console.error('Error getting access token:', error);
-    throw error;
-  }
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -41,98 +18,55 @@ export default async function handler(req, res) {
     }
     
     const userId = session.user.id;
-    const { amount, phone, currency = 'KES' } = req.body;
+    const { amount, phone, description = 'Wallet Top Up' } = req.body;
     
     // Validate request data
     if (!amount || amount <= 0 || !phone) {
       return res.status(400).json({ error: 'Invalid amount or phone number' });
     }
     
-    // Format phone number (ensure it has the country code)
-    let formattedPhone = phone;
-    if (!formattedPhone.startsWith('254')) {
-      // Remove leading zero if present
-      formattedPhone = formattedPhone.replace(/^0/, '');
-      // Add Kenyan country code
-      formattedPhone = `254${formattedPhone}`;
+    // Find active M-PESA payment method
+    const client = await clientPromise;
+    const db = client.db();
+    
+    const mpesaMethod = await db.collection('paymentMethods').findOne({
+      code: 'mpesa',
+      isActive: true
+    });
+    
+    if (!mpesaMethod) {
+      return res.status(400).json({ error: 'M-PESA payment method not available' });
     }
     
-    // Get OAuth token
-    const accessToken = await getAccessToken();
+    // Process payment using the utility function
+    const result = await processMpesaPayment({
+      amount,
+      phoneNumber: phone,
+      reference: description,
+      paymentMethodId: mpesaMethod._id,
+      userId
+    });
     
-    const passkey = process.env.MPESA_PASS_KEY;
-    const businessShortCode = process.env.MPESA_BUSINESS_SHORT_CODE;
-    const timestamp = getTimestamp();
+    // Store the pending transaction in the database
+    await db.collection('pendingTransactions').insertOne({
+      userId: new ObjectId(userId),
+      checkoutRequestId: result.CheckoutRequestID,
+      merchantRequestId: result.MerchantRequestID,
+      amount: parseFloat(amount),
+      phone,
+      description,
+      status: 'pending',
+      paymentMethod: 'mpesa',
+      createdAt: new Date()
+    });
     
-    // Create password
-    const password = Buffer.from(
-      `${businessShortCode}${passkey}${timestamp}`
-    ).toString('base64');
-    
-    // Fix the callback URL formation
-    const callback_url = process.env.MPESA_CALLBACK_URL;
-    
-    console.log('Using M-Pesa callback URL:', callback_url);
-    
-    // Initiate STK push
-    const url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest";
-    
-    const stkPushResponse = await axios.post(
-      url,
-      {
-        BusinessShortCode: businessShortCode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: "CustomerPayBillOnline",
-        Amount: amount,
-        PartyA: formattedPhone,
-        PartyB: businessShortCode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: callback_url,
-        AccountReference: "TipWave Wallet TopUp",
-        TransactionDesc: "Top up your TipWave wallet"
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    
-    // Log the STK push response for debugging
-    console.log('M-Pesa STK push response:', JSON.stringify(stkPushResponse.data, null, 2));
-    
-    // If STK push is successful
-    if (stkPushResponse.data.ResponseCode === "0") {
-      const client = await clientPromise;
-      const db = client.db();
-      
-      // Store pending transaction
-      await db.collection('pendingTransactions').insertOne({
-        userId: new ObjectId(userId),
-        checkoutRequestId: stkPushResponse.data.CheckoutRequestID,
-        merchantRequestId: stkPushResponse.data.MerchantRequestID,
-        amount: Number(amount),
-        phone: formattedPhone,
-        currency,
-        status: 'pending',
-        createdAt: new Date()
-      });
-      
-      return res.status(200).json({
-        success: true,
-        CheckoutRequestID: stkPushResponse.data.CheckoutRequestID,
-        MerchantRequestID: stkPushResponse.data.MerchantRequestID
-      });
-    } else {
-      return res.status(400).json({ 
-        error: 'Failed to initiate M-Pesa payment',
-        details: stkPushResponse.data
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      CheckoutRequestID: result.CheckoutRequestID,
+      MerchantRequestID: result.MerchantRequestID
+    });
   } catch (error) {
-    console.error('Error initiating M-Pesa payment:', error);
+    console.error('Error initiating M-PESA payment:', error);
     return res.status(500).json({ 
       success: false, 
       error: 'Failed to initiate payment',

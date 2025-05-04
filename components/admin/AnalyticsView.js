@@ -14,6 +14,13 @@ export default function AnalyticsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // Add state for default currency
+  const [defaultCurrency, setDefaultCurrency] = useState({
+    code: 'USD',
+    symbol: '$',
+    rate: 1
+  });
+  
   // Dashboard summary metrics
   const [summary, setSummary] = useState({
     totalRevenue: 0,
@@ -28,6 +35,18 @@ export default function AnalyticsView() {
     setError(null);
     
     try {
+      // Fetch currency information first
+      const currencyResponse = await axios.get('/api/admin/currencies');
+      const currencies = currencyResponse.data.currencies || [];
+      
+      // Find default currency
+      const defaultCurr = currencies.find(curr => curr.isDefault) || 
+                         currencies.find(curr => curr.code === 'USD') ||
+                         { code: 'USD', symbol: '$', rate: 1 };
+      
+      setDefaultCurrency(defaultCurr);
+      
+      // Now fetch analytics data
       const response = await axios.get(`/api/admin/analytics?timeRange=${timeRange}`);
       setAnalyticsData(response.data);
       
@@ -76,10 +95,11 @@ export default function AnalyticsView() {
     completed: '#6366F1'  // indigo
   };
 
+  // Update formatCurrency to use the default currency from state
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: defaultCurrency.code,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
@@ -183,14 +203,14 @@ export default function AnalyticsView() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis dataKey="date" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" tickFormatter={(value) => `$${value}`} />
+                  <YAxis stroke="#9CA3AF" tickFormatter={(value) => `${defaultCurrency.symbol}${value}`} />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: '#1F2937',
                       border: '1px solid #374151',
                       borderRadius: '0.5rem'
                     }}
-                    formatter={(value) => [`$${value}`, 'Revenue']}
+                    formatter={(value) => [`${defaultCurrency.symbol}${value}`, 'Revenue']}
                   />
                   <Area
                     type="monotone"
@@ -289,7 +309,7 @@ export default function AnalyticsView() {
                       borderRadius: '0.5rem'
                     }}
                     formatter={(value, name) => [
-                      name === 'avgAmount' ? `$${value}` : value, 
+                      name === 'avgAmount' ? `${defaultCurrency.symbol}${value}` : value, 
                       name === 'count' ? 'Bids' : 'Avg Amount'
                     ]}
                   />

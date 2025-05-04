@@ -12,7 +12,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/admin?callbackUrl=/dashboard/admin');
-    } else if (session?.user?.role !== 'ADMIN') {
+    } else if (status === 'authenticated' && session?.user?.role !== 'ADMIN') {
       router.push('/auth/user');
     }
   }, [session, status, router]);

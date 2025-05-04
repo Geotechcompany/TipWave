@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DollarSign, Calendar, TrendingUp, TrendingDown, Download, ArrowRight, Loader2 } from "lucide-react";
 import axios from "axios";
 
-export default function AdminRevenueChart({ initialStats = null }) {
+export default function AdminRevenueChart({ initialStats = null, defaultCurrency }) {
   const [stats, setStats] = useState(initialStats);
   const [isLoading, setIsLoading] = useState(!initialStats);
   const [error, setError] = useState(null);
@@ -45,13 +45,13 @@ export default function AdminRevenueChart({ initialStats = null }) {
   const isPositiveChange = percentChange >= 0;
   
   // Format currency
-  const formatCurrency = (amount) => {
+  const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: defaultCurrency?.code || 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(value);
   };
 
   return (

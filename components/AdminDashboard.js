@@ -13,7 +13,8 @@ import {
   Shield,
   
 
-  Database
+  Database,
+
 } from "lucide-react";
 
 // Import admin components
@@ -32,10 +33,16 @@ import { AppLoader } from "./AppLoader";
 import DJApplicationsReview from "./admin/DJApplicationsReview";
 import UserManagement from "./admin/UserManagement";
 import EmailManagement from "./admin/EmailManagement";
+import PaymentMethodManagement from "./admin/PaymentMethodManagement";
 
 export default function AdminDashboard() {
-  const { data: session, status } = useSession();
   const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/auth/admin?redirected=true');
+    },
+  });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,26 +70,39 @@ export default function AdminDashboard() {
     emailStats: { sent: 0, failed: 0, scheduled: 0 }
   });
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push('/auth/admin');
-    }
-  }, [status, router]);
-
-  const handleSignOut = async () => {
+  const [defaultCurrency, setDefaultCurrency] = useState({
+    code: 'USD',
+    symbol: '$',
+    rate: 1
+  });
+  
+  const fetchDefaultCurrency = useCallback(async () => {
     try {
-      await signOut({ redirect: true, callbackUrl: "/" });
+      const response = await fetch('/api/admin/currencies');
+      if (!response.ok) throw new Error('Failed to fetch currencies');
+      
+      const data = await response.json();
+      const currencies = data.currencies || [];
+      
+      const defaultCurr = currencies.find(curr => curr.isDefault) || 
+                         currencies.find(curr => curr.code === 'USD') ||
+                         (currencies.length > 0 ? currencies[0] : { code: 'USD', symbol: '$', rate: 1 });
+      
+      setDefaultCurrency(defaultCurr);
     } catch (error) {
-      console.error('Sign out error:', error);
-      toast.error('Failed to sign out');
+      console.error('Error fetching default currency:', error);
     }
-  };
+  }, []);
 
+  // Define fetchAdminData before using it in useEffect
   const fetchAdminData = useCallback(async () => {
-    if (!session?.user?.id) return;
-
+    if (status !== "authenticated" || !session?.user?.id) return;
+    
     try {
       setRefreshing(true);
+      
+      await fetchDefaultCurrency();
+      
       const response = await fetch(`/api/admin/stats?timeRange=${timeRange}`);
       if (response.ok) {
         const data = await response.json();
@@ -95,7 +115,77 @@ export default function AdminDashboard() {
       setRefreshing(false);
       setIsLoading(false);
     }
-  }, [timeRange, session?.user?.id]);
+  }, [timeRange, session?.user?.id, fetchDefaultCurrency, status]);
+
+  // Improve session check with better error handling
+  useEffect(() => {
+    if (status === "loading") {
+      // Show loading state while verifying session
+      setIsLoading(true);
+      return;
+    }
+    
+    if (status === "unauthenticated") {
+      console.log("Session is unauthenticated, redirecting to login...");
+      router.push('/auth/admin?session=expired');
+      return;
+    }
+    
+    // Verify admin role once session is loaded
+    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+      console.log("User is not an admin, redirecting...", session?.user);
+      toast.error('Admin access required');
+      router.push('/');
+      return;
+    }
+    
+    // Session is valid and user is admin, proceed with fetching data
+    console.log("Admin session verified successfully");
+    fetchAdminData();
+  }, [status, session, router, fetchAdminData]);
+
+  // Enhance the session refresh approach
+  useEffect(() => {
+    // More aggressive session refresh - every 1 minute
+    const interval = setInterval(async () => {
+      try {
+        if (status === "authenticated") {
+          // Use a more forceful approach to refresh the session
+          const response = await fetch('/api/auth/session', {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
+          
+          if (!response.ok) {
+            console.warn('Session refresh response not OK:', response.status);
+          } else {
+            const data = await response.json();
+            if (!data?.user) {
+              console.warn('Session exists but user data is missing');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Session refresh error:', error);
+      }
+    }, 60 * 1000); // Every 1 minute
+    
+    return () => clearInterval(interval);
+  }, [status]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut({ redirect: true, callbackUrl: "/" });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Failed to sign out');
+    }
+  };
 
   useEffect(() => {
     fetchAdminData();
@@ -205,11 +295,13 @@ export default function AdminDashboard() {
                 isLoading={isLoading}
                 timeRange={timeRange}
                 setTimeRange={setTimeRange}
+                defaultCurrency={defaultCurrency}
               />
               
               <AdminRevenueChart 
                 stats={stats}
                 isLoading={isLoading}
+                defaultCurrency={defaultCurrency}
               />
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -231,11 +323,11 @@ export default function AdminDashboard() {
             </motion.div>
           )}
           
-          {activeTab === "users" && <UserManagement />}
-          {activeTab === "songs" && <SongManagement />}
-          {activeTab === "bids" && <BidManagement />}
-          {activeTab === "analytics" && <AnalyticsView />}
-          {activeTab === "settings" && <SettingsView />}
+          {activeTab === "users" && <UserManagement defaultCurrency={defaultCurrency} />}
+          {activeTab === "songs" && <SongManagement defaultCurrency={defaultCurrency} />}
+          {activeTab === "bids" && <BidManagement defaultCurrency={defaultCurrency} />}
+          {activeTab === "analytics" && <AnalyticsView defaultCurrency={defaultCurrency} />}
+          {activeTab === "settings" && <SettingsView defaultCurrency={defaultCurrency} />}
           {activeTab === "content" && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Content Moderation</h2>
@@ -256,7 +348,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-          {activeTab === "djapplications" && <DJApplicationsReview />}
+          {activeTab === "djapplications" && <DJApplicationsReview defaultCurrency={defaultCurrency} />}
           {activeTab === "emails" && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -264,9 +356,14 @@ export default function AdminDashboard() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              <EmailManagement stats={stats} refreshData={refreshData} />
+              <EmailManagement 
+                stats={stats} 
+                refreshData={refreshData} 
+                defaultCurrency={defaultCurrency} 
+              />
             </motion.div>
           )}
+          {activeTab === "payment-methods" && <PaymentMethodManagement defaultCurrency={defaultCurrency} />}
         </div>
       </div>
     </div>

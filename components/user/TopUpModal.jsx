@@ -1,34 +1,51 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, Phone, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
+import { 
+  X, Loader2, Phone, CheckCircle, AlertTriangle, XCircle, Wallet, 
+  CreditCard, ArrowRight 
+} from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
+import useSWR from "swr";
+
+const fetcher = url => fetch(url).then(res => res.json());
 
 export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
-  const [amount, setAmount] = useState(10);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { 
-    formatCurrency, 
-  } = useCurrency();
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [localCurrency, setLocalCurrency] = useState({ 
-    code: 'KES', 
-    symbol: 'Ksh',
-    name: 'Kenyan Shilling'
-  });
-  const [isVerifying, setIsVerifying] = useState(false);
-  /**
-   * Stores the transaction ID from M-Pesa for tracking/receipt purposes 
-   * (currently only set, future implementation will use this for transaction lookup)
-   */
-  const [_transactionId, setTransactionId] = useState(null);
-  const [attempts, setAttempts] = useState(0);
-  const [verificationInterval, setVerificationInterval] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { formatCurrency } = useCurrency();
+
+  
   const [bannerToast, setBannerToast] = useState({
     show: false,
     message: '',
     type: '', // 'success' or 'error'
   });
+
+  // Fetch payment methods using SWR
+  const { data: paymentMethodsData, error: paymentMethodsError, isLoading: paymentMethodsLoading } = useSWR(
+    isOpen ? '/api/payment-methods/active' : null, // Only fetch when modal is open
+    fetcher
+  );
+
+  // Use useMemo to prevent unnecessary re-renders
+  const paymentMethods = useMemo(() => 
+    paymentMethodsData?.paymentMethods || [],
+    [paymentMethodsData]
+  );
+
+  // Set default payment method when data loads
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !selectedMethod) {
+      setSelectedMethod(paymentMethods[0]._id);
+    }
+  }, [paymentMethods, selectedMethod]);
+
+  // Get the selected payment method object
+  const selectedPaymentMethod = paymentMethods.find(m => m._id === selectedMethod);
+  const isMpesa = selectedPaymentMethod?.code === 'mpesa';
 
   useEffect(() => {
     const fetchCurrency = async () => {
@@ -48,14 +65,6 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
     fetchCurrency();
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (verificationInterval) {
-        clearInterval(verificationInterval);
-      }
-    };
-  }, [verificationInterval]);
-
   const showBannerToast = (message, type = 'success') => {
     setBannerToast({
       show: true,
@@ -72,244 +81,230 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (amount <= 0) {
+    if (!amount || parseFloat(amount) <= 0) {
       toast.error("Please enter a valid amount");
       return;
     }
     
-    // Validate phone number
-    if (!phoneNumber) {
-      toast.error("Please enter your M-Pesa phone number");
+    if (isMpesa && !phone) {
+      toast.error("Please enter your phone number");
       return;
     }
     
-    setIsSubmitting(true);
-    
     try {
-      // Always use M-Pesa endpoint
-      const endpoint = '/api/payments/mpesa/stkpush';
-      const body = { 
-        amount, 
-        phone: phoneNumber,
-        currency: localCurrency.code
-      };
+      setIsProcessing(true);
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-      
-      if (!response.ok) {
-        throw new Error("Payment failed");
-      }
-      
-      const data = await response.json();
-      
-      // Process M-Pesa payment
-      setTransactionId(data.CheckoutRequestID);
-      console.log(`M-Pesa transaction reference: ${data.CheckoutRequestID}`);
-      showBannerToast("M-Pesa request sent. Please check your phone to complete payment.");
-      setIsVerifying(true);
-      
-      // Poll for payment confirmation
-      verifyMpesaPayment(data.CheckoutRequestID);
-    } catch (error) {
-      console.error("Error processing payment:", error);
-      showBannerToast("Payment failed. Please try again.", "error");
-      setIsSubmitting(false);
-    }
-  };
-  
-  const verifyMpesaPayment = async (CheckoutRequestID) => {
-    // Reset attempts counter when starting verification
-    setAttempts(0);
-    let localAttempts = 0;
-    const maxAttempts = 10;
-    
-    const intervalId = setInterval(async () => {
-      try {
-        localAttempts++;
-        setAttempts(localAttempts); // Update state with current attempt count
-        
-        const response = await fetch(`/api/payments/mpesa/confirm/${CheckoutRequestID}`);
-        if (!response.ok) {
-          throw new Error("Failed to verify payment");
-        }
+      if (isMpesa) {
+        const response = await fetch('/api/payments/mpesa/stkpush', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: parseFloat(amount),
+            phone,
+            storeTransaction: true,
+            description: 'Wallet Top Up'
+          }),
+        });
         
         const data = await response.json();
         
-        // If payment is completed or failed, close the modal and notify
-        if (data.status === "COMPLETED") {
-          clearInterval(intervalId);
-          setIsVerifying(false);
-          setIsSubmitting(false);
-          
-          // Send the data to parent component
-          onComplete(data);
-          
-          // Close modal immediately
-          onClose();
-          
-          // Show success message
-          showBannerToast("Payment completed successfully! Your balance has been updated.");
-          return;
-        } 
-        
-        if (data.status === "FAILED") {
-          clearInterval(intervalId);
-          setIsVerifying(false);
-          setIsSubmitting(false);
-          
-          // Send failure info to parent
-          onComplete(data);
-          
-          // Close modal
-          onClose();
-          
-          // Show error message
-          showBannerToast("Payment failed. Please try again.", "error");
-          return;
+        if (!response.ok) {
+          throw new Error(data.error || data.details || 'Failed to process payment');
         }
         
-        // If we've reached max attempts, stop polling but allow user to close manually
-        if (localAttempts >= maxAttempts) {
-          clearInterval(intervalId);
-          setIsVerifying(false);
-          
-          // Update UI to show "Check status later" button instead of spinner
-          setIsSubmitting(false);
-          showBannerToast("Payment is still processing. You can close this window and check your account later.");
-        }
-      } catch (error) {
-        console.error("Error verifying payment:", error);
+        showBannerToast('M-PESA payment initiated successfully', 'success');
+        toast.success('M-PESA STK push sent to your phone. Please check your phone to complete the payment.');
         
-        // On error after several attempts, allow user to close modal
-        if (localAttempts >= 3) {
-          setIsVerifying(false);
-          showBannerToast("Couldn't verify payment status. Please check your account later.", "error");
+        handleClose();
+        
+        if (onComplete) {
+          onComplete({
+            amount: parseFloat(amount),
+            method: 'mpesa',
+            status: 'pending',
+            checkoutRequestId: data.CheckoutRequestID,
+            merchantRequestId: data.MerchantRequestID,
+            transactionId: data.CheckoutRequestID
+          });
         }
+      } else {
+        toast.error('This payment method is not yet implemented');
       }
-    }, 5000); // Check every 5 seconds
-    
-    // Save interval ID to state so we can clear it if user closes modal manually
-    setVerificationInterval(intervalId);
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      toast.error(error.message || 'Failed to process payment');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // JSX - adding M-Pesa option
+  const handleClose = () => {
+    // Reset form state
+    setAmount("");
+    setPhone("");
+    setSelectedMethod(null);
+    setIsProcessing(false);
+    
+    // Call the onClose callback
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-900 border border-gray-800 rounded-lg p-6 w-full max-w-md"
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm" 
+        onClick={handleClose}
+      />
+      
+      {/* Modal */}
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-700">
+          <h3 className="text-xl font-semibold text-white flex items-center">
+            <Wallet className="h-5 w-5 mr-2 text-purple-400" />
+            Top Up Wallet
+          </h3>
+          <button 
+            onClick={handleClose}
+            className="text-gray-400 hover:text-white transition-colors"
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Top Up Your Account</h2>
-              <button 
-                onClick={onClose} 
-                className="text-gray-400 hover:text-white"
-                disabled={isSubmitting}
-              >
-                <X className="h-5 w-5" />
-              </button>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="p-5">
+          <form onSubmit={handleSubmit}>
+            {/* Current Balance */}
+            <div className="mb-5 bg-gray-800/50 rounded-xl p-4">
+              <div className="text-sm text-gray-400">Current Balance</div>
+              <div className="text-2xl font-bold text-white">{formatCurrency(currentBalance)}</div>
             </div>
             
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-gray-400 mb-2 text-sm">Current Balance</label>
-                <div className="text-2xl font-bold flex items-center">
-                  <span className="opacity-70 mr-1">{localCurrency.symbol}</span>
-                  {formatCurrency(currentBalance || 0, false)}
+            {/* Amount Input */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Amount to Top Up
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min="1"
+                  step="any"
+                  placeholder="Enter amount"
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <span className="text-gray-400">KES</span>
                 </div>
               </div>
+            </div>
+            
+            {/* Payment Methods */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Payment Method
+              </label>
               
-              <div className="mb-6">
-                <label className="block text-gray-400 mb-2 text-sm">Amount to Add</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-400">{localCurrency.symbol}</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
-                    className="bg-gray-800 border border-gray-700 pl-10 pr-3 py-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={isSubmitting}
-                  />
+              {paymentMethodsLoading ? (
+                <div className="flex items-center justify-center py-4 bg-gray-800/50 rounded-lg">
+                  <Loader2 className="h-5 w-5 animate-spin text-purple-400 mr-2" />
+                  <span className="text-gray-400">Loading payment methods...</span>
                 </div>
-              </div>
-              
-              {/* Show phone number input when M-Pesa is selected */}
-              <div className="mb-4">
-                <label className="block text-gray-400 mb-2 text-sm">M-Pesa Phone Number</label>
+              ) : paymentMethodsError ? (
+                <div className="flex items-center py-4 px-3 bg-red-500/10 text-red-400 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  <span>Failed to load payment methods</span>
+                </div>
+              ) : paymentMethods.length === 0 ? (
+                <div className="flex items-center py-4 px-3 bg-yellow-500/10 text-yellow-400 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  <span>No payment methods available</span>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {paymentMethods.map((method) => (
+                    <div 
+                      key={method._id}
+                      onClick={() => setSelectedMethod(method._id)}
+                      className={`flex items-center p-4 rounded-lg cursor-pointer transition-colors ${
+                        selectedMethod === method._id
+                          ? 'bg-purple-500/20 border border-purple-500/50'
+                          : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <div className="h-10 w-10 bg-gray-700 rounded-lg flex items-center justify-center mr-3">
+                        {method.icon ? (
+                          <img src={method.icon} alt={method.name} className="h-6 w-6" />
+                        ) : (
+                          <CreditCard className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-white">{method.name}</div>
+                        <div className="text-xs text-gray-400">{method.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Phone Input for M-PESA */}
+            {isMpesa && (
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  M-PESA Phone Number
+                </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </div>
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
                     type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="e.g. 254712345678"
-                    className="bg-gray-800 border border-gray-700 pl-10 pr-3 py-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    disabled={isSubmitting}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. 07XXXXXXXX"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Enter your phone number with country code (254)</p>
-              </div>
-              
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center">
-                      <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                      Processing...
-                    </span>
-                  ) : (
-                    <>
-                      Top Up {localCurrency.symbol}{amount.toFixed(2)}
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Add a cancel button when verifying for too long */}
-              {isVerifying && attempts > 5 && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-full mt-3 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Check Status Later
-                </button>
-              )}
-            </form>
-
-            {/* Show transaction reference in verifying state */}
-            {isVerifying && (
-              <div className="text-center mt-4">
-                <p className="text-sm text-gray-400">Transaction Reference:</p>
-                <p className="font-mono text-xs">{_transactionId}</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Enter the phone number registered with M-PESA
+                </p>
               </div>
             )}
-          </motion.div>
-        </motion.div>
-      )}
+            
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={!selectedMethod || !amount || isProcessing || (isMpesa && !phone)}
+              className="w-full flex items-center justify-center py-3 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Top Up Wallet
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </motion.div>
 
       {/* Banner Toast */}
       {bannerToast.show && (
@@ -349,6 +344,6 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
           }
         }
       `}</style>
-    </AnimatePresence>
+    </div>
   );
 } 

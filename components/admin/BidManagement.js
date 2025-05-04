@@ -24,8 +24,31 @@ export default function BidManagement() {
   const [selectedBids, setSelectedBids] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [defaultCurrency, setDefaultCurrency] = useState({
+    code: 'USD',
+    symbol: '$',
+    rate: 1
+  });
 
-  // Memoize fetchBids function with useCallback
+  useEffect(() => {
+    const fetchDefaultCurrency = async () => {
+      try {
+        const response = await axios.get('/api/admin/currencies');
+        const currencies = response.data.currencies || [];
+        
+        const defaultCurr = currencies.find(curr => curr.isDefault) || 
+                           currencies.find(curr => curr.code === 'USD') ||
+                           { code: 'USD', symbol: '$', rate: 1 };
+        
+        setDefaultCurrency(defaultCurr);
+      } catch (error) {
+        console.error('Error fetching default currency:', error);
+      }
+    };
+    
+    fetchDefaultCurrency();
+  }, []);
+
   const fetchBids = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -40,22 +63,47 @@ export default function BidManagement() {
       });
 
       const response = await axios.get(`/api/admin/bids?${queryParams}`);
+      console.log("Bid data received:", response.data);
       
-      // Format the bids from the response
-      const formattedBids = response.data.bids.map(bid => ({
-        id: bid._id || bid.id,
-        songTitle: bid.song?.title || 'Unknown Song',
-        artist: bid.song?.artist || 'Unknown Artist',
-        albumArt: bid.song?.albumArt || null,
-        userId: bid.user?._id || bid.user?.id || null,
-        userName: bid.user?.name || 'Unknown User',
-        userEmail: bid.user?.email || null,
-        userImage: bid.user?.image || null,
-        amount: bid.amount || 0,
-        status: bid.status || 'pending',
-        createdAt: bid.createdAt || new Date().toISOString(),
-        notes: bid.notes || ''
-      }));
+      if (response.data.bids.length > 0) {
+        console.log("Bid data structure sample:", {
+          _id: response.data.bids[0]._id,
+          songId: response.data.bids[0].songId,
+          userId: response.data.bids[0].userId,
+          song: response.data.bids[0].song,
+          user: response.data.bids[0].user,
+          songData: response.data.bids[0].songData,
+          userData: response.data.bids[0].userData,
+          originalSongId: response.data.bids[0].originalSongId,
+          originalUserId: response.data.bids[0].originalUserId,
+          songIdForLookup: response.data.bids[0].songIdForLookup,
+          userIdForLookup: response.data.bids[0].userIdForLookup
+        });
+      }
+      
+      const formattedBids = response.data.bids.map(bid => {
+        if (!bid.song?.title && !bid.songData?.title) {
+          console.log("Missing song data:", bid);
+        }
+        if (!bid.user?.name && !bid.userData?.name) {
+          console.log("Missing user data:", bid);
+        }
+        
+        return {
+          id: bid._id || bid.id,
+          songTitle: bid.song?.title || bid.songData?.title || bid.songTitle || 'Unknown Song',
+          artist: bid.song?.artist || bid.songData?.artist || bid.artist || 'Unknown Artist',
+          albumArt: bid.song?.albumArt || bid.songData?.albumArt || bid.albumArt || null,
+          userId: bid.user?._id || bid.userData?._id || bid.userId || null,
+          userName: bid.user?.name || bid.userData?.name || bid.userName || 'Unknown User',
+          userEmail: bid.user?.email || bid.userData?.email || bid.userEmail || null,
+          userImage: bid.user?.image || bid.userData?.image || bid.userImage || null,
+          amount: bid.amount || 0,
+          status: bid.status || 'pending',
+          createdAt: bid.createdAt || new Date().toISOString(),
+          notes: bid.notes || ''
+        };
+      });
       
       setBids(formattedBids);
       setPagination(prev => ({ 
@@ -64,7 +112,6 @@ export default function BidManagement() {
         totalPages: response.data.pagination?.pages || Math.ceil(response.data.pagination?.total / pagination.limit) || 1
       }));
       
-      // Clear selection when fetching new bids
       setSelectedBids([]);
     } catch (error) {
       console.error('Error fetching bids:', error);
@@ -75,7 +122,10 @@ export default function BidManagement() {
     }
   }, [pagination.page, pagination.limit, search, filter, sortBy]);
 
-  // Add debouncing for search
+  const formatCurrency = (amount) => {
+    return `${defaultCurrency.symbol}${amount.toLocaleString()}`;
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchBids();
@@ -83,14 +133,12 @@ export default function BidManagement() {
     return () => clearTimeout(timer);
   }, [fetchBids]);
   
-  // Now the refreshBids function should use the memoized fetchBids
   const refreshBids = async () => {
     setIsRefreshing(true);
     try {
       await fetchBids();
       toast.success("Bid data refreshed");
     } catch (error) {
-      // Error is already handled in fetchBids
     } finally {
       setIsRefreshing(false);
     }
@@ -125,7 +173,6 @@ export default function BidManagement() {
         action
       });
 
-      // Update local state
       const updatedBids = bids.map(bid => 
         selectedBids.includes(bid.id) 
           ? { ...bid, status: action } 
@@ -163,7 +210,6 @@ export default function BidManagement() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header and controls */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="flex items-center flex-1 bg-gray-800/50 rounded-lg px-3 py-2">
           <Search className="h-5 w-5 text-gray-400" />
@@ -212,7 +258,6 @@ export default function BidManagement() {
         </div>
       </div>
 
-      {/* Bulk actions */}
       {selectedBids.length > 0 && (
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
@@ -251,7 +296,6 @@ export default function BidManagement() {
         </motion.div>
       )}
 
-      {/* Bids table */}
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
         <div className="p-4 border-b border-gray-700 flex justify-between items-center">
           <h3 className="font-medium text-gray-200">Song Requests</h3>
@@ -392,7 +436,7 @@ export default function BidManagement() {
                         </div>
                       </td>
                       <td className="p-4 font-medium">
-                        ${bid.amount.toLocaleString()}
+                        {formatCurrency(bid.amount)}
                       </td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -453,7 +497,6 @@ export default function BidManagement() {
           )}
         </AnimatePresence>
 
-        {/* Pagination controls */}
         {pagination.totalPages > 1 && !isLoading && !error && bids.length > 0 && (
           <div className="flex items-center justify-between p-4 border-t border-gray-700">
             <div className="text-sm text-gray-400">

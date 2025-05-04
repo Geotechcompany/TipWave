@@ -97,15 +97,17 @@ export default async function handler(req, res) {
       // Format user data for the frontend
       const formattedUsers = users.map(user => ({
         id: user._id.toString(),
+        _id: user._id.toString(),
         name: user.name || "Unknown User",
         email: user.email || null,
         image: user.image || null,
         createdAt: user.createdAt || new Date(),
         isAdmin: user.isAdmin === true,
         role: user.role || "USER",
-        isActive: user.isActive !== false, // Default to true
+        status: user.status || (user.isActive !== false ? 'active' : 'inactive'),
+        isActive: user.isActive !== false,
         isOnline: user.lastActive ? 
-          (new Date() - new Date(user.lastActive)) < (5 * 60 * 1000) : false, // Online if active in last 5 min
+          (new Date() - new Date(user.lastActive)) < (5 * 60 * 1000) : false,
       }));
       
       return res.status(200).json({

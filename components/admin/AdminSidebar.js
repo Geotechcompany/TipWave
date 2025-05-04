@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { 
   Users, Music, Settings, LayoutDashboard, 
-  DollarSign, BarChart2, FileCheck, ChevronRight, Mail
+  DollarSign, BarChart2, FileCheck, ChevronRight, Mail, CreditCard
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -39,6 +39,12 @@ export default function AdminSidebar({ activeTab, setActiveTab, onCollapseChange
       label: "Bids", 
       icon: <DollarSign className="w-5 h-5" />,
       color: "from-amber-500 to-orange-600"
+    },
+    { 
+      tab: "payment-methods", 
+      label: "Payment Methods", 
+      icon: <CreditCard className="w-5 h-5" />,
+      color: "from-red-500 to-pink-600"
     },
     { 
       tab: "analytics", 
