@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-export function EarningsPanel() {
+export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', rate: 1 } }) {
   const { data: session } = useSession();
   const [earnings, setEarnings] = useState({
     total: 0,
@@ -16,6 +16,11 @@ export function EarningsPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState("month");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // Format currency with the correct symbol
+  const formatCurrency = (amount) => {
+    return `${defaultCurrency.symbol || '$'}${parseFloat(amount).toFixed(2)}`;
+  };
 
   const fetchEarnings = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -70,7 +75,7 @@ export function EarningsPanel() {
           new Date(tx.date).toLocaleDateString(),
           tx.songTitle,
           tx.requesterName,
-          `$${tx.amount.toFixed(2)}`
+          formatCurrency(tx.amount)
         ])
       ].map(row => row.join(',')).join('\n');
 
@@ -139,7 +144,7 @@ export function EarningsPanel() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Withdraw Earnings</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to withdraw ${earnings.total.toFixed(2)} to your connected bank account?
+                  Are you sure you want to withdraw {formatCurrency(earnings.total)} to your connected bank account?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -163,19 +168,19 @@ export function EarningsPanel() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <StatCard
               title="Total Earnings"
-              value={`$${earnings.total.toFixed(2)}`}
+              value={formatCurrency(earnings.total)}
               icon={DollarSign}
               trend={earnings.trends.monthly}
             />
             <StatCard
               title="This Month"
-              value={`$${earnings.monthly[earnings.monthly.length - 1]?.total.toFixed(2) || 0}`}
+              value={formatCurrency(earnings.monthly[earnings.monthly.length - 1]?.total || 0)}
               icon={Calendar}
               trend={earnings.trends.monthly}
             />
             <StatCard
               title="Weekly Average"
-              value={`$${(earnings.total / 4).toFixed(2)}`}
+              value={formatCurrency(earnings.total / 4)}
               icon={TrendingUp}
               trend={earnings.trends.weekly}
             />
@@ -186,7 +191,11 @@ export function EarningsPanel() {
             <h3 className="text-lg font-medium mb-4">Recent Transactions</h3>
             <div className="space-y-4">
               {earnings.recentTransactions.map((transaction) => (
-                <TransactionRow key={transaction._id} {...transaction} />
+                <TransactionRow 
+                  key={transaction._id} 
+                  {...transaction} 
+                  currencySymbol={defaultCurrency.symbol}
+                />
               ))}
             </div>
           </div>
@@ -220,7 +229,7 @@ function StatCard({ title, value, icon: Icon, trend }) {
   );
 }
 
-function TransactionRow({ date, amount, songTitle, requesterName }) {
+function TransactionRow({ date, amount, songTitle, requesterName, currencySymbol = '$' }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-gray-700/50 last:border-0">
       <div className="flex items-center space-x-4">
@@ -233,7 +242,7 @@ function TransactionRow({ date, amount, songTitle, requesterName }) {
         </div>
       </div>
       <div className="text-right">
-        <p className="font-medium text-green-500">${amount.toFixed(2)}</p>
+        <p className="font-medium text-green-500">{currencySymbol}{amount.toFixed(2)}</p>
         <p className="text-sm text-gray-400">
           {new Date(date).toLocaleDateString()}
         </p>

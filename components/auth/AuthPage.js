@@ -351,6 +351,29 @@ export default function AuthPage() {
                   )}
                 </div>
 
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      className="h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+                    />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400">
+                      Remember me
+                    </label>
+                  </div>
+
+                  <div className="text-sm">
+                    <Link 
+                      href="/auth/reset-password" 
+                      className="font-medium text-blue-500 hover:text-blue-400 transition-colors"
+                    >
+                      Forgot your password?
+                    </Link>
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isLoading}

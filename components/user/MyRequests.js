@@ -177,15 +177,25 @@ export function MyRequests() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({ 
+          requestRefund: true // Explicitly request a refund
+        })
       });
 
       if (!response.ok) {
         throw new Error('Failed to cancel request');
       }
 
-      // Show success message and refresh the requests
-      showBannerToast('Song request cancelled successfully');
+      const data = await response.json();
+      
+      // Show success message with refund information
+      showBannerToast(
+        data.refunded 
+          ? `Request cancelled and ${getCurrencySymbol()}${convertAmount(data.refundAmount)} refunded to your wallet` 
+          : 'Song request cancelled successfully'
+      );
+      
       fetchRequests();
     } catch (error) {
       console.error('Error cancelling request:', error);
@@ -197,7 +207,7 @@ export function MyRequests() {
     }
   };
 
-  // Update the ConfirmationDialog component for better mobile support
+  // Update the ConfirmationDialog component to include refund info
   const ConfirmationDialog = ({ isOpen, onClose, onConfirm, request }) => {
     if (!isOpen || !request) return null;
     
@@ -205,8 +215,11 @@ export function MyRequests() {
       <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
         <div className="bg-gray-800 rounded-lg p-5 sm:p-6 max-w-md w-full border border-gray-700">
           <h3 className="text-base sm:text-lg font-medium mb-2">Cancel Song Request</h3>
-          <p className="text-sm sm:text-base text-gray-300 mb-4">
+          <p className="text-sm sm:text-base text-gray-300 mb-2">
             Are you sure you want to cancel your request for &ldquo;{request.songTitle}&rdquo; by {request.songArtist}?
+          </p>
+          <p className="text-sm text-blue-400 mb-4">
+            {getCurrencySymbol()}{convertAmount(request.amount)} will be refunded to your wallet.
           </p>
           <div className="flex flex-col sm:flex-row justify-end gap-3 sm:space-x-3">
             <button
@@ -219,7 +232,7 @@ export function MyRequests() {
               onClick={() => onConfirm(request._id)}
               className="w-full sm:w-auto order-1 sm:order-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 transition-colors text-sm"
             >
-              Cancel Request
+              Cancel & Refund
             </button>
           </div>
         </div>
