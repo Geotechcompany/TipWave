@@ -7,7 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { 
   LayoutDashboard, Music, DollarSign, 
-  TrendingUp, Zap, Share2,
+ Zap, Share2,
   Bell, Settings, Calendar, BarChart2, Users,
   PlusCircle, ListMusic, Loader2, CheckCircle
 } from "lucide-react";
@@ -22,6 +22,7 @@ import { FanManagementPanel } from "./FanManagementPanel";
 import { VenuesPanel } from "./VenuesPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
+import { StatCard } from "./StatCard";
 
 export default function DJDashboard() {
   const { data: session, status } = useSession();
@@ -57,46 +58,83 @@ export default function DJDashboard() {
     yearlyData: []
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState('week');
+  const [defaultCurrency, setDefaultCurrency] = useState({
+    code: 'USD',
+    symbol: '$',
+    rate: 1
+  });
+  const [activeRequests, setActiveRequests] = useState([]);
+  const [isActiveRequestsLoading, setIsActiveRequestsLoading] = useState(true);
   
   // Memoize all the fetch functions to use in dependency arrays
   const fetchDJStats = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
       setIsLoading(true);
       const response = await fetch(`/api/dj/${session.user.id}/stats`);
       if (!response.ok) throw new Error('Failed to fetch stats');
       const { data } = await response.json();
-      setStats(data);
+      setStats({
+        totalRequests: safelyAccessNestedProperty(data, 'totalRequests', 0),
+        acceptedRequests: safelyAccessNestedProperty(data, 'acceptedRequests', 0),
+        rejectedRequests: safelyAccessNestedProperty(data, 'rejectedRequests', 0),
+        totalEarnings: safelyAccessNestedProperty(data, 'totalEarnings', 0),
+        upcomingEvents: safelyAccessNestedProperty(data, 'upcomingEvents', []),
+        topSongs: safelyAccessNestedProperty(data, 'topSongs', []),
+        completionRate: safelyAccessNestedProperty(data, 'completionRate', 0),
+        recentRequests: safelyAccessNestedProperty(data, 'recentRequests', []),
+        trends: safelyAccessNestedProperty(data, 'trends', { requests: 0, earnings: 0 }),
+        events: safelyAccessNestedProperty(data, 'events', [])
+      });
     } catch (error) {
       console.error('Error fetching DJ stats:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, safelyAccessNestedProperty]);
 
   const fetchNotifications = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
-      const response = await fetch(`/api/dj/${session.user.id}/notifications`);
+      const response = await fetch(`/api/dj/${session?.user?.id}/notifications`);
       if (!response.ok) throw new Error('Failed to fetch notifications');
-      const { data } = await response.json();
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
+      const data = await response.json();
+      
+      // Check if data exists and has notifications property
+      setNotifications(data?.notifications || []);
+      setUnreadCount(data?.unreadCount || 0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
     }
   }, [session?.user?.id]);
 
   const fetchGenres = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
       const response = await fetch(`/api/dj/${session.user.id}/genres`);
       if (!response.ok) throw new Error('Failed to fetch genres');
-      const { data } = await response.json();
-      setGenres(data.genres);
+      
+      const data = await response.json();
+      if (data && data.genres) {
+        setGenres(data.genres);
+      } else {
+        setGenres([]);
+        console.warn('No genres data found in response');
+      }
     } catch (error) {
       console.error('Error fetching genres:', error);
+      setGenres([]);
     }
   }, [session?.user?.id]);
 
   const fetchEvents = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
       setIsEventsLoading(true);
       const response = await fetch(`/api/dj/${session.user.id}/events?upcoming=true`);
@@ -111,17 +149,24 @@ export default function DJDashboard() {
   }, [session?.user?.id]);
 
   const fetchRecentRequests = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
-      const response = await fetch(`/api/dj/${session.user.id}/requests?limit=5`);
+      const response = await fetch(`/api/dj/${session?.user?.id}/requests?limit=5`);
       if (!response.ok) throw new Error('Failed to fetch recent requests');
-      const { data } = await response.json();
-      setRecentRequests(data.requests);
+      const data = await response.json();
+      
+      // Check if data exists and has requests property
+      setRecentRequests(data?.data?.requests || []);
     } catch (error) {
       console.error('Error fetching recent requests:', error);
+      setRecentRequests([]);
     }
   }, [session?.user?.id]);
 
   const fetchAnalytics = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
       const response = await fetch(`/api/dj/${session.user.id}/analytics`);
       if (!response.ok) throw new Error('Failed to fetch analytics');
@@ -131,6 +176,66 @@ export default function DJDashboard() {
       console.error('Error fetching analytics:', error);
     }
   }, [session?.user?.id]);
+
+  const fetchDefaultCurrency = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const response = await fetch('/api/admin/currencies');
+      if (!response.ok) throw new Error('Failed to fetch currencies');
+      
+      const data = await response.json();
+      const currencies = data.currencies || [];
+      
+      const defaultCurr = currencies.find(curr => curr.isDefault) || 
+                        currencies.find(curr => curr.code === 'USD') ||
+                        (currencies.length > 0 ? currencies[0] : { code: 'USD', symbol: '$', rate: 1 });
+      
+      setDefaultCurrency(defaultCurr);
+    } catch (error) {
+      console.error('Error fetching default currency:', error);
+    }
+  }, [session?.user?.id]);
+
+  const fetchActiveRequests = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      setIsActiveRequestsLoading(true);
+      const response = await fetch(`/api/dj/${session?.user?.id}/requests/active`);
+      
+      // If the endpoint doesn't exist (404), try alternative endpoint
+      if (response.status === 404) {
+        const fallbackResponse = await fetch(`/api/dj/${session?.user?.id}/requests?status=pending&limit=10`);
+        if (!fallbackResponse.ok) throw new Error('Failed to fetch active requests');
+        const fallbackData = await fallbackResponse.json();
+        setActiveRequests(fallbackData?.requests || fallbackData?.data?.requests || []);
+        return;
+      }
+      
+      if (!response.ok) throw new Error('Failed to fetch active requests');
+      const data = await response.json();
+      setActiveRequests(data?.requests || []);
+    } catch (error) {
+      console.error('Error fetching active requests:', error);
+      toast.error('Failed to load active requests');
+      setActiveRequests([]);
+    } finally {
+      setIsActiveRequestsLoading(false);
+    }
+  }, [session?.user?.id]);
+
+  // Move these two hooks to the top with the other hooks (around line 65-70)
+  const formatCurrency = useCallback((amount) => {
+    return `${defaultCurrency?.symbol || '$'}${parseFloat(amount || 0).toFixed(2)}`;
+  }, [defaultCurrency]);
+
+  const safelyAccessNestedProperty = useCallback((obj, path, fallback = null) => {
+    if (!obj) return fallback;
+    const value = path.split('.').reduce((acc, part) => 
+      acc && acc[part] !== undefined ? acc[part] : undefined, obj);
+    return value !== undefined ? value : fallback;
+  }, []);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -165,6 +270,18 @@ export default function DJDashboard() {
     }
   }, [session?.user?.id, fetchRecentRequests, fetchAnalytics]);
 
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchDefaultCurrency();
+    }
+  }, [session?.user?.id, fetchDefaultCurrency]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchActiveRequests();
+    }
+  }, [fetchActiveRequests, session?.user?.id]);
+
   const markAllAsRead = async () => {
     try {
       const response = await fetch(`/api/dj/${session.user.id}/notifications`, {
@@ -188,6 +305,48 @@ export default function DJDashboard() {
   const handleSignOut = async () => {
     await signOut({ redirect: true, callbackUrl: "/" });
   };
+
+  const handleAcceptRequest = useCallback(async (requestId) => {
+    if (!session?.user?.id || !requestId) return;
+    
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/requests/${requestId}/accept`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) throw new Error('Failed to accept request');
+      
+      // Update the active requests list (remove the accepted request)
+      setActiveRequests(prev => prev.filter(req => req._id !== requestId));
+      // Refresh other relevant data
+      fetchDJStats();
+      toast.success('Request accepted successfully');
+    } catch (error) {
+      console.error('Error accepting request:', error);
+      toast.error('Failed to accept request');
+    }
+  }, [session?.user?.id, fetchDJStats]);
+
+  const handleRejectRequest = useCallback(async (requestId) => {
+    if (!session?.user?.id || !requestId) return;
+    
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/requests/${requestId}/reject`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) throw new Error('Failed to reject request');
+      
+      // Update the active requests list (remove the rejected request)
+      setActiveRequests(prev => prev.filter(req => req._id !== requestId));
+      // Refresh other relevant data
+      fetchDJStats();
+      toast.success('Request rejected');
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to reject request');
+    }
+  }, [session?.user?.id, fetchDJStats]);
 
   // Loading state
   if (status === "loading") {
@@ -438,17 +597,28 @@ export default function DJDashboard() {
           <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
             <AnimatePresence mode="wait">
               {selectedView === "analytics" ? (
-                <AnalyticsPanel />
+                <AnalyticsPanel defaultCurrency={defaultCurrency} />
               ) : selectedView === "earnings" ? (
-                <EarningsPanel />
+                <motion.div
+                  key="earnings"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <EarningsPanel defaultCurrency={defaultCurrency} />
+                </motion.div>
               ) : selectedView === "requests" ? (
-                <RequestsPanel />
+                <RequestsPanel 
+                  defaultCurrency={defaultCurrency} 
+                  onRequestsUpdate={fetchActiveRequests}
+                />
               ) : selectedView === "library" ? (
                 <LibraryPanel />
               ) : selectedView === "events" ? (
                 <EventsPanel />
               ) : selectedView === "fans" ? (
-                <FanManagementPanel />
+                <FanManagementPanel defaultCurrency={defaultCurrency} />
               ) : selectedView === "venues" ? (
                 <VenuesPanel />
               ) : selectedView === "settings" ? (
@@ -487,80 +657,30 @@ export default function DJDashboard() {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-gray-400 text-sm">Total Requests</p>
-                            <h3 className="text-2xl font-bold mt-1">{stats?.totalRequests ?? 0}</h3>
-                          </div>
-                          <div className="p-3 bg-blue-500/20 text-blue-500 rounded-lg">
-                            <Music className="h-5 w-5" />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex items-center text-xs text-gray-400">
-                          <TrendingUp className={`h-3 w-3 mr-1 ${
-                            (stats?.trends?.requests ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
-                          }`} />
-                          <span className={
-                            (stats?.trends?.requests ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
-                          }>
-                            {(stats?.trends?.requests ?? 0) >= 0 ? '+' : ''}{stats?.trends?.requests ?? 0}% from last month
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-gray-400 text-sm">Total Earnings</p>
-                            <h3 className="text-2xl font-bold mt-1">${stats?.totalEarnings ?? 0}</h3>
-                          </div>
-                          <div className="p-3 bg-green-500/20 text-green-500 rounded-lg">
-                            <DollarSign className="h-5 w-5" />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex items-center text-xs text-gray-400">
-                          <TrendingUp className={`h-3 w-3 mr-1 ${
-                            (stats?.trends?.earnings ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
-                          }`} />
-                          <span className={
-                            (stats?.trends?.earnings ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'
-                          }>
-                            {(stats?.trends?.earnings ?? 0) >= 0 ? '+' : ''}{stats?.trends?.earnings ?? 0}% from last month
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-gray-400 text-sm">Completion Rate</p>
-                            <h3 className="text-2xl font-bold mt-1">
-                              {(stats?.totalRequests ?? 0) > 0
-                                ? Math.round(((stats?.acceptedRequests ?? 0) / (stats?.totalRequests ?? 0)) * 100)
-                                : 0}%
-                            </h3>
-                          </div>
-                          <div className="p-3 bg-purple-500/20 text-purple-500 rounded-lg">
-                            <CheckCircle className="h-5 w-5" />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex items-center text-xs text-gray-400">
-                          <div className="w-full bg-gray-700 rounded-full h-1.5">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 to-purple-600 h-1.5 rounded-full"
-                              style={{
-                                width: `${
-                                  (stats?.totalRequests ?? 0) > 0
-                                    ? Math.round(((stats?.acceptedRequests ?? 0) / (stats?.totalRequests ?? 0)) * 100)
-                                    : 0
-                                }%`,
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-6">
+                      <StatCard 
+                        title="Total Requests" 
+                        value={safelyAccessNestedProperty(stats, 'totalRequests', 0)} 
+                        icon={Music} 
+                        trend={safelyAccessNestedProperty(stats, 'trends.requests', 0)} 
+                      />
+                      <StatCard 
+                        title="Completion Rate" 
+                        value={`${safelyAccessNestedProperty(stats, 'completionRate', 0)}%`} 
+                        icon={CheckCircle} 
+                        trend={safelyAccessNestedProperty(stats, 'trends.completionRate', 0)} 
+                      />
+                      <StatCard 
+                        title="Total Earnings" 
+                        value={formatCurrency(safelyAccessNestedProperty(stats, 'totalEarnings', 0))} 
+                        icon={DollarSign} 
+                        trend={safelyAccessNestedProperty(stats, 'trends.earnings', 0)} 
+                      />
+                      <StatCard 
+                        title="Upcoming Events" 
+                        value={safelyAccessNestedProperty(stats, 'upcomingEvents.length', 0)} 
+                        icon={Calendar} 
+                      />
                     </div>
                   )}
 
@@ -584,7 +704,7 @@ export default function DJDashboard() {
                                 <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : recentRequests?.length > 0 ? (
+                          ) : safelyAccessNestedProperty(recentRequests, 'length', 0) > 0 ? (
                             recentRequests.map((request, i) => (
                               <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
                                 <div className="flex items-center space-x-3">
@@ -592,12 +712,12 @@ export default function DJDashboard() {
                                     <Music className="h-5 w-5 text-blue-400" />
                                   </div>
                                   <div className="flex-1">
-                                    <h4 className="font-medium">{request.songTitle}</h4>
-                                    <p className="text-sm text-gray-400">{request.requesterName}</p>
+                                    <h4 className="font-medium">{safelyAccessNestedProperty(request, 'songTitle', '')}</h4>
+                                    <p className="text-sm text-gray-400">{safelyAccessNestedProperty(request, 'requesterName', '')}</p>
                                   </div>
                                   <div className="text-right">
                                     <span className="px-2 py-1 rounded-md bg-green-900/30 text-green-400 text-xs font-medium">
-                                      ${request.amount}
+                                      {formatCurrency(safelyAccessNestedProperty(request, 'amount', 0))}
                                     </span>
                                   </div>
                                 </div>
@@ -642,11 +762,11 @@ export default function DJDashboard() {
                               <div className="animate-pulse">
                                 <div className="h-[200px] bg-gray-700/50 rounded-lg" />
                               </div>
-                            ) : analytics?.[`${selectedTimeframe}lyData`]?.length > 0 ? (
+                            ) : safelyAccessNestedProperty(analytics, `${selectedTimeframe}lyData.length`, 0) > 0 ? (
                               <div className="h-[200px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <AreaChart
-                                    data={analytics[`${selectedTimeframe}lyData`]}
+                                    data={safelyAccessNestedProperty(analytics, `${selectedTimeframe}lyData`, [])}
                                     margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                                   >
                                     <defs>
@@ -700,17 +820,17 @@ export default function DJDashboard() {
                                 <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : stats?.events?.length > 0 ? (
+                          ) : safelyAccessNestedProperty(stats, 'events.length', 0) > 0 ? (
                             <div className="space-y-4">
-                              {stats?.events?.map((event, i) => (
+                              {safelyAccessNestedProperty(stats, 'events', []).map((event, i) => (
                                 <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
                                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
                                     <Calendar className="h-6 w-6 text-blue-400" />
                                   </div>
                                   <div className="flex-1">
-                                    <h4 className="font-medium">{event.name}</h4>
+                                    <h4 className="font-medium">{safelyAccessNestedProperty(event, 'name', '')}</h4>
                                     <p className="text-sm text-gray-400">
-                                      {new Date(event.date).toLocaleDateString()}
+                                      {new Date(safelyAccessNestedProperty(event, 'date', '')).toLocaleDateString()}
                                     </p>
                                   </div>
                                 </div>
@@ -749,18 +869,18 @@ export default function DJDashboard() {
                                 <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
                               ))}
                             </div>
-                          ) : genres?.length > 0 ? (
+                          ) : safelyAccessNestedProperty(genres, 'length', 0) > 0 ? (
                             <div className="space-y-4">
                               {genres.map((genre, i) => (
                                 <div key={i}>
                                   <div className="flex justify-between text-sm mb-1">
-                                    <span>{genre.name}</span>
-                                    <span>{genre.percentage}%</span>
+                                    <span>{safelyAccessNestedProperty(genre, 'name', '')}</span>
+                                    <span>{safelyAccessNestedProperty(genre, 'percentage', 0)}%</span>
                                   </div>
                                   <div className="h-2 bg-gray-700 rounded-full">
                                     <div
                                       className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"
-                                      style={{ width: `${genre.percentage}%` }}
+                                      style={{ width: `${safelyAccessNestedProperty(genre, 'percentage', 0)}%` }}
                                     />
                                   </div>
                                 </div>
@@ -775,6 +895,58 @@ export default function DJDashboard() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Active Requests Section */}
+                  {isActiveRequestsLoading ? (
+                    <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                      <div className="p-4 border-b border-gray-700/50">
+                        <h3 className="font-medium text-white">Active Requests</h3>
+                      </div>
+                      <div className="p-6 flex justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                      </div>
+                    </div>
+                  ) : safelyAccessNestedProperty(activeRequests, 'length', 0) > 0 ? (
+                    <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+                      <div className="p-4 border-b border-gray-700/50">
+                        <h3 className="font-medium text-white">Active Requests <span className="text-blue-400 ml-2">{safelyAccessNestedProperty(activeRequests, 'length', 0)}</span></h3>
+                      </div>
+                      <div className="divide-y divide-gray-700/50">
+                        {safelyAccessNestedProperty(activeRequests, 'slice', [])(0, 3).map((request) => (
+                          <div key={safelyAccessNestedProperty(request, '_id', '')} className="p-4 flex justify-between items-center">
+                            <div>
+                              <p className="font-medium text-white">{safelyAccessNestedProperty(request, 'songTitle', '')}</p>
+                              <p className="text-sm text-gray-400">From: {safelyAccessNestedProperty(request, 'requesterName', '')}</p>
+                            </div>
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => handleAcceptRequest(safelyAccessNestedProperty(request, '_id', ''))}
+                                className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs"
+                              >
+                                Accept
+                              </button>
+                              <button 
+                                onClick={() => handleRejectRequest(safelyAccessNestedProperty(request, '_id', ''))}
+                                className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {safelyAccessNestedProperty(activeRequests, 'length', 0) > 3 && (
+                          <div className="p-4 text-center">
+                            <button 
+                              onClick={() => setSelectedView("requests")}
+                              className="text-sm text-blue-400 hover:text-blue-300"
+                            >
+                              View all {safelyAccessNestedProperty(activeRequests, 'length', 0)} requests
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                 </motion.div>
               ) : null}
             </AnimatePresence>

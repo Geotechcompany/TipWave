@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export function AnalyticsPanel() {
+export function AnalyticsPanel({ defaultCurrency = { code: 'USD', symbol: '$' } }) {
   const { data: session } = useSession();
   const [analytics, setAnalytics] = useState({
     requestTrends: [],
@@ -31,6 +31,11 @@ export function AnalyticsPanel() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState("month");
+
+  // Format currency with the correct symbol
+  const formatCurrency = (amount) => {
+    return `${defaultCurrency.symbol || '$'}${parseFloat(amount).toFixed(2)}`;
+  };
 
   // Memoize fetchAnalytics with useCallback
   const fetchAnalytics = useCallback(async () => {
@@ -109,7 +114,7 @@ export function AnalyticsPanel() {
             />
             <StatCard
               title="Average Request Value"
-              value={`$${analytics.audienceStats?.avgRequestValue?.toFixed(2) || '0.00'}`}
+              value={formatCurrency(analytics.audienceStats?.avgRequestValue || 0)}
               icon={TrendingUp}
             />
           </div>
@@ -128,7 +133,7 @@ export function AnalyticsPanel() {
                   />
                   <YAxis 
                     stroke="#9CA3AF"
-                    tickFormatter={(value) => `$${value}`}
+                    tickFormatter={(value) => formatCurrency(value)}
                   />
                   <Tooltip
                     contentStyle={{
@@ -136,7 +141,7 @@ export function AnalyticsPanel() {
                       border: "1px solid #374151",
                       borderRadius: "0.5rem",
                     }}
-                    formatter={(value) => [`$${value}`, "Revenue"]}
+                    formatter={(value) => [formatCurrency(value), "Revenue"]}
                   />
                   <Line
                     type="monotone"
@@ -163,6 +168,7 @@ export function AnalyticsPanel() {
                   title={song.title}
                   artist={song.artist}
                   requestCount={song.requestCount}
+                  currencySymbol={defaultCurrency.symbol}
                 />
               )) || (
                 <div className="text-center py-6 text-gray-400">
@@ -193,7 +199,7 @@ function StatCard({ title, value, icon: Icon }) {
   );
 }
 
-function SongRow({ rank, title, artist, requestCount }) {
+function SongRow({ rank, title, artist, requestCount, currencySymbol = '$' }) {
   return (
     <div className="flex items-center justify-between p-4 hover:bg-gray-700/20">
       <div className="flex items-center space-x-4">
@@ -206,7 +212,7 @@ function SongRow({ rank, title, artist, requestCount }) {
         </div>
       </div>
       <div className="text-right">
-        <p className="font-medium text-green-400">${artist.totalRevenue.toFixed(2)}</p>
+        <p className="font-medium text-green-400">{currencySymbol}{artist.totalRevenue.toFixed(2)}</p>
       </div>
     </div>
   );

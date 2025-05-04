@@ -16,14 +16,14 @@ export function RequestHistory({ initialRequests = [] }) {
   
   // Use SWR for auto-refreshing data
   const { data, error, isLoading } = useSWR('/api/user/requests', fetcher, {
-    fallbackData: initialRequests,
+    fallbackData: { requests: initialRequests, pagination: { total: initialRequests.length, hasMore: false } },
     refreshInterval: 30000, // Refresh every 30 seconds
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
   });
 
   // Filter requests based on status
-  const filteredRequests = data?.filter(request => {
+  const filteredRequests = data?.requests?.filter(request => {
     if (filter === "all") return true;
     return request.status.toLowerCase() === filter;
   }) || [];
@@ -111,8 +111,8 @@ function FilterButton({ label, active, onClick }) {
 
 function RequestItem({ request, index, formatCurrency }) {
   // Format the date
-  const formattedDate = request.date 
-    ? formatDistanceToNow(new Date(request.date), { addSuffix: true })
+  const formattedDate = request.createdAt 
+    ? formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })
     : "Recently";
 
   // Determine status icon and color
@@ -121,6 +121,8 @@ function RequestItem({ request, index, formatCurrency }) {
   
   switch (request.status.toLowerCase()) {
     case 'approved':
+    case 'accepted':
+    case 'completed':
       statusIcon = <Check className="h-4 w-4" />;
       statusColor = "bg-green-500 text-white";
       break;
@@ -146,7 +148,7 @@ function RequestItem({ request, index, formatCurrency }) {
         </div>
         <div className="flex-1">
           <h3 className="font-medium text-white">{request.songTitle}</h3>
-          <p className="text-sm text-gray-400">{request.artist}</p>
+          <p className="text-sm text-gray-400">{request.songArtist || request.artist}</p>
         </div>
         <div className="text-right">
           <div className="font-medium text-white">{formatCurrency(request.amount)}</div>
