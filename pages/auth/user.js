@@ -125,6 +125,14 @@ export default function UserLogin() {
                 className="w-full px-4 py-3 bg-gray-700 rounded-lg border border-gray-600 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
                 required
               />
+              <div className="mt-2 text-right">
+                <Link 
+                  href="/auth/reset-password" 
+                  className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
             </div>
 
             <button
