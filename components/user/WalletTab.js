@@ -38,6 +38,7 @@ export function WalletTab() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [transactionType, setTransactionType] = useState("all");
+  const [fetchAll, setFetchAll] = useState(false);
   const { 
     formatCurrency
   } = useCurrency();
@@ -52,6 +53,8 @@ export function WalletTab() {
     message: '',
     type: '', // 'success' or 'error'
   });
+  const [lastCheckedTime, setLastCheckedTime] = useState(Date.now());
+  const [isExporting, setIsExporting] = useState(false);
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -114,7 +117,7 @@ export function WalletTab() {
       
       // Make the API request
       const response = await fetch(
-        `/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}${typeParam}${fetchAllParam}`
+        `/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}&type=${transactionType}&all=${fetchAll}`
       );
       
       if (!response.ok) {
@@ -137,7 +140,7 @@ export function WalletTab() {
 
   useEffect(() => {
     fetchTransactions();
-  }, [fetchTransactions]);
+  }, [currentPage, itemsPerPage, transactionType, fetchAll]);
 
   // Add this useEffect to trigger transaction fetching
   useEffect(() => {
@@ -567,76 +570,36 @@ export function WalletTab() {
   };
 
   const handleExportTransactions = async () => {
+    setIsExporting(true);
     try {
-      setIsExporting(true);
-      
       // Fetch all transactions for export
-      const response = await fetch(`/api/user/transactions?export=true&type=${transactionType}`);
+      const response = await fetch(
+        `/api/user/transactions?export=true&type=${transactionType}`
+      );
       
-      if (!response.ok) {
-        throw new Error("Failed to fetch transactions for export");
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Process and download CSV
+        const csvContent = convertToCSV(data.transactions);
+        downloadCSV(csvContent, `transactions-${new Date().toISOString().split('T')[0]}.csv`);
+        
+        toast.success('Export successful');
+      } else {
+        throw new Error('Failed to export transactions');
       }
-      
-      const data = await response.json();
-      const transactions = data.transactions || [];
-      
-      if (transactions.length === 0) {
-        toast.error("No transactions to export");
-        return;
-      }
-      
-      // Convert transactions to CSV format
-      const headers = ["Date", "Time", "Type", "Description", "Amount", "Status"];
-      
-      // Create CSV content
-      let csvContent = headers.join(",") + "\n";
-      
-      transactions.forEach(transaction => {
-        const date = new Date(transaction.createdAt);
-        const formattedDate = date.toLocaleDateString();
-        const formattedTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        // Format amount with + or -
-        const isPositive = transaction.type === 'topup' || transaction.type === 'refund';
-        const amountPrefix = isPositive ? '+' : '-';
-        const displayAmount = Math.abs(transaction.amount);
-        const formattedAmount = `${amountPrefix}${displayAmount}`;
-        
-        const row = [
-          formattedDate,
-          formattedTime,
-          getTransactionTypeLabel(transaction.type),
-          transaction.description || "",
-          formattedAmount,
-          transaction.status
-        ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",");
-        
-        csvContent += row + "\n";
-      });
-      
-      // Create a download link
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      
-      // Set download attributes
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `wallet-transactions-${timestamp}.csv`);
-      link.style.visibility = 'hidden';
-      
-      // Add to document, click and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success("Transactions exported successfully");
     } catch (error) {
-      console.error('Error exporting transactions:', error);
-      toast.error("Failed to export transactions");
+      console.error('Export error:', error);
+      toast.error('Failed to export transactions');
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // Example function to toggle fetchAll
+  const handleViewAllTransactions = () => {
+    setFetchAll(true);
+    fetchTransactions();
   };
 
   return (
@@ -700,13 +663,7 @@ export function WalletTab() {
           </button>
           
           <button
-            onClick={() => {
-              setCurrentPage(1);
-              setTransactionType("all");
-              setItemsPerPage(100); // Show more items
-              setFetchAll(true);
-              toast.success("Loading all transactions");
-            }}
+            onClick={handleViewAllTransactions}
             className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/10 rounded-lg py-3 px-4 text-white font-medium transition-colors"
           >
             <History className="h-5 w-5" />
@@ -755,11 +712,9 @@ export function WalletTab() {
                 {isExporting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                  <ArrowDownCircle className="h-4 w-4" />
                 )}
-                Export {isExporting ? "..." : "CSV"}
+                Export
               </button>
             </div>
           </div>
