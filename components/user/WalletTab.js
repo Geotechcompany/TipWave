@@ -5,7 +5,7 @@ import {
   Calendar, Filter,  Loader2, CreditCard, 
   Music, RefreshCcw, History,  
   ChevronLeft, ChevronRight, Circle, Hash, CheckCircle, XCircle, 
-  RepeatIcon, ChevronDown, AlertTriangle, 
+  RepeatIcon, ChevronDown, AlertTriangle
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
@@ -52,11 +52,6 @@ export function WalletTab() {
     message: '',
     type: '', // 'success' or 'error'
   });
-  const [isExporting, setIsExporting] = useState(false);
-  const [fetchAll, setFetchAll] = useState(false);
-  const [lastCheckedTime, setLastCheckedTime] = useState(null);
-  const [ setCheckingAllPending] = useState(false);
-  
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {

@@ -1,6 +1,7 @@
-import { generateDefaultAvatar } from '@/lib/avatar';
-import { hashPassword } from '@/lib/auth';
+import { hash } from 'bcryptjs';
 import clientPromise from '@/lib/mongodb';
+import { sendVerificationEmail } from '@/lib/email';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,48 +11,72 @@ export default async function handler(req, res) {
   try {
     const { name, email, password, role = 'USER' } = req.body;
 
-    // Basic validation
+    // Validation
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Connect to database
     const client = await clientPromise;
     const db = client.db();
 
-    // Check if user already exists
-    const existingUser = await db.collection('users').findOne({ email });
+    // Check if email already exists
+    const existingUser = await db.collection('users').findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
+      return res.status(409).json({ error: 'Email already in use' });
     }
 
-    // Generate avatar
-    const profilePicture = generateDefaultAvatar({ name, email });
+    // Hash password
+    const hashedPassword = await hash(password, 12);
 
-    // Create the user
-    const hashedPassword = await hashPassword(password);
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24); // Token valid for 24 hours
+
+    // Create user
     const newUser = {
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
-      profilePicture,
-      role,
+      role: role.toUpperCase(),
+      emailVerified: false,
+      verificationToken,
+      verificationTokenExpiry: tokenExpiry,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      balance: 0,
+      active: true
     };
 
     const result = await db.collection('users').insertOne(newUser);
-    console.log(`User registered with ID: ${result.insertedId}`);
 
-    // Exclude password from response
-    // eslint-disable-next-line no-unused-vars
-    const { _id, password: _, ...userWithoutSensitiveInfo } = newUser;
+    // Create empty wallet for the user
+    await db.collection('wallets').insertOne({
+      userId: result.insertedId,
+      balance: 0,
+      currency: 'USD',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
 
-    res.status(201).json({
-      user: userWithoutSensitiveInfo,
-      message: 'User registered successfully'
+    // Send verification email
+    await sendVerificationEmail({
+      to: email,
+      token: verificationToken,
+      name
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Registration successful. Please verify your email.'
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Failed to register user' });
+    return res.status(500).json({ error: 'Registration failed' });
   }
 } 

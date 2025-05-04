@@ -22,30 +22,44 @@ export default async function handler(req, res) {
 
     // Handle GET request to fetch user transactions
     if (req.method === 'GET') {
-      const { limit = 10, page = 1, type } = req.query;
-      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const { limit = 10, page = 1, type, all = false, export: isExport = false } = req.query;
+      
+      // If exporting or fetching all, use larger limit
+      const effectiveLimit = isExport === 'true' || all === 'true' ? 1000 : parseInt(limit);
+      const skip = (parseInt(page) - 1) * effectiveLimit;
       
       // Build query filter
-      const filter = { userId };
-      if (type) filter.type = type;
+      const filter = { userId: new ObjectId(userId) };
+      if (type && type !== 'all') {
+        filter.type = type;
+      }
       
       // Fetch transactions with pagination
       const transactions = await db.collection('transactions')
         .find(filter)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
+        .skip(all === 'true' ? 0 : skip)
+        .limit(parseInt(effectiveLimit))
         .toArray();
       
       const total = await db.collection('transactions').countDocuments(filter);
       
+      // Format transactions to ensure they're serializable
+      const formattedTransactions = transactions.map(tx => ({
+        ...tx,
+        _id: tx._id.toString(),
+        userId: tx.userId.toString(),
+        djId: tx.djId ? tx.djId.toString() : null,
+        relatedId: tx.relatedId ? tx.relatedId.toString() : null
+      }));
+      
       return res.status(200).json({
-        transactions,
+        transactions: formattedTransactions,
         pagination: {
           total,
           page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / parseInt(limit))
+          limit: parseInt(effectiveLimit),
+          pages: Math.ceil(total / parseInt(effectiveLimit))
         }
       });
     }

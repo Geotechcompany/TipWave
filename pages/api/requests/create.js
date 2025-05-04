@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     }
 
     // Extract request data
-    const { selectedTrack, djId, amount, message } = req.body;
+    const { selectedTrack, djId, amount, message, confirmedDuplicate } = req.body;
 
     // Validate required fields
     if (!selectedTrack || !djId || !amount) {
@@ -48,6 +48,25 @@ export default async function handler(req, res) {
     const dj = await db.collection('users').findOne({ _id: new ObjectId(djId) });
     if (!dj) {
       return res.status(404).json({ error: 'DJ not found' });
+    }
+
+    // Check for recent duplicate requests (within last 60 seconds) unless explicitly confirmed
+    if (!confirmedDuplicate) {
+      const recentDuplicate = await db.collection('song_requests').findOne({
+        userId: session.user.id,
+        djId,
+        songId: selectedTrack.id,
+        createdAt: { $gte: new Date(Date.now() - 60 * 1000) } // Within last 60 seconds
+      });
+      
+      if (recentDuplicate) {
+        return res.status(409).json({ 
+          error: 'Duplicate request', 
+          message: 'You already requested this song recently',
+          isDuplicate: true,
+          requestId: recentDuplicate._id
+        });
+      }
     }
 
     // Start a MongoDB session for the transaction
@@ -123,10 +142,11 @@ export default async function handler(req, res) {
           to: dj.email,
           type: EmailTypes.NEW_REQUEST,
           data: {
-            djName: dj.name,
+            djName: dj.name || 'DJ',
             userName: session.user.name || 'A user',
-            songTitle: selectedTrack.name,
-            amount: requestAmount
+            songTitle: selectedTrack.name || 'a song',
+            amount: requestAmount || 0,
+            status: 'pending'
           }
         });
       } catch (emailError) {
