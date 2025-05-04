@@ -17,9 +17,6 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { formatCurrency } = useCurrency();
   
-  // Add state for local currency
-  const [localCurrency, setLocalCurrency] = useState(null);
-
   // Toast banner state
   const [bannerToast, setBannerToast] = useState({
     show: false,
@@ -69,25 +66,6 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
   // Get the selected payment method object
   const selectedPaymentMethod = paymentMethods.find(m => m._id === selectedMethod);
   const isMpesa = selectedPaymentMethod?.code === 'mpesa';
-
-  // Fetch currency on mount
-  useEffect(() => {
-    const fetchCurrency = async () => {
-      try {
-        const response = await fetch('/api/currencies/default');
-        if (response.ok) {
-          const data = await response.json();
-          setLocalCurrency(data);
-        } else {
-          console.error("Failed to fetch currency, using default");
-        }
-      } catch (error) {
-        console.error("Error fetching currency:", error);
-      }
-    };
-    
-    fetchCurrency();
-  }, []);
 
   // Clean up interval on unmount and when modal closes
   useEffect(() => {
