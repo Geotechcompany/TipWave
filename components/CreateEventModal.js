@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Dialog } from "@headlessui/react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Calendar, Clock, MapPin, Music, Users, X, Loader2 } from "lucide-react";
@@ -20,6 +19,34 @@ export function CreateEventModal({ isOpen, onClose }) {
     capacity: "",
     imageUrl: ""
   });
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    
+    if (isOpen) {
+      window.addEventListener('keydown', handleEsc);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOpen, onClose]);
+
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,22 +97,20 @@ export function CreateEventModal({ isOpen, onClose }) {
     }));
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog
-      open={isOpen}
-      onClose={onClose}
-      className="fixed inset-0 z-50 overflow-y-auto"
-    >
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
+      
       <div className="flex items-center justify-center min-h-screen px-4">
-        <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-        
-        <Dialog.Panel as={motion.div}
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-10"
+          className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-10 relative"
         >
           <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-            <Dialog.Title className="text-lg font-medium">Create New Event</Dialog.Title>
+            <h2 className="text-lg font-medium">Create New Event</h2>
             <button
               onClick={onClose}
               className="rounded-full p-1 hover:bg-gray-800"
@@ -97,14 +122,15 @@ export function CreateEventModal({ isOpen, onClose }) {
           <form onSubmit={handleSubmit} className="p-4">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Event Title</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Event Title</label>
                 <input
                   required
                   type="text"
                   value={eventData.title}
                   onChange={handleInputChange}
                   name="title"
-                  className="w-full px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+                  className="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-4 py-2.5"
+                  placeholder="Event name"
                 />
               </div>
               
@@ -116,11 +142,9 @@ export function CreateEventModal({ isOpen, onClose }) {
                   name="description"
                   value={eventData.description}
                   onChange={handleInputChange}
-                  required
-                  rows={3}
-                  className="w-full rounded-lg bg-gray-700 border-gray-600 text-white px-4 py-2.5"
-                  placeholder="Describe your event"
-                />
+                  className="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-4 py-2.5 min-h-[100px]"
+                  placeholder="Event description"
+                ></textarea>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -234,8 +258,8 @@ export function CreateEventModal({ isOpen, onClose }) {
               </div>
             </div>
           </form>
-        </Dialog.Panel>
+        </motion.div>
       </div>
-    </Dialog>
+    </div>
   );
 } 

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Dialog } from "@headlessui/react";
+
 import { motion } from "framer-motion";
 import { X, Loader2, Plus } from "lucide-react";
 import toast from "react-hot-toast";
@@ -17,6 +17,34 @@ export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
     contactEmail: "",
     contactPhone: ""
   });
+  
+  // Close on escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    
+    if (isOpen) {
+      window.addEventListener('keydown', handleEsc);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isOpen, onClose]);
+
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,25 +91,23 @@ export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
       [name]: value
     }));
   };
+  
+  if (!isOpen) return null;
 
   return (
-    <Dialog
-      open={isOpen}
-      onClose={onClose}
-      className="fixed inset-0 z-50 overflow-y-auto"
-    >
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+      
       <div className="flex items-center justify-center min-h-screen px-4 sm:px-6 text-center">
-        <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
-        
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative bg-gray-900 rounded-xl w-full max-w-lg mx-auto shadow-xl overflow-hidden"
+          className="relative bg-gray-900 rounded-xl w-full max-w-lg mx-auto shadow-xl overflow-hidden z-10"
         >
           <div>
             <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-              <Dialog.Title className="text-lg font-medium">Add New Venue</Dialog.Title>
+              <h2 className="text-lg font-medium">Add New Venue</h2>
               <button
                 onClick={onClose}
                 className="rounded-full p-1 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
@@ -210,6 +236,6 @@ export function CreateVenueModal({ isOpen, onClose, onVenueCreated }) {
           </div>
         </motion.div>
       </div>
-    </Dialog>
+    </div>
   );
 } 

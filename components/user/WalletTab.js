@@ -5,13 +5,27 @@ import {
   Calendar, Filter,  Loader2, CreditCard, 
   Music, RefreshCcw, History,  
   ChevronLeft, ChevronRight, Circle, Hash, CheckCircle, XCircle, 
-  RepeatIcon, ChevronDown, AlertTriangle
+  RepeatIcon, ChevronDown, AlertTriangle, 
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import toast from "react-hot-toast";
 import { TopUpModal } from "./TopUpModal.jsx";
 import { useSession } from "next-auth/react";
 import 'tailwindcss/tailwind.css';
+
+const getTransactionTypeLabel = (type) => {
+  switch (type) {
+    case 'topup':
+      return 'Wallet Deposit';
+    case 'refund':
+      return 'Refund';
+    case 'request':
+      return 'Song Request';
+    default:
+      return 'Transaction';
+  }
+};
+
 
 
 export function WalletTab() {
@@ -32,12 +46,17 @@ export function WalletTab() {
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTransactions, setAllTransactions] = useState([]);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [bannerToast, setBannerToast] = useState({
     show: false,
     message: '',
     type: '', // 'success' or 'error'
   });
+  const [isExporting, setIsExporting] = useState(false);
+  const [fetchAll, setFetchAll] = useState(false);
+  const [lastCheckedTime, setLastCheckedTime] = useState(null);
+  const [ setCheckingAllPending] = useState(false);
+  
   
   // Fetch wallet balance and transaction history
   const fetchWalletData = useCallback(async () => {
@@ -93,58 +112,44 @@ export function WalletTab() {
   const fetchTransactions = useCallback(async () => {
     try {
       setIsLoadingTransactions(true);
-      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
       
-      // Update to use itemsPerPage instead of hardcoded limit
-      const response = await fetch(`/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}${typeParam}`);
+      // Build query parameters
+      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
+      const fetchAllParam = fetchAll ? '&all=true' : '';
+      
+      // Make the API request
+      const response = await fetch(
+        `/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}${typeParam}${fetchAllParam}`
+      );
       
       if (!response.ok) {
         throw new Error("Failed to fetch transactions");
       }
       
       const data = await response.json();
-      let allTransactions = data.transactions || [];
       
-      // Get pending transactions if we're looking at all or topup transactions
-      if (transactionType === "all" || transactionType === "topup") {
-        const pendingResponse = await fetch(`/api/payments/mpesa/pending`);
-        if (pendingResponse.ok) {
-          const pendingData = await pendingResponse.json();
-          
-          // Format pending transactions to match regular transactions
-          const formattedPending = pendingData.transactions.map(pt => ({
-            _id: pt._id || pt.checkoutRequestId,
-            type: 'topup',
-            amount: pt.amount,
-            currency: pt.currency || 'KES',
-            paymentMethod: 'mpesa',
-            status: 'pending',
-            description: 'M-Pesa wallet top-up (pending)',
-            details: {
-              checkoutRequestId: pt.checkoutRequestId
-            },
-            createdAt: pt.createdAt
-          }));
-          
-          // Combine and sort all transactions by date
-          allTransactions = [...allTransactions, ...formattedPending]
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        }
-      }
+      // Update state with the response data
+      setAllTransactions(data.transactions || []);
+      setTotalPages(data.pagination?.pages || 1);
       
-      setAllTransactions(allTransactions || []); // Use setAllTransactions instead
-      setTotalPages(data.totalPages || 1);
     } catch (error) {
-      console.error("Error fetching transactions:", error);
-      showBannerToast("Failed to load transaction history", "error");
+      console.error('Error fetching transactions:', error);
+      toast.error("Failed to load transactions");
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [currentPage, transactionType, itemsPerPage]); // Add itemsPerPage as dependency
+  }, [currentPage, itemsPerPage, transactionType, fetchAll]);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
+
+  // Add this useEffect to trigger transaction fetching
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchTransactions();
+    }
+  }, [session?.user?.id, currentPage, transactionType, itemsPerPage, fetchAll, fetchTransactions]);
 
   const handleTopUpComplete = (data) => {
     if (data?.CheckoutRequestID) {
@@ -205,72 +210,135 @@ export function WalletTab() {
     }
   };
   
-  const handleFilterChange = (type) => {
-    setTransactionType(type);
-    setCurrentPage(1); // Reset to first page when filter changes
+  const handleFilterChange = (newType) => {
+    setTransactionType(newType);
+    setCurrentPage(1); // Reset to page 1 when filter changes
+    // We'll let the useEffect trigger the fetch
   };
 
   const checkPaymentStatus = useCallback(async (checkoutRequestId) => {
     try {
       setCheckingPayment(true);
-      const res = await fetch(`/api/payments/mpesa/confirm/${checkoutRequestId}`);
-      if (res.ok) {
-        const data = await res.json();
-        
-        if (data.status === "COMPLETED") {
-          toast.success("Payment completed successfully!");
-          fetchWalletData();
-          return true;
-        } else if (data.status === "FAILED") {
-          toast.error("Payment failed. Please try again.");
-          fetchWalletData();
-          return true;
-        } else {
-          toast.info("Payment is still being processed. Please wait.");
-        }
+      
+      const response = await fetch(`/api/payments/mpesa/check/${checkoutRequestId}`);
+      if (!response.ok) {
+        throw new Error('Failed to check payment status');
       }
-      return false; // Still pending
+      
+      const data = await response.json();
+      
+      // Immediately update the transaction in the UI
+      if (data.status === 'completed') {
+        // Find and update the transaction in the local state
+        setAllTransactions(prev => 
+          prev.map(tx => 
+            tx.details?.checkoutRequestId === checkoutRequestId
+              ? { ...tx, status: 'completed' }
+              : tx
+          )
+        );
+        
+        // Show success message
+        toast.success('Payment confirmed successfully!');
+        
+        // Refresh wallet data to show updated balance
+        fetchWalletData();
+      } else if (data.status === 'failed') {
+        // Update failed status in UI
+        setAllTransactions(prev => 
+          prev.map(tx => 
+            tx.details?.checkoutRequestId === checkoutRequestId
+              ? { ...tx, status: 'failed', failureReason: data.failureReason }
+              : tx
+          )
+        );
+        
+        toast.error(`Payment failed: ${data.failureReason || 'Unknown error'}`);
+      }
+      
+      return data.status;
     } catch (error) {
       console.error('Error checking payment status:', error);
-      return false;
+      toast.error('Failed to check payment status');
+      return null;
     } finally {
       setCheckingPayment(false);
     }
   }, [fetchWalletData]);
 
-  useEffect(() => {
-    // Check if there are any pending transactions
-    const hasPendingTransaction = transactions.some(tx => 
-      tx.status === 'pending' || 
-      (tx.type === 'topup' && tx.paymentMethod === 'mpesa')
+  const checkAllPendingTransactions = useCallback(async () => {
+    // Find transactions with pending status
+    const pendingTxs = allTransactions.filter(tx => 
+      tx.status?.toLowerCase() === 'pending' && 
+      tx.details?.checkoutRequestId
     );
     
-    let intervalId;
-    if (hasPendingTransaction) {
-      // Poll for updates every 10 seconds if we have pending transactions
-      intervalId = setInterval(() => {
-        // Find pending M-Pesa transactions
-        const pendingMpesa = transactions.find(tx => 
-          tx.status === 'pending' && 
-          tx.paymentMethod === 'mpesa' && 
-          tx.details?.checkoutRequestId
-        );
-        
-        if (pendingMpesa?.details?.checkoutRequestId) {
-          checkPaymentStatus(pendingMpesa.details.checkoutRequestId);
-        } else {
-          fetchWalletData();
-        }
-      }, 10000);
+    if (pendingTxs.length === 0) return;
+    
+    setCheckingAllPending(true);
+    setLastCheckedTime(new Date());
+    
+    // Show a toast notification that we're checking
+    toast.loading(`Checking ${pendingTxs.length} pending transactions...`, {
+      id: 'checking-pending-transactions'
+    });
+    
+    try {
+      // Process each pending transaction sequentially
+      for (const tx of pendingTxs) {
+        await checkPaymentStatus(tx.details.checkoutRequestId);
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Show success toast
+      toast.success(`Checked ${pendingTxs.length} pending transactions`, {
+        id: 'checking-pending-transactions'
+      });
+      
+      // Refresh data after checking all
+      fetchTransactions();
+      fetchWalletData();
+    } catch (error) {
+      console.error('Error checking pending transactions:', error);
+      toast.error('Failed to check some transactions', {
+        id: 'checking-pending-transactions'
+      });
+    } finally {
+      setCheckingAllPending(false);
+    }
+  }, [allTransactions, checkPaymentStatus, fetchTransactions, fetchWalletData]);
+
+  // Find pending transactions and update effect that's causing the warning
+  useEffect(() => {
+    // Find pending transactions that need checking
+    if (!session?.user?.id) return;
+    
+    const hasPendingTxs = allTransactions.some(tx => 
+      tx.status?.toLowerCase() === 'pending' && 
+      tx.details?.checkoutRequestId
+    );
+    
+    if (!hasPendingTxs) return;
+    
+    // Set up interval to check pending transactions every 30 seconds
+    const intervalId = setInterval(() => {
+      // Call check function here
+      checkAllPendingTransactions();
+    }, 30000); // 30 seconds
+    
+    // Check immediately on first load
+    if (!lastCheckedTime) {
+      checkAllPendingTransactions();
     }
     
-    // Also refresh when the component mounts
-    fetchWalletData();
-    
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [transactions, checkPaymentStatus, fetchWalletData]);
+    return () => clearInterval(intervalId);
+  }, [
+    session?.user?.id, 
+    allTransactions, 
+    lastCheckedTime, 
+    checkAllPendingTransactions
+  ]);
 
   const getTransactionStatus = (transaction) => {
     // Convert status to lowercase for consistent comparison
@@ -503,11 +571,85 @@ export function WalletTab() {
     }, 5000);
   };
 
+  const handleExportTransactions = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Fetch all transactions for export
+      const response = await fetch(`/api/user/transactions?export=true&type=${transactionType}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch transactions for export");
+      }
+      
+      const data = await response.json();
+      const transactions = data.transactions || [];
+      
+      if (transactions.length === 0) {
+        toast.error("No transactions to export");
+        return;
+      }
+      
+      // Convert transactions to CSV format
+      const headers = ["Date", "Time", "Type", "Description", "Amount", "Status"];
+      
+      // Create CSV content
+      let csvContent = headers.join(",") + "\n";
+      
+      transactions.forEach(transaction => {
+        const date = new Date(transaction.createdAt);
+        const formattedDate = date.toLocaleDateString();
+        const formattedTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Format amount with + or -
+        const isPositive = transaction.type === 'topup' || transaction.type === 'refund';
+        const amountPrefix = isPositive ? '+' : '-';
+        const displayAmount = Math.abs(transaction.amount);
+        const formattedAmount = `${amountPrefix}${displayAmount}`;
+        
+        const row = [
+          formattedDate,
+          formattedTime,
+          getTransactionTypeLabel(transaction.type),
+          transaction.description || "",
+          formattedAmount,
+          transaction.status
+        ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",");
+        
+        csvContent += row + "\n";
+      });
+      
+      // Create a download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      // Set download attributes
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `wallet-transactions-${timestamp}.csv`);
+      link.style.visibility = 'hidden';
+      
+      // Add to document, click and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Transactions exported successfully");
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      toast.error("Failed to export transactions");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      transition={{ duration: 0.3 }}
+      className="max-w-4xl mx-auto"
     >
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200">
@@ -526,8 +668,7 @@ export function WalletTab() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 backdrop-blur-lg rounded-xl border border-blue-500/20 p-6"
-      >
+        className="bg-gradient-to-br from-blue-600/20 to-purple-700/20 backdrop-blur-lg rounded-xl border border-gray-700/50 p-5 shadow-lg">
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-3">
             <div className="bg-blue-500/20 p-3 rounded-full">
@@ -567,14 +708,14 @@ export function WalletTab() {
             onClick={() => {
               setCurrentPage(1);
               setTransactionType("all");
-              setItemsPerPage(10); // Show more items
-              fetchTransactions();
-              toast.success("Showing all transactions");
+              setItemsPerPage(100); // Show more items
+              setFetchAll(true);
+              toast.success("Loading all transactions");
             }}
             className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-white/10 rounded-lg py-3 px-4 text-white font-medium transition-colors"
           >
             <History className="h-5 w-5" />
-            View All
+            View All Transactions
           </button>
         </div>
       </motion.div>
@@ -588,7 +729,7 @@ export function WalletTab() {
               Transaction History
             </h3>
             
-            {/* Controls for filtering and page size */}
+            {/* Controls for filtering, page size and export */}
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               {/* Transaction type filter */}
               <div className="relative w-full sm:w-auto">
@@ -602,32 +743,29 @@ export function WalletTab() {
                 >
                   <option value="all">All Transactions</option>
                   <option value="topup">Top Ups</option>
-                  <option value="tip">Tips to DJs</option>
+                  <option value="request">Song Requests</option>
+                  <option value="refund">Refunds</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                   <ChevronDown className="h-4 w-4 text-gray-400" />
                 </div>
               </div>
               
-              {/* Items per page selector */}
-              <div className="relative w-full sm:w-auto">
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1); // Reset to first page when changing page size
-                  }}
-                  className="w-full sm:w-auto px-4 py-2 bg-gray-700/50 text-gray-200 text-sm rounded-xl border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 backdrop-blur-md appearance-none"
-                >
-                  <option value={5}>5 per page</option>
-                  <option value={10}>10 per page</option>
-                  <option value={20}>20 per page</option>
-                  <option value={50}>50 per page</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
+              {/* Export button */}
+              <button
+                onClick={handleExportTransactions}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600/80 hover:bg-purple-600 text-white rounded-xl text-sm transition-colors"
+                disabled={isExporting || allTransactions.length === 0}
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                )}
+                Export {isExporting ? "..." : "CSV"}
+              </button>
             </div>
           </div>
         </div>
@@ -713,9 +851,14 @@ export function WalletTab() {
                         
                         {/* Amount and Actions - Right aligned on larger screens, below on mobile */}
                         <div className="flex justify-between items-center sm:flex-col sm:items-end sm:space-y-2 mt-2 sm:mt-0">
-                          <p className={`font-semibold text-base sm:text-lg ${transaction.type === 'topup' ? 'text-green-400' : 'text-gray-200'} transition-colors`}>
-                            {transaction.type === 'topup' ? '+' : '-'}
-                            {formatCurrency(transaction.amount, transaction.currency)}
+                          <p className={`font-semibold text-base ${
+                            transaction.type === 'topup' || transaction.type === 'refund'
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          }`}>
+                            {transaction.type === 'topup' || transaction.type === 'refund' 
+                              ? `+${formatCurrency(transaction.amount)}`
+                              : `-${formatCurrency(transaction.amount)}`}
                           </p>
                           
                           {/* Action buttons with improved styling */}
@@ -802,7 +945,7 @@ export function WalletTab() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                      className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all`}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
@@ -839,7 +982,7 @@ export function WalletTab() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                       disabled={currentPage === totalPages}
-                      className="p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all"
+                      className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white hover:bg-gray-700/50 transition-all`}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -883,19 +1026,20 @@ export function WalletTab() {
           </div>
         </div>
       )}
+      
+      {/* Move style tag inside the return statement */}
+      <style jsx>{`
+        @keyframes slide-in-right {
+          0% {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          100% {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </motion.div>
   );
-}
-
-<style jsx>{`
-  @keyframes slide-in-right {
-    0% {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    100% {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-`}</style> 
+} 
