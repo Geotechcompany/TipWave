@@ -77,7 +77,7 @@ export function WalletTab() {
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allTransactions, setAllTransactions] = useState([]);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [bannerToast, setBannerToast] = useState({
     show: false,
     message: '',
@@ -141,10 +141,6 @@ export function WalletTab() {
     try {
       setIsLoadingTransactions(true);
       
-      // Build query parameters
-      const typeParam = transactionType !== "all" ? `&type=${transactionType}` : '';
-      const fetchAllParam = fetchAll ? '&all=true' : '';
-      
       // Make the API request
       const response = await fetch(
         `/api/user/transactions?page=${currentPage}&limit=${itemsPerPage}&type=${transactionType}&all=${fetchAll}`
@@ -170,14 +166,14 @@ export function WalletTab() {
 
   useEffect(() => {
     fetchTransactions();
-  }, [currentPage, itemsPerPage, transactionType, fetchAll]);
+  }, [currentPage, itemsPerPage, transactionType, fetchAll, fetchTransactions]);
 
-  // Add this useEffect to trigger transaction fetching
+  // Initial data fetch for transactions when user ID is available
   useEffect(() => {
     if (session?.user?.id) {
       fetchTransactions();
     }
-  }, [session?.user?.id, currentPage, transactionType, itemsPerPage, fetchAll, fetchTransactions]);
+  }, [session?.user?.id, fetchTransactions]);
 
   const handleTopUpComplete = (data) => {
     if (data?.CheckoutRequestID) {
@@ -555,7 +551,7 @@ export function WalletTab() {
         },
         body: JSON.stringify({
           amount: transaction.amount,
-          phone: phoneNumber,
+          phoneNumber: phoneNumber,
           currency: transaction.currency || 'KES'
         }),
       });

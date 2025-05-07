@@ -240,23 +240,40 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       setIsProcessing(true);
       
       if (isMpesa) {
+        // Make sure phone number has proper format (254XXXXXXXXX)
+        // Remove any spaces, dashes or other characters
+        const formattedPhone = phone.replace(/\D/g, '');
+        
+        // Make sure it starts with country code (254 for Kenya)
+        const phoneWithCountryCode = formattedPhone.startsWith('254') 
+          ? formattedPhone 
+          : formattedPhone.startsWith('0') 
+            ? `254${formattedPhone.substring(1)}` 
+            : `254${formattedPhone}`;
+        
+        console.log('Sending payment request with phone:', phoneWithCountryCode, 'amount:', amount);
+        
         const response = await fetch('/api/payments/mpesa/stkpush', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            phoneNumber: phoneWithCountryCode,
             amount: parseFloat(amount),
-            phone,
-            description: 'Wallet Top Up'
+            // Include any other required fields
+            description: 'Wallet top-up',
+            accountReference: 'Wallet',
+            // Add any other fields required by your API
           }),
         });
         
-        const data = await response.json();
-        
         if (!response.ok) {
-          throw new Error(data.error || data.details || 'Failed to process payment');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Payment processing failed');
         }
+        
+        const data = await response.json();
         
         showBannerToast('M-PESA payment initiated. Check your phone to complete the transaction.', 'success');
         toast.success('M-PESA STK push sent to your phone. Please check your phone to complete the payment.');
@@ -278,7 +295,7 @@ export function TopUpModal({ isOpen, onClose, onComplete, currentBalance }) {
       }
     } catch (error) {
       console.error('Payment processing error:', error);
-      toast.error(error.message || 'Failed to process payment');
+      toast.error(error.message || 'Payment failed');
     } finally {
       setIsProcessing(false);
     }

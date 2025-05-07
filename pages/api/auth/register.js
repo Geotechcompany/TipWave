@@ -1,6 +1,6 @@
 import { hash } from 'bcryptjs';
 import clientPromise from '@/lib/mongodb';
-import { sendVerificationEmail } from '@/lib/email';
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
 import crypto from 'crypto';
 
 export default async function handler(req, res) {
@@ -64,11 +64,14 @@ export default async function handler(req, res) {
       updatedAt: new Date()
     });
 
-    // Send verification email
-    await sendVerificationEmail({
+    // Send verification email using the correct function
+    await sendNotificationEmail({
       to: email,
-      token: verificationToken,
-      name
+      type: EmailTypes.VERIFICATION,
+      data: {
+        name,
+        token: verificationToken
+      }
     });
 
     return res.status(201).json({

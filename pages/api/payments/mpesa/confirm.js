@@ -1,7 +1,8 @@
-
 import clientPromise from '@/lib/mongodb';
 import axios from 'axios';
 import { getTimestamp } from '@/lib/utils';
+import { sendNotificationEmail, EmailTypes } from '@/lib/email';
+import { decryptData } from '@/utils/encryption';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -15,166 +16,170 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Checking transaction status for:', transactionId);
+    
     // Connect to database
     const client = await clientPromise;
     const db = client.db();
     
-    // First check in mpesa_transactions collection
-    const mpesaTransaction = await db.collection('mpesa_transactions').findOne({ 
-      CheckoutRequestID: transactionId 
+    // First check if we have a callback result already
+    const transaction = await db.collection('transactions').findOne({
+      'details.checkoutRequestId': transactionId
     });
-
-    if (mpesaTransaction) {
+    
+    if (transaction && transaction.status !== 'PENDING') {
+      console.log('Transaction already processed:', transaction.status);
       return res.status(200).json({
         success: true,
-        status: mpesaTransaction.ResultCode === "0" ? "COMPLETED" : "FAILED",
-        data: mpesaTransaction
+        status: transaction.status,
+        data: transaction
       });
     }
     
-    // If not found in mpesa_transactions, check in pendingTransactions
-    const pendingTx = await db.collection('pendingTransactions').findOne({
-      checkoutRequestId: transactionId
+    // Find the pending transaction
+    const pendingTx = await db.collection('transactions').findOne({
+      'details.checkoutRequestId': transactionId,
+      status: 'PENDING'
     });
     
-    if (pendingTx) {
-      // Get OAuth token for M-Pesa API
-      const auth = Buffer.from(
-        `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`
-      ).toString('base64');
-      
-      const tokenResponse = await axios.get(
-        'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-        {
-          headers: {
-            Authorization: `Basic ${auth}`
-          }
+    if (!pendingTx) {
+      console.log('No pending transaction found with ID:', transactionId);
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    // Get credentials from database (not environment variables)
+    const mpesaPaymentMethod = await db.collection('paymentMethods').findOne({ 
+      code: 'mpesa',
+      isActive: true 
+    });
+    
+    if (!mpesaPaymentMethod) {
+      return res.status(500).json({ error: 'M-Pesa payment method not found or inactive' });
+    }
+    
+    // Decrypt the credentials from database
+    const credentials = mpesaPaymentMethod.credentials || {};
+    const consumerKey = credentials.consumerKey ? decryptData(credentials.consumerKey) : null;
+    const consumerSecret = credentials.consumerSecret ? decryptData(credentials.consumerSecret) : null;
+    const passkey = credentials.passKey ? decryptData(credentials.passKey) : null;
+    const shortcode = credentials.businessShortCode ? decryptData(credentials.businessShortCode) : null;
+    
+    if (!consumerKey || !consumerSecret || !passkey || !shortcode) {
+      return res.status(500).json({ error: 'M-Pesa configuration incomplete in database' });
+    }
+    
+    // Get OAuth token
+    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
+    const tokenResponse = await axios.get(
+      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      {
+        headers: {
+          Authorization: `Basic ${auth}`
         }
-      );
+      }
+    );
 
-      // Query transaction status from M-Pesa
-      const timestamp = getTimestamp();
-      const password = Buffer.from(
-        `${process.env.MPESA_BUSINESS_SHORT_CODE}${process.env.MPESA_PASS_KEY}${timestamp}`
-      ).toString('base64');
-      
-      console.log('Checking M-Pesa transaction status for:', transactionId);
-      
-      const statusResponse = await axios.post(
-        'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
-        {
-          BusinessShortCode: process.env.MPESA_BUSINESS_SHORT_CODE,
-          Password: password,
-          Timestamp: timestamp,
-          CheckoutRequestID: transactionId
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${tokenResponse.data.access_token}`,
-            'Content-Type': 'application/json'
-          }
+    // Query transaction status from M-Pesa
+    const timestamp = getTimestamp();
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+    
+    console.log('Querying M-Pesa for status of transaction:', transactionId);
+    
+    const statusResponse = await axios.post(
+      'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query',
+      {
+        BusinessShortCode: shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        CheckoutRequestID: transactionId
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${tokenResponse.data.access_token}`,
+          'Content-Type': 'application/json'
         }
-      );
-      
-      console.log('M-Pesa status response:', JSON.stringify(statusResponse.data, null, 2));
-
-      // Store result in both collections for consistency
-      if (statusResponse.data) {
-        // Store in mpesa_transactions collection
-        await db.collection('mpesa_transactions').updateOne(
-          { CheckoutRequestID: transactionId },
-          { $set: { ...statusResponse.data, updatedAt: new Date() } },
-          { upsert: true }
-        );
-        
-        // Update pending transaction status
-        await db.collection('pendingTransactions').updateOne(
-          { checkoutRequestId: transactionId },
-          { 
-            $set: { 
-              mpesaResponse: statusResponse.data,
-              status: statusResponse.data.ResultCode === "0" ? "COMPLETED" : "FAILED",
-              updatedAt: new Date() 
-            } 
-          }
-        );
-
-        // If transaction successful, update user's wallet
-        if (statusResponse.data.ResultCode === "0") {
-          // Start MongoDB session for transaction
-          const mongoSession = client.startSession();
-          
-          try {
-            mongoSession.startTransaction();
-            
-            // Create a transaction record if not exists
-            const existingTransaction = await db.collection('transactions').findOne({
-              checkoutRequestId: transactionId
-            }, { session: mongoSession });
-            
-            if (!existingTransaction) {
-              await db.collection('transactions').insertOne({
-                userId: pendingTx.userId,
-                type: 'topup',
-                amount: pendingTx.amount,
-                currency: pendingTx.currency,
-                paymentMethod: 'mpesa',
-                status: 'COMPLETED',
-                description: `M-Pesa wallet top-up`,
-                details: {
-                  checkoutRequestId: transactionId
-                },
-                createdAt: new Date()
-              }, { session: mongoSession });
-              
-              // Update user's wallet balance
-              await db.collection('wallets').updateOne(
-                { userId: pendingTx.userId },
-                { 
-                  $inc: { balance: Number(pendingTx.amount) },
-                  $set: { updatedAt: new Date() }
-                },
-                { 
-                  session: mongoSession,
-                  upsert: true
-                }
-              );
-            }
-            
-            await mongoSession.commitTransaction();
-          } catch (error) {
-            await mongoSession.abortTransaction();
-            console.error('Transaction error:', error);
-          } finally {
-            await mongoSession.endSession();
-          }
-        }
-
-        return res.status(200).json({
-          success: true,
-          status: statusResponse.data.ResultCode === "0" ? "COMPLETED" : "FAILED",
-          data: statusResponse.data
-        });
+      }
+    );
+    
+    console.log('M-Pesa status response:', JSON.stringify(statusResponse.data, null, 2));
+    
+    // Process the response
+    const responseCode = statusResponse.data.ResponseCode;
+    let newStatus = 'PENDING';
+    
+    if (responseCode === '0') {
+      // Check the result code
+      if (statusResponse.data.ResultCode === '0') {
+        newStatus = 'COMPLETED';
+      } else {
+        newStatus = 'FAILED';
       }
       
-      // If we have a pending transaction but no status from M-Pesa yet
-      return res.status(200).json({
-        success: true,
-        status: "PENDING",
-        data: pendingTx
-      });
+      // Update transaction status
+      await db.collection('transactions').updateOne(
+        { 'details.checkoutRequestId': transactionId },
+        { 
+          $set: { 
+            status: newStatus,
+            'details.mpesaResponse': statusResponse.data,
+            updatedAt: new Date()
+          } 
+        }
+      );
+      
+      // If completed, update user's wallet and send email notification
+      if (newStatus === 'COMPLETED') {
+        const userId = pendingTx.userId;
+        
+        // Add amount to wallet
+        await db.collection('wallets').updateOne(
+          { userId: userId },
+          { 
+            $inc: { balance: pendingTx.amount },
+            $set: { updatedAt: new Date() }
+          }
+        );
+        
+        // Get user details for email notification
+        const user = await db.collection('users').findOne({ _id: userId });
+        
+        if (user && user.email) {
+          try {
+            // Send success email notification
+            await sendNotificationEmail({
+              type: EmailTypes.PAYMENT_STATUS,
+              recipient: user.email,
+              data: {
+                name: user.name || 'Valued Customer',
+                status: 'COMPLETED',
+                amount: pendingTx.amount,
+                currency: 'KES',
+                transactionId: transactionId,
+                date: new Date().toLocaleDateString(),
+                paymentMethod: 'M-Pesa',
+                description: 'Wallet Top-up'
+              }
+            });
+            console.log('Payment success email sent to:', user.email);
+          } catch (emailError) {
+            console.error('Error sending payment success email:', emailError);
+            // Continue processing even if email fails
+          }
+        }
+      }
     }
-
-    return res.status(404).json({ 
-      success: false, 
-      error: 'Transaction not found or still pending'
+    
+    return res.status(200).json({
+      success: true,
+      status: newStatus,
+      data: statusResponse.data
     });
+    
   } catch (error) {
-    console.error('Error checking M-Pesa payment status:', error);
+    console.error('M-Pesa confirmation error:', error);
     return res.status(500).json({ 
-      success: false, 
-      error: 'Failed to check payment status',
-      details: error.message 
+      error: 'Failed to confirm payment status',
+      details: error.message
     });
   }
 } 
