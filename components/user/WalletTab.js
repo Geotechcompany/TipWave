@@ -83,7 +83,6 @@ export function WalletTab() {
     message: '',
     type: '', // 'success' or 'error'
   });
-  const [lastCheckedTime, setLastCheckedTime] = useState(Date.now());
   const [isExporting, setIsExporting] = useState(false);
   
   // Fetch wallet balance and transaction history
@@ -290,80 +289,6 @@ export function WalletTab() {
     }
   }, [fetchWalletData]);
 
-  const checkAllPendingTransactions = useCallback(async () => {
-    // Find transactions with pending status
-    const pendingTxs = allTransactions.filter(tx => 
-      tx.status?.toLowerCase() === 'pending' && 
-      tx.details?.checkoutRequestId
-    );
-    
-    if (pendingTxs.length === 0) return;
-    
-    setCheckingAllPending(true);
-    setLastCheckedTime(new Date());
-    
-    // Show a toast notification that we're checking
-    toast.loading(`Checking ${pendingTxs.length} pending transactions...`, {
-      id: 'checking-pending-transactions'
-    });
-    
-    try {
-      // Process each pending transaction sequentially
-      for (const tx of pendingTxs) {
-        await checkPaymentStatus(tx.details.checkoutRequestId);
-        // Small delay to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      // Show success toast
-      toast.success(`Checked ${pendingTxs.length} pending transactions`, {
-        id: 'checking-pending-transactions'
-      });
-      
-      // Refresh data after checking all
-      fetchTransactions();
-      fetchWalletData();
-    } catch (error) {
-      console.error('Error checking pending transactions:', error);
-      toast.error('Failed to check some transactions', {
-        id: 'checking-pending-transactions'
-      });
-    } finally {
-      setCheckingAllPending(false);
-    }
-  }, [allTransactions, checkPaymentStatus, fetchTransactions, fetchWalletData]);
-
-  // Find pending transactions and update effect that's causing the warning
-  useEffect(() => {
-    // Find pending transactions that need checking
-    if (!session?.user?.id) return;
-    
-    const hasPendingTxs = allTransactions.some(tx => 
-      tx.status?.toLowerCase() === 'pending' && 
-      tx.details?.checkoutRequestId
-    );
-    
-    if (!hasPendingTxs) return;
-    
-    // Set up interval to check pending transactions every 30 seconds
-    const intervalId = setInterval(() => {
-      // Call check function here
-      checkAllPendingTransactions();
-    }, 30000); // 30 seconds
-    
-    // Check immediately on first load
-    if (!lastCheckedTime) {
-      checkAllPendingTransactions();
-    }
-    
-    return () => clearInterval(intervalId);
-  }, [
-    session?.user?.id, 
-    allTransactions, 
-    lastCheckedTime, 
-    checkAllPendingTransactions
-  ]);
-
   const getTransactionStatus = (transaction) => {
     // Convert status to lowercase for consistent comparison
     const status = (transaction.status || 'pending').toLowerCase();
@@ -380,12 +305,12 @@ export function WalletTab() {
     }
   };
 
-  // Add this function to manually expire a specific transaction
-  const handleExpireTransaction = async (checkoutRequestId) => {
+  // First, make sure your handleCancelTransaction function is properly defined
+  const handleCancelTransaction = async (checkoutRequestId) => {
     try {
-      setCheckingPayment(true);
+      setIsSubmitting(true);
       
-      console.log('Expiring transaction:', checkoutRequestId);
+      console.log('Cancelling transaction:', checkoutRequestId);
       
       // Check if the API endpoint exists
       if (!checkoutRequestId) {
@@ -408,18 +333,18 @@ export function WalletTab() {
         const data = await response.json();
         console.log('Transaction cancel response:', data);
         
-        toast.success("Transaction marked as failed");
-        fetchWalletData();
+        toast.success("Transaction cancelled successfully");
+        fetchWalletData(); // Refresh the data
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error("Error response:", response.status, errorData);
         toast.error(`Could not cancel: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error("Error expiring transaction:", error);
+      console.error("Error cancelling transaction:", error);
       toast.error("Failed to cancel transaction");
     } finally {
-      setCheckingPayment(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -884,26 +809,17 @@ export function WalletTab() {
                             
                             {isPending && isPendingTooLong(transaction.createdAt) && (
                               <button
-                                onClick={() => {
-                                  // Make sure we're using the right ID and the function is available
-                                  if (transaction.details?.checkoutRequestId) {
-                                    // Log for debugging
-                                    console.log('Cancelling transaction:', transaction.details.checkoutRequestId);
-                                    handleExpireTransaction(transaction.details.checkoutRequestId);
-                                  } else if (transaction.checkoutRequestId) {
-                                    // Alternative ID location
-                                    console.log('Cancelling transaction (alt):', transaction.checkoutRequestId);
-                                    handleExpireTransaction(transaction.checkoutRequestId);
-                                  } else {
-                                    toast.error("Cannot cancel: Missing transaction ID");
-                                  }
-                                }}
-                                disabled={checkingPayment}
+                                onClick={() => handleCancelTransaction(transaction.details?.checkoutRequestId)}
+                                disabled={isSubmitting}
                                 className="text-xs px-3 py-1.5 bg-red-500/10 text-red-400 rounded-full hover:bg-red-500/20 
                                          transition-colors duration-200 flex items-center space-x-1 border border-red-500/20"
                               >
-                                <XCircle className="h-3 w-3" />
-                                <span>Cancel</span>
+                                {isSubmitting ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <XCircle className="h-3 w-3" />
+                                )}
+                                Cancel
                               </button>
                             )}
                           </div>

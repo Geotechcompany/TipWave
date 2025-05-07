@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import clientPromise from '@/lib/mongodb';
-
+import { ObjectId } from 'mongodb';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,17 +29,31 @@ export default async function handler(req, res) {
     
     console.log(`Cancelling transaction ${transactionId} for user ${userId}`);
     
-    // Update the pending transaction status to "cancelled" instead of "failed"
-    const result = await db.collection('pendingTransactions').updateOne(
+    // Find the transaction first to verify ownership
+    const transaction = await db.collection('transactions').findOne({
+      'details.checkoutRequestId': transactionId,
+      userId: new ObjectId(userId),
+      status: 'PENDING'
+    });
+    
+    if (!transaction) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Transaction not found or already processed' 
+      });
+    }
+    
+    // Update the transaction in the transactions collection (not pendingTransactions)
+    const result = await db.collection('transactions').updateOne(
       { 
-        checkoutRequestId: transactionId,
-        status: 'pending' // Only update if still pending
+        'details.checkoutRequestId': transactionId,
+        status: 'PENDING'
       },
       { 
         $set: { 
-          status: 'cancelled',
-          failureReason: 'Manually cancelled by user',
-          completedAt: new Date()
+          status: 'CANCELLED',
+          'details.failureReason': 'Manually cancelled by user',
+          updatedAt: new Date()
         } 
       }
     );
