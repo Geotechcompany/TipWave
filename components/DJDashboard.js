@@ -24,6 +24,14 @@ import { SettingsPanel } from "./SettingsPanel";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
 import { StatCard } from "./StatCard";
 
+const safelyAccessNestedProperty = (obj, path, defaultValue = undefined) => {
+  if (!obj || !path) return defaultValue;
+  const keys = path.split('.');
+  return keys.reduce((acc, key) => 
+    acc && acc[key] !== undefined ? acc[key] : defaultValue
+  , obj);
+};
+
 export default function DJDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -92,7 +100,7 @@ export default function DJDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [session?.user?.id, safelyAccessNestedProperty]);
+  }, [session?.user?.id]);
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -229,13 +237,6 @@ export default function DJDashboard() {
   const formatCurrency = useCallback((amount) => {
     return `${defaultCurrency?.symbol || '$'}${parseFloat(amount || 0).toFixed(2)}`;
   }, [defaultCurrency]);
-
-  const safelyAccessNestedProperty = useCallback((obj, path, fallback = null) => {
-    if (!obj) return fallback;
-    const value = path.split('.').reduce((acc, part) => 
-      acc && acc[part] !== undefined ? acc[part] : undefined, obj);
-    return value !== undefined ? value : fallback;
-  }, []);
 
   useEffect(() => {
     if (status === "unauthenticated") {

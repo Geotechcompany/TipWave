@@ -13,20 +13,50 @@ import { TopUpModal } from "./TopUpModal.jsx";
 import { useSession } from "next-auth/react";
 import 'tailwindcss/tailwind.css';
 
-const getTransactionTypeLabel = (type) => {
-  switch (type) {
-    case 'topup':
-      return 'Wallet Deposit';
-    case 'refund':
-      return 'Refund';
-    case 'request':
-      return 'Song Request';
-    default:
-      return 'Transaction';
-  }
+const convertToCSV = (transactions) => {
+  // Headers for the CSV
+  const headers = ["Date", "Time", "Type", "Description", "Amount", "Status"];
+  let csvContent = headers.join(",") + "\n";
+  
+  transactions.forEach(transaction => {
+    const date = new Date(transaction.createdAt);
+    const formattedDate = date.toLocaleDateString();
+    const formattedTime = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Format amount with + or -
+    const isPositive = transaction.type === 'topup' || transaction.type === 'refund';
+    const amountPrefix = isPositive ? '+' : '-';
+    const displayAmount = Math.abs(transaction.amount);
+    const formattedAmount = `${amountPrefix}${displayAmount}`;
+    
+    const row = [
+      formattedDate,
+      formattedTime,
+      transaction.type,
+      transaction.description || "",
+      formattedAmount,
+      transaction.status
+    ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",");
+    
+    csvContent += row + "\n";
+  });
+  
+  return csvContent;
 };
 
-
+const downloadCSV = (csvContent, filename) => {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
 export function WalletTab() {
   const { data: session } = useSession();
