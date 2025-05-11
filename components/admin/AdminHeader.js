@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell, RefreshCw, Search, Settings, 
-  LogOut, User, ChevronDown, Shield,
-  
+  LogOut, User, ChevronDown,
 } from "lucide-react";
 import Image from "next/image";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 
 export default function AdminHeader({ 
   user,
@@ -22,6 +23,7 @@ export default function AdminHeader({
   setActiveTab
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Add scroll detection for subtle header appearance change
   useEffect(() => {
@@ -34,54 +36,62 @@ export default function AdminHeader({
   }, []);
   
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
-      isScrolled 
-        ? "bg-gray-800/95 backdrop-blur-md shadow-lg"
-        : "bg-gradient-to-r from-gray-900 to-gray-800"
-    } border-b border-gray-700/50`}>
+    <header 
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
+        isScrolled 
+          ? "bg-gray-800/95 backdrop-blur-md shadow-lg"
+          : "bg-gradient-to-r from-gray-900 to-gray-800"
+      } border-b border-gray-700/50`}
+    >
       <div className="container mx-auto">
         <div className="flex items-center justify-between px-4 md:px-6 h-16">
+          {/* Left Section */}
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-white">
-             
+            <h1 className="text-xl font-semibold text-white hidden md:block">
+              Admin Dashboard
             </h1>
           </div>
           
+          {/* Right Section */}
           <div className="flex items-center space-x-3 md:space-x-4">
             {/* Search Bar */}
-            <div className="hidden md:flex items-center bg-gray-900/70 rounded-lg px-3 py-1.5 border border-gray-700/50 backdrop-blur-sm hover:border-gray-600/70 transition-colors">
-              <Search className="h-4 w-4 text-gray-400" />
-              <input
+            <div className="relative hidden md:flex items-center">
+              <Input
                 type="text"
                 placeholder="Search..."
-                className="bg-transparent border-none focus:outline-none text-sm ml-2 w-48 placeholder:text-gray-500 text-gray-200"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-64 pl-10 bg-gray-900/70 border-gray-700/50 focus:border-gray-600"
               />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             </div>
 
             {/* Refresh Button */}
-            <motion.button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={refreshData}
-              className="p-2 rounded-full hover:bg-gray-700/70 transition-all hover:shadow-md active:scale-95"
               disabled={refreshing}
-              whileTap={{ scale: 0.95 }}
+              className="hover:bg-gray-700/70"
             >
               <RefreshCw className={`h-5 w-5 text-gray-300 ${
                 refreshing ? "animate-spin" : ""
               }`} />
-            </motion.button>
+            </Button>
 
             {/* Notifications */}
             <div ref={notificationsRef} className="relative">
-              <motion.button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 rounded-full hover:bg-gray-700/70 transition-all hover:shadow-md relative active:scale-95"
-                whileTap={{ scale: 0.95 }}
+                className="hover:bg-gray-700/70 relative"
               >
                 <Bell className="h-5 w-5 text-gray-300" />
                 {stats.notifications?.length > 0 && (
                   <span className="absolute top-1 right-1 h-2.5 w-2.5 bg-red-500 rounded-full ring-2 ring-gray-800 animate-pulse" />
                 )}
-              </motion.button>
+              </Button>
 
               <AnimatePresence>
                 {showNotifications && (
@@ -142,40 +152,24 @@ export default function AdminHeader({
 
             {/* Profile Menu */}
             <div ref={profileMenuRef} className="relative">
-              <motion.button
+              <Button
+                variant="ghost"
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-3 p-1.5 rounded-lg hover:bg-gray-700/50 transition-all hover:shadow-md"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                className="flex items-center gap-2 hover:bg-gray-700/70 px-2"
               >
-                <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-gray-600 ring-2 ring-blue-500/20">
-                  {user?.imageUrl ? (
-                    <Image
-                      src={user.imageUrl}
-                      alt={user?.fullName || "Profile"}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-gray-800"></span>
-                </div>
-                <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium line-clamp-1 text-white">
-                    {user?.fullName || "Admin User"}
-                  </p>
-                  <p className="text-xs text-gray-400 flex items-center">
-                    <Shield className="h-3 w-3 mr-1 text-blue-400" />
-                    Administrator
-                  </p>
-                </div>
-                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
-                  showProfileMenu ? 'rotate-180' : ''
-                }`} />
-              </motion.button>
+                {user?.image ? (
+                  <Image
+                    src={user.image}
+                    alt={user.name || "Profile"}
+                    width={28}
+                    height={28}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <User className="h-5 w-5 text-gray-300" />
+                )}
+                <ChevronDown className="h-4 w-4 text-gray-400" />
+              </Button>
 
               <AnimatePresence>
                 {showProfileMenu && (
@@ -184,7 +178,7 @@ export default function AdminHeader({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 5, scale: 0.98 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-56 bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-700/80 py-2 overflow-hidden"
+                    className="absolute right-0 mt-2 w-48 bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-700/80 py-1"
                   >
                     <div className="px-4 py-3 border-b border-gray-700/50">
                       <p className="text-sm font-medium text-white">{user?.fullName || "Admin User"}</p>

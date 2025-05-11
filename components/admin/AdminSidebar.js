@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { 
   Users, Music, Settings, LayoutDashboard, 
-  DollarSign, BarChart2, FileCheck, ChevronRight, Mail, CreditCard
+  DollarSign, BarChart2, FileCheck, ChevronRight, Mail, CreditCard, Wallet
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -47,6 +47,12 @@ export default function AdminSidebar({ activeTab, setActiveTab, onCollapseChange
       color: "from-red-500 to-pink-600"
     },
     { 
+      tab: "withdrawal-methods", 
+      label: "Withdrawal Methods", 
+      icon: <Wallet className="w-5 h-5" />,
+      color: "from-purple-500 to-indigo-600"
+    },
+    { 
       tab: "analytics", 
       label: "Analytics", 
       icon: <BarChart2 className="w-5 h-5" />,
@@ -69,6 +75,12 @@ export default function AdminSidebar({ activeTab, setActiveTab, onCollapseChange
       label: "Emails", 
       icon: <Mail className="w-5 h-5" />,
       color: "from-purple-500 to-pink-600"
+    },
+    {
+      tab: "withdrawals",
+      label: "Withdrawals",
+      icon: <Wallet className="h-5 w-5" />,
+      color: "from-emerald-500 to-teal-600"
     },
   ];
 

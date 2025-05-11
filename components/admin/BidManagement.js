@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
-  Search, RefreshCw, Check, X, DollarSign, 
-  ChevronLeft, ChevronRight, Loader2,
-  AlertCircle, MoreHorizontal, Music, User
+  Search, Loader2,
+  Music, User,
+  ArrowLeft, ArrowRight, 
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
-import Link from "next/link";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Badge } from "../ui/badge";
 
 export default function BidManagement() {
   const [bids, setBids] = useState([]);
@@ -208,322 +210,225 @@ export default function BidManagement() {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="w-full"
     >
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex items-center flex-1 bg-gray-800/50 rounded-lg px-3 py-2">
-          <Search className="h-5 w-5 text-gray-400" />
-          <input
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Bid Management</h2>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={refreshBids}
+            variant="outline"
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Refresh'
+            )}
+          </Button>
+          
+          {selectedBids.length > 0 && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleBulkAction('approved')}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Approve Selected
+              </Button>
+              <Button
+                onClick={() => handleBulkAction('rejected')}
+                variant="destructive"
+              >
+                Reject Selected
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
             type="text"
-            placeholder="Search songs, artists or users..."
+            placeholder="Search bids..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent border-none focus:outline-none text-sm ml-2 w-full"
+            className="pl-10 w-full"
           />
         </div>
-        
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
           >
-            <option value="all">All Bids</option>
+            <option value="all">All Status</option>
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
-            <option value="completed">Completed</option>
             <option value="rejected">Rejected</option>
           </select>
-          
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
           >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="highest">Highest Amount</option>
-            <option value="lowest">Lowest Amount</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="amount-high">Highest Amount</option>
+            <option value="amount-low">Lowest Amount</option>
           </select>
-          
-          <motion.button
-            onClick={refreshBids}
-            disabled={isLoading || isRefreshing}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </motion.button>
         </div>
       </div>
 
-      {selectedBids.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between bg-gray-800/70 rounded-lg p-3"
-        >
-          <span className="text-sm text-gray-300">
-            {selectedBids.length} bid{selectedBids.length !== 1 ? 's' : ''} selected
-          </span>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => handleBulkAction('approved')}
-              className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-md text-xs flex items-center"
-            >
-              <Check className="w-3 h-3 mr-1" /> Approve All
-            </button>
-            <button 
-              onClick={() => handleBulkAction('rejected')}
-              className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-md text-xs flex items-center"
-            >
-              <X className="w-3 h-3 mr-1" /> Reject All
-            </button>
-            <button 
-              onClick={() => handleBulkAction('completed')}
-              className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-md text-xs flex items-center"
-            >
-              <DollarSign className="w-3 h-3 mr-1" /> Mark Completed
-            </button>
-            <button 
-              onClick={() => setSelectedBids([])}
-              className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md text-xs"
-            >
-              Clear Selection
-            </button>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      ) : bids.length === 0 ? (
+        <div className="text-center py-12 bg-gray-800/50 rounded-lg">
+          <Music className="h-12 w-12 mx-auto text-gray-500 mb-3" />
+          <h3 className="text-lg font-medium text-gray-300">No bids found</h3>
+          <p className="text-gray-400 mt-1">Try adjusting your search or filters</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 mb-4">
+            <input
+              type="checkbox"
+              checked={selectedBids.length === bids.length && bids.length > 0}
+              onChange={toggleAllSelection}
+              className="rounded border-gray-600 bg-gray-800"
+            />
+            <span className="text-sm text-gray-400">
+              {selectedBids.length} bid(s) selected
+            </span>
           </div>
-        </motion.div>
+
+          <div className="grid gap-4">
+            {bids.map((bid) => (
+              <div 
+                key={bid.id}
+                className="bg-gray-800/50 rounded-lg p-4 hover:bg-gray-800/70 transition-colors"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedBids.includes(bid.id)}
+                    onChange={() => toggleBidSelection(bid.id)}
+                    className="rounded border-gray-600 bg-gray-800"
+                  />
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1">
+                    <div className="flex items-center flex-1 min-w-0">
+                      <div className="w-12 h-12 bg-gray-700 rounded flex items-center justify-center mr-3 flex-shrink-0">
+                        {bid.albumArt ? (
+                          <img 
+                            src={bid.albumArt} 
+                            alt={bid.songTitle} 
+                            className="w-full h-full object-cover rounded" 
+                          />
+                        ) : (
+                          <Music className="w-6 h-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-white truncate">{bid.songTitle}</h3>
+                        <p className="text-sm text-gray-400 truncate">{bid.artist}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 sm:ml-4">
+                      <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                        {bid.userImage ? (
+                          <img 
+                            src={bid.userImage} 
+                            alt={bid.userName} 
+                            className="w-full h-full object-cover rounded-full" 
+                          />
+                        ) : (
+                          <User className="w-4 h-4 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{bid.userName}</p>
+                        <p className="text-xs text-gray-400 truncate">{bid.userEmail}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-4 sm:mt-0 w-full sm:w-auto">
+                      <div className="text-right flex-1 sm:flex-none">
+                        <p className="text-lg font-medium text-white">
+                          {formatCurrency(bid.amount)}
+                        </p>
+                        <Badge 
+                          className={`
+                            ${bid.status === "pending" ? "bg-blue-500/20 text-blue-400" :
+                              bid.status === "approved" ? "bg-green-500/20 text-green-400" :
+                              bid.status === "completed" ? "bg-purple-500/20 text-purple-400" :
+                              "bg-red-500/20 text-red-400"}
+                          `}
+                        >
+                          {bid.status}
+                        </Badge>
+                      </div>
+
+                      {bid.status === "pending" && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusChange(bid.id, "approved")}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleStatusChange(bid.id, "rejected")}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-          <h3 className="font-medium text-gray-200">Song Requests</h3>
-          <span className="text-sm text-gray-400">
-            {pagination.total} total bids
-          </span>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {isLoading ? (
-            <motion.div 
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center p-12"
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-between items-center mt-6 flex-col sm:flex-row gap-4">
+          <p className="text-sm text-gray-400">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} bids
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              disabled={pagination.page === 1}
             >
-              <Loader2 className="w-10 h-10 animate-spin text-blue-400 mb-4" />
-              <p className="text-gray-400">Loading bids...</p>
-            </motion.div>
-          ) : error ? (
-            <motion.div 
-              key="error"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center p-12 text-center"
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              disabled={pagination.page === pagination.totalPages}
             >
-              <AlertCircle className="w-10 h-10 text-red-400 mb-4" />
-              <p className="text-red-400 mb-2">{error}</p>
-              <button 
-                onClick={refreshBids}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm mt-2"
-              >
-                Try Again
-              </button>
-            </motion.div>
-          ) : bids.length === 0 ? (
-            <motion.div 
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center p-12 text-center"
-            >
-              <Music className="w-10 h-10 text-gray-500 mb-4" />
-              <p className="text-gray-400 mb-2">No bids found</p>
-              <p className="text-gray-500 text-sm mb-4">
-                {search ? "Try a different search term or filter." : "There are no song requests yet."}
-              </p>
-              {search && (
-                <button 
-                  onClick={() => setSearch("")}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
-                >
-                  Clear Search
-                </button>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="table"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="overflow-x-auto"
-            >
-              <table className="w-full">
-                <thead className="bg-gray-800/50 border-b border-gray-700">
-                  <tr>
-                    <th className="p-4 text-left">
-                      <div className="flex items-center">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedBids.length === bids.length && bids.length > 0}
-                          onChange={toggleAllSelection}
-                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-opacity-25"
-                        />
-                      </div>
-                    </th>
-                    <th className="p-4 text-left">Song</th>
-                    <th className="p-4 text-left">User</th>
-                    <th className="p-4 text-left">Amount</th>
-                    <th className="p-4 text-left">Status</th>
-                    <th className="p-4 text-left">Date</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {bids.map((bid) => (
-                    <tr key={bid.id} className="hover:bg-gray-700/30">
-                      <td className="p-4">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedBids.includes(bid.id)}
-                          onChange={() => toggleBidSelection(bid.id)}
-                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-opacity-25"
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gray-700 rounded flex items-center justify-center mr-3">
-                            {bid.albumArt ? (
-                              <img 
-                                src={bid.albumArt} 
-                                alt={bid.songTitle} 
-                                className="w-full h-full object-cover rounded" 
-                              />
-                            ) : (
-                              <Music className="w-5 h-5 text-gray-400" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium">{bid.songTitle}</p>
-                            <p className="text-sm text-gray-400">{bid.artist}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center mr-2">
-                            {bid.userImage ? (
-                              <img 
-                                src={bid.userImage} 
-                                alt={bid.userName} 
-                                className="w-full h-full object-cover rounded-full" 
-                              />
-                            ) : (
-                              <User className="w-4 h-4 text-gray-400" />
-                            )}
-                          </div>
-                          <div>
-                            <p>{bid.userName}</p>
-                            {bid.userEmail && (
-                              <p className="text-xs text-gray-400">{bid.userEmail}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 font-medium">
-                        {formatCurrency(bid.amount)}
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          bid.status === "pending" ? "bg-blue-500/20 text-blue-400" :
-                          bid.status === "approved" ? "bg-green-500/20 text-green-400" :
-                          bid.status === "completed" ? "bg-purple-500/20 text-purple-400" :
-                          "bg-red-500/20 text-red-400"
-                        }`}>
-                          {bid.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-gray-400">
-                        {new Date(bid.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          {bid.status === "pending" && (
-                            <>
-                              <button
-                                onClick={() => handleStatusChange(bid.id, "approved")}
-                                className="p-1.5 rounded-full bg-green-500/10 hover:bg-green-500/20 text-green-400"
-                                title="Approve"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleStatusChange(bid.id, "rejected")}
-                                className="p-1.5 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                                title="Reject"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          {bid.status === "approved" && (
-                            <button
-                              onClick={() => handleStatusChange(bid.id, "completed")}
-                              className="p-1.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-400"
-                              title="Mark Completed"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </button>
-                          )}
-                          <Link 
-                            href={`/admin/bids/${bid.id}`}
-                            className="p-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400"
-                            title="View Details"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {pagination.totalPages > 1 && !isLoading && !error && bids.length > 0 && (
-          <div className="flex items-center justify-between p-4 border-t border-gray-700">
-            <div className="text-sm text-gray-400">
-              Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} bids
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                disabled={pagination.page === 1}
-                className="p-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-gray-300">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                disabled={pagination.page === pagination.totalPages}
-                className="p-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+              Next
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </motion.div>
   );
 } 

@@ -1,17 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { 
-  LayoutDashboard, Music, DollarSign, 
- Zap, Share2,
-  Bell, Settings, Calendar, BarChart2, Users,
-  PlusCircle, ListMusic, Loader2, CheckCircle
+  Music, DollarSign, 
+  Zap, Bell, Settings, Calendar, 
+  BarChart2, Users, PlusCircle, ListMusic, 
+  Loader2, CheckCircle, Home, Menu, Wallet, MapPin
 } from "lucide-react";
-import toast from "react-hot-toast";
+
 import { CreateEventModal } from "./CreateEventModal";
 import { RequestsPanel } from "./RequestsPanel";
 import { LibraryPanel } from "./LibraryPanel";
@@ -21,8 +21,11 @@ import { EventsPanel } from "./EventsPanel";
 import { FanManagementPanel } from "./FanManagementPanel";
 import { VenuesPanel } from "./VenuesPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
-import { StatCard } from "./StatCard";
+
+
+import { MobileSidebar } from './MobileSidebar';
+import { DashboardOverview } from './DashboardOverview';
+import { WithdrawalTransactions } from "./WithdrawalTransactions";
 
 const safelyAccessNestedProperty = (obj, path, defaultValue = undefined) => {
   if (!obj || !path) return defaultValue;
@@ -54,25 +57,15 @@ export default function DJDashboard() {
   const [selectedView, setSelectedView] = useState("overview");
   const [showNotifications, setShowNotifications] = useState(false);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [genres, setGenres] = useState([]);
-  const [isEventsLoading, setIsEventsLoading] = useState(true);
   const [recentRequests, setRecentRequests] = useState([]);
-  const [analytics, setAnalytics] = useState({
-    weeklyData: [],
-    monthlyData: [],
-    yearlyData: []
-  });
-  const [selectedTimeframe, setSelectedTimeframe] = useState('week');
   const [defaultCurrency, setDefaultCurrency] = useState({
     code: 'USD',
     symbol: '$',
     rate: 1
   });
-  const [activeRequests, setActiveRequests] = useState([]);
-  const [isActiveRequestsLoading, setIsActiveRequestsLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   
   // Memoize all the fetch functions to use in dependency arrays
   const fetchDJStats = useCallback(async () => {
@@ -111,48 +104,10 @@ export default function DJDashboard() {
       const data = await response.json();
       
       // Check if data exists and has notifications property
-      setNotifications(data?.notifications || []);
       setUnreadCount(data?.unreadCount || 0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      setNotifications([]);
       setUnreadCount(0);
-    }
-  }, [session?.user?.id]);
-
-  const fetchGenres = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/genres`);
-      if (!response.ok) throw new Error('Failed to fetch genres');
-      
-      const data = await response.json();
-      if (data && data.genres) {
-        setGenres(data.genres);
-      } else {
-        setGenres([]);
-        console.warn('No genres data found in response');
-      }
-    } catch (error) {
-      console.error('Error fetching genres:', error);
-      setGenres([]);
-    }
-  }, [session?.user?.id]);
-
-  const fetchEvents = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      setIsEventsLoading(true);
-      const response = await fetch(`/api/dj/${session.user.id}/events?upcoming=true`);
-      if (!response.ok) throw new Error('Failed to fetch events');
-      
-      await response.json();
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    } finally {
-      setIsEventsLoading(false);
     }
   }, [session?.user?.id]);
 
@@ -169,19 +124,6 @@ export default function DJDashboard() {
     } catch (error) {
       console.error('Error fetching recent requests:', error);
       setRecentRequests([]);
-    }
-  }, [session?.user?.id]);
-
-  const fetchAnalytics = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/analytics`);
-      if (!response.ok) throw new Error('Failed to fetch analytics');
-      const { data } = await response.json();
-      setAnalytics(data);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
     }
   }, [session?.user?.id]);
 
@@ -205,38 +147,10 @@ export default function DJDashboard() {
     }
   }, [session?.user?.id]);
 
-  const fetchActiveRequests = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    try {
-      setIsActiveRequestsLoading(true);
-      const response = await fetch(`/api/dj/${session?.user?.id}/requests/active`);
-      
-      // If the endpoint doesn't exist (404), try alternative endpoint
-      if (response.status === 404) {
-        const fallbackResponse = await fetch(`/api/dj/${session?.user?.id}/requests?status=pending&limit=10`);
-        if (!fallbackResponse.ok) throw new Error('Failed to fetch active requests');
-        const fallbackData = await fallbackResponse.json();
-        setActiveRequests(fallbackData?.requests || fallbackData?.data?.requests || []);
-        return;
-      }
-      
-      if (!response.ok) throw new Error('Failed to fetch active requests');
-      const data = await response.json();
-      setActiveRequests(data?.requests || []);
-    } catch (error) {
-      console.error('Error fetching active requests:', error);
-      toast.error('Failed to load active requests');
-      setActiveRequests([]);
-    } finally {
-      setIsActiveRequestsLoading(false);
-    }
-  }, [session?.user?.id]);
-
-  // Move these two hooks to the top with the other hooks (around line 65-70)
+  // Format currency is used in DashboardOverview
   const formatCurrency = useCallback((amount) => {
-    return `${defaultCurrency?.symbol || '$'}${parseFloat(amount || 0).toFixed(2)}`;
-  }, [defaultCurrency]);
+    return `${defaultCurrency.symbol}${parseFloat(amount || 0).toFixed(2)}`;
+  }, [defaultCurrency.symbol]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -254,22 +168,9 @@ export default function DJDashboard() {
 
   useEffect(() => {
     if (session?.user?.id) {
-      fetchGenres();
-    }
-  }, [session?.user?.id, fetchGenres]);
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchEvents();
-    }
-  }, [session?.user?.id, fetchEvents]);
-
-  useEffect(() => {
-    if (session?.user?.id) {
       fetchRecentRequests();
-      fetchAnalytics();
     }
-  }, [session?.user?.id, fetchRecentRequests, fetchAnalytics]);
+  }, [session?.user?.id, fetchRecentRequests]);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -277,77 +178,52 @@ export default function DJDashboard() {
     }
   }, [session?.user?.id, fetchDefaultCurrency]);
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchActiveRequests();
-    }
-  }, [fetchActiveRequests, session?.user?.id]);
-
-  const markAllAsRead = async () => {
+  // Handle notifications
+  const markAllAsRead = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
     try {
-      const response = await fetch(`/api/dj/${session.user.id}/notifications`, {
-        method: 'PATCH'
+      await fetch(`/api/dj/${session.user.id}/notifications/mark-read`, {
+        method: 'POST'
       });
-      if (!response.ok) throw new Error('Failed to mark notifications as read');
-      
       setUnreadCount(0);
-      fetchNotifications();
-      toast.success('Marked all as read');
     } catch (error) {
       console.error('Error marking notifications as read:', error);
-      toast.error('Failed to update notifications');
     }
-  };
+  }, [session?.user?.id]);
 
-  const handleCreateEvent = () => {
+  // Event handlers used in the UI
+  const handleCreateEvent = useCallback(() => {
     setIsCreateEventModalOpen(true);
-  };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut({ redirect: true, callbackUrl: "/" });
   };
 
-  const handleAcceptRequest = useCallback(async (requestId) => {
-    if (!session?.user?.id || !requestId) return;
-    
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/requests/${requestId}/accept`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) throw new Error('Failed to accept request');
-      
-      // Update the active requests list (remove the accepted request)
-      setActiveRequests(prev => prev.filter(req => req._id !== requestId));
-      // Refresh other relevant data
-      fetchDJStats();
-      toast.success('Request accepted successfully');
-    } catch (error) {
-      console.error('Error accepting request:', error);
-      toast.error('Failed to accept request');
-    }
-  }, [session?.user?.id, fetchDJStats]);
-
-  const handleRejectRequest = useCallback(async (requestId) => {
-    if (!session?.user?.id || !requestId) return;
-    
-    try {
-      const response = await fetch(`/api/dj/${session.user.id}/requests/${requestId}/reject`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) throw new Error('Failed to reject request');
-      
-      // Update the active requests list (remove the rejected request)
-      setActiveRequests(prev => prev.filter(req => req._id !== requestId));
-      // Refresh other relevant data
-      fetchDJStats();
-      toast.success('Request rejected');
-    } catch (error) {
-      console.error('Error rejecting request:', error);
-      toast.error('Failed to reject request');
-    }
-  }, [session?.user?.id, fetchDJStats]);
+  // Add notifications dropdown with markAllAsRead functionality
+  const NotificationsDropdown = () => (
+    showNotifications && (
+      <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
+        <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+          <h3 className="font-medium">Notifications</h3>
+          <button
+            onClick={markAllAsRead}
+            className="text-sm text-blue-400 hover:text-blue-300"
+          >
+            Mark all as read
+          </button>
+        </div>
+        <div className="p-4">
+          {unreadCount === 0 ? (
+            <p className="text-sm text-gray-400">No new notifications</p>
+          ) : (
+            <p className="text-sm text-gray-400">{unreadCount} unread notifications</p>
+          )}
+        </div>
+      </div>
+    )
+  );
 
   // Loading state
   if (status === "loading") {
@@ -358,605 +234,297 @@ export default function DJDashboard() {
     );
   }
 
-  const navigation = [
-    {
-      name: "Overview",
-      icon: LayoutDashboard,
-      href: "#",
-      current: selectedView === "overview",
-      onClick: () => setSelectedView("overview")
-    },
-    {
-      name: "Song Requests",
-      icon: Music,
-      href: "#",
-      current: selectedView === "requests",
-      onClick: () => setSelectedView("requests")
-    },
-    {
-      name: "Music Library",
-      icon: ListMusic,
-      href: "#",
-      current: selectedView === "library",
-      onClick: () => setSelectedView("library")
-    },
-    {
-      name: "Earnings",
-      icon: DollarSign,
-      href: "#",
-      current: selectedView === "earnings",
-      onClick: () => setSelectedView("earnings")
-    },
-    {
-      name: "Analytics",
-      icon: BarChart2,
-      href: "#",
-      current: selectedView === "analytics",
-      onClick: () => setSelectedView("analytics")
-    }
+  // Navigation menu items
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: Home },
+    { id: 'requests', label: 'Song Requests', icon: Music },
+    { id: 'library', label: 'Music Library', icon: ListMusic },
+    { id: 'earnings', label: 'Earnings', icon: DollarSign },
+    { id: 'withdrawals', label: 'Withdrawals', icon: Wallet },
+    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+    { id: 'events', label: 'Events', icon: Calendar },
+    { id: 'fans', label: 'Fans', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'venues', label: 'Venues', icon: MapPin },
   ];
-
-  const managementNavigation = [
-    { name: "Events", icon: Calendar, onClick: () => setSelectedView("events") },
-    { name: "Fan Management", icon: Users, onClick: () => setSelectedView("fans") },
-    { name: "Venues", icon: Share2, onClick: () => setSelectedView("venues") },
-    { name: "Settings", icon: Settings, onClick: () => setSelectedView("settings") }
-  ];
-
-  const ProfileSection = () => (
-    <div className="relative">
-      <button
-        onClick={() => setShowProfileMenu(!showProfileMenu)}
-        className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800/50"
-      >
-        <div className="relative w-8 h-8 rounded-full overflow-hidden">
-          <Image
-            src={session?.user?.image || "/default-avatar.png"}
-            alt={session?.user?.name || "DJ"}
-            fill
-            className="object-cover"
-          />
-        </div>
-        <div className="flex-1 text-left">
-          <p className="text-sm font-medium">{session?.user?.name}</p>
-          <p className="text-xs text-gray-400">{session?.user?.email}</p>
-        </div>
-      </button>
-      {showProfileMenu && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
-          <div className="py-1">
-            <button
-              onClick={() => {
-                setSelectedView("settings");
-                setShowProfileMenu(false);
-              }}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800"
-            >
-              Settings
-            </button>
-            <button
-              onClick={handleSignOut}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 text-red-400"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Top navigation bar */}
-      <div className="sticky top-0 z-40 bg-gray-900 border-b border-gray-800">
-        <div className="flex items-center justify-between px-4 md:px-6 h-16">
-          <div className="flex items-center space-x-4">
-            <div className="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
-              TipWave
-            </div>
-            <span className="px-2 py-1 rounded-md bg-blue-900/30 text-blue-400 text-xs font-medium">
-              DJ Portal
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+      <MobileSidebar 
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        activeView={selectedView} 
+        onViewChange={setSelectedView}
+      />
+
+      {/* Mobile menu button */}
+      <button 
+        onClick={() => setIsOpen(true)} 
+        className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Notifications button with panel */}
+      <div className="relative">
+        <button
+          onClick={() => setShowNotifications(!showNotifications)}
+          className="p-2 text-gray-400 hover:text-white rounded-lg"
+        >
+          <Bell size={20} />
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+              {unreadCount}
             </span>
+          )}
+        </button>
+        <NotificationsDropdown />
+      </div>
+      
+      {/* Main layout with desktop navigation */}
+      <div className="flex">
+        {/* Desktop Navigation - hidden on mobile */}
+        <aside className="hidden lg:flex flex-col w-64 h-screen bg-gray-900 border-r border-gray-800 sticky top-0">
+          {/* Logo/Brand section */}
+          <div className="p-4 border-b border-gray-800">
+            <h1 className="text-xl font-bold text-white">DJ Dashboard</h1>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="p-2 rounded-full hover:bg-gray-800 relative"
-              >
-                <Bell className="h-5 w-5 text-gray-400" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 h-4 w-4 bg-blue-500 rounded-full text-xs flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
-                  <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                    <h3 className="font-medium">Notifications</h3>
+          {/* Navigation items */}
+          <nav className="flex-1 overflow-y-auto py-4">
+            <ul className="space-y-1 px-3">
+              {navItems.map(item => {
+                const Icon = item.icon;
+                const isActive = selectedView === item.id;
+                
+                return (
+                  <li key={item.id}>
                     <button
-                      onClick={markAllAsRead}
-                      className="text-sm text-blue-400 hover:text-blue-300"
+                      onClick={() => setSelectedView(item.id)}
+                      className={`flex items-center w-full px-4 py-3 rounded-lg transition-colors ${
+                        isActive 
+                          ? 'bg-blue-600/20 text-blue-400' 
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                      }`}
                     >
-                      Mark all as read
+                      <Icon className="h-5 w-5 mr-3" />
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* Upgrade Banner */}
+          <div className="mt-auto px-3 pb-4">
+            <div className="rounded-xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4">
+                <div className="flex items-center mb-3">
+                  <Zap className="h-5 w-5 text-yellow-300 mr-2" />
+                  <h3 className="font-bold text-white">Upgrade to Pro</h3>
+                </div>
+                
+                <p className="text-sm text-white/80 mb-3">
+                  Unlock premium features and boost your earnings
+                </p>
+                
+                <ul className="text-xs text-white/80 mb-4 space-y-1">
+                  <li className="flex items-center">
+                    <CheckCircle className="h-3.5 w-3.5 text-green-300 mr-2" />
+                    <span>Custom branding</span>
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-3.5 w-3.5 text-green-300 mr-2" />
+                    <span>Priority requests</span>
+                  </li>
+                  <li className="flex items-center">
+                    <CheckCircle className="h-3.5 w-3.5 text-green-300 mr-2" />
+                    <span>Advanced analytics</span>
+                  </li>
+                </ul>
+                
+                <button 
+                  onClick={() => router.push('/pricing')}
+                  className="w-full bg-white text-blue-600 font-medium py-2 px-4 rounded-lg hover:bg-blue-50 transition-colors text-sm"
+                >
+                  Upgrade Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+        
+        {/* Main content area */}
+        <main className="flex-1">
+          {/* Top Navigation Bar - Mobile optimized */}
+          <div className="sticky top-0 z-30 bg-gray-900 border-b border-gray-800">
+            <div className="container mx-auto px-4 py-2">
+              <div className="flex items-center justify-between">
+                {/* Left side - Mobile menu trigger and hidden title */}
+                <div className="flex items-center">
+                  {/* Mobile menu button visible on mobile only */}
+                  <button 
+                    onClick={() => setIsOpen(true)} 
+                    className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
+                    aria-label="Open Menu"
+                  >
+                    <Menu size={20} />
+                  </button>
+                  
+           
+                </div>
+
+                {/* Right side actions - Mobile optimized */}
+                <div className="flex items-center space-x-2 md:space-x-3">
+                  {/* Create Event button - Full text on desktop, icon only on mobile */}
+                  <button
+                    onClick={() => setIsCreateEventModalOpen(true)}
+                    className="inline-flex items-center md:px-4 px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    aria-label="Create Event"
+                  >
+                    <PlusCircle size={18} className="md:mr-2" />
+                    <span className="hidden md:inline">Create Event</span>
+                  </button>
+                  
+                  {/* Notifications */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowNotifications(!showNotifications)}
+                      className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800"
+                      aria-label="Notifications"
+                    >
+                      <Bell size={20} />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
                     </button>
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification._id}
-                        className="p-4 border-b border-gray-700/50 hover:bg-gray-800/50"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-lg ${
-                            notification.type === 'success' ? 'bg-green-500/20 text-green-500' :
-                            notification.type === 'info' ? 'bg-blue-500/20 text-blue-500' :
-                            'bg-yellow-500/20 text-yellow-500'
-                          }`}>
-                            {notification.type === 'success' ? '✓' : 
-                             notification.type === 'info' ? 'ℹ' : '⚠'}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm">{notification.message}</p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {new Date(notification.createdAt).toRelativeTimeString()}
-                            </p>
-                          </div>
+                  
+                  {/* Profile - Always visible */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowProfileMenu(!showProfileMenu)}
+                      className="flex items-center"
+                      aria-label="User menu"
+                    >
+                      <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                        <Image
+                          src={session?.user?.image || "/default-avatar.png"}
+                          alt={session?.user?.name || "DJ"}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    </button>
+                    
+                    {/* Profile dropdown menu */}
+                    {showProfileMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-xl shadow-lg border border-gray-700 z-50">
+                        <div className="p-3 border-b border-gray-800">
+                          <p className="font-medium text-sm">{session?.user?.name}</p>
+                          <p className="text-xs text-gray-400">{session?.user?.email}</p>
+                        </div>
+                        <div className="py-1">
+                          <button
+                            onClick={() => {
+                              setSelectedView("settings");
+                              setShowProfileMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800"
+                          >
+                            Settings
+                          </button>
+                          <button
+                            onClick={handleSignOut}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 text-red-400"
+                          >
+                            Sign Out
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-            
-            <button 
-              onClick={() => setSelectedView("settings")}
-              className="p-2 rounded-full hover:bg-gray-800"
-            >
-              <Settings className="h-5 w-5 text-gray-400" />
-            </button>
-            
-            <ProfileSection />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex min-h-[calc(100vh-64px)]">
-        {/* Sidebar - keep fixed position but adjust z-index */}
-        <div className="w-16 md:w-56 border-r border-gray-800 flex flex-col fixed h-[calc(100vh-64px)] bg-gray-900 z-30">
-          <div className="p-3">
-            <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
-              Main
-            </div>
-            <ul className="space-y-1">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <button
-                    onClick={item.onClick}
-                    className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                      selectedView === item.name.toLowerCase()
-                        ? "bg-blue-900/20 text-blue-400"
-                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 mr-2" />
-                    <span className="hidden md:inline-block">{item.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="mt-6 p-3">
-            <div className="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wider pb-4">
-              Management
-            </div>
-            <ul className="space-y-1">
-              {managementNavigation.map((item) => (
-                <li key={item.name}>
-                  <button
-                    onClick={item.onClick}
-                    className={`flex items-center w-full rounded-lg px-3 py-2 text-left ${
-                      selectedView === item.name.toLowerCase()
-                        ? "bg-blue-900/20 text-blue-400"
-                        : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 mr-2" />
-                    <span className="hidden md:inline-block">{item.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          <div className="mt-auto p-3">
-            <div className="hidden md:flex flex-col bg-gray-800/50 rounded-lg p-4 space-y-3">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-500/20 text-blue-500 rounded-lg">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-sm">Pro Features</h3>
-                  <p className="text-xs text-gray-400">Upgrade for more</p>
                 </div>
               </div>
-              <button className="w-full py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm rounded-md">
-                Upgrade
-              </button>
             </div>
           </div>
-        </div>
-
-        {/* Main content - add proper margin and padding */}
-        <div className="flex-1 ml-16 md:ml-56">
-          <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
-            <AnimatePresence mode="wait">
-              {selectedView === "analytics" ? (
-                <AnalyticsPanel defaultCurrency={defaultCurrency} />
-              ) : selectedView === "earnings" ? (
-                <motion.div
-                  key="earnings"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <EarningsPanel defaultCurrency={defaultCurrency} />
-                </motion.div>
-              ) : selectedView === "requests" ? (
-                <RequestsPanel 
-                  defaultCurrency={defaultCurrency} 
-                  onRequestsUpdate={fetchActiveRequests}
+          
+          {/* Main dashboard content */}
+          <div className="container mx-auto px-4 py-8">
+            {/* Dashboard content - render based on selected view */}
+            <div className="mt-4">
+              {selectedView === "overview" && (
+                <DashboardOverview 
+                  stats={stats}
+                  recentRequests={recentRequests}
+                  defaultCurrency={defaultCurrency}
+                  isLoading={isLoading}
+                  formatCurrency={formatCurrency}
                 />
-              ) : selectedView === "library" ? (
+              )}
+              
+              {selectedView === "requests" && (
+                <RequestsPanel 
+                  defaultCurrency={defaultCurrency}
+                />
+              )}
+              
+              {selectedView === "library" && (
                 <LibraryPanel />
-              ) : selectedView === "events" ? (
+              )}
+              
+              {selectedView === "earnings" && (
+                <>
+                  <EarningsPanel 
+                    defaultCurrency={defaultCurrency}
+                  />
+                  <div className="mt-8">
+                    <WithdrawalTransactions 
+                      defaultCurrency={defaultCurrency}
+                    />
+                  </div>
+                </>
+              )}
+              
+              {selectedView === "analytics" && (
+                <AnalyticsPanel 
+                  defaultCurrency={defaultCurrency}
+                />
+              )}
+              
+              {selectedView === "events" && (
                 <EventsPanel />
-              ) : selectedView === "fans" ? (
-                <FanManagementPanel defaultCurrency={defaultCurrency} />
-              ) : selectedView === "venues" ? (
-                <VenuesPanel />
-              ) : selectedView === "settings" ? (
+              )}
+              
+              {selectedView === "fans" && (
+                <FanManagementPanel />
+              )}
+              
+              {selectedView === "settings" && (
                 <SettingsPanel />
-              ) : selectedView === "overview" ? (
-                <motion.div
-                  key="overview"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-bold">DJ Dashboard</h1>
-                    <div className="flex items-center space-x-2">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleCreateEvent}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-sm font-medium flex items-center"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create Event
-                      </motion.button>
-                    </div>
-                  </div>
+              )}
 
-                  {isLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="bg-gray-800/50 rounded-xl p-6 animate-pulse h-28">
-                          <div className="h-4 bg-gray-700 rounded w-1/3 mb-2"></div>
-                          <div className="h-6 bg-gray-700 rounded w-1/2"></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-6">
-                      <StatCard 
-                        title="Total Requests" 
-                        value={safelyAccessNestedProperty(stats, 'totalRequests', 0)} 
-                        icon={Music} 
-                        trend={safelyAccessNestedProperty(stats, 'trends.requests', 0)} 
-                      />
-                      <StatCard 
-                        title="Completion Rate" 
-                        value={`${safelyAccessNestedProperty(stats, 'completionRate', 0)}%`} 
-                        icon={CheckCircle} 
-                        trend={safelyAccessNestedProperty(stats, 'trends.completionRate', 0)} 
-                      />
-                      <StatCard 
-                        title="Total Earnings" 
-                        value={formatCurrency(safelyAccessNestedProperty(stats, 'totalEarnings', 0))} 
-                        icon={DollarSign} 
-                        trend={safelyAccessNestedProperty(stats, 'trends.earnings', 0)} 
-                      />
-                      <StatCard 
-                        title="Upcoming Events" 
-                        value={safelyAccessNestedProperty(stats, 'upcomingEvents.length', 0)} 
-                        icon={Calendar} 
-                      />
-                    </div>
-                  )}
+              {selectedView === "withdrawals" && (
+                <WithdrawalTransactions 
+                  defaultCurrency={defaultCurrency}
+                />
+              )}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                      <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                        <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                          <h3 className="font-medium">Recent Song Requests</h3>
-                          <button 
-                            onClick={() => setSelectedView("requests")}
-                            className="text-sm text-blue-400 hover:text-blue-300"
-                          >
-                            View all
-                          </button>
-                        </div>
-                        
-                        <div className="divide-y divide-gray-700/50">
-                          {isLoading ? (
-                            <div className="animate-pulse space-y-4">
-                              {[...Array(3)].map((_, i) => (
-                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
-                              ))}
-                            </div>
-                          ) : safelyAccessNestedProperty(recentRequests, 'length', 0) > 0 ? (
-                            recentRequests.map((request, i) => (
-                              <div key={i} className="p-4 hover:bg-gray-700/30 transition-colors">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg flex items-center justify-center">
-                                    <Music className="h-5 w-5 text-blue-400" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium">{safelyAccessNestedProperty(request, 'songTitle', '')}</h4>
-                                    <p className="text-sm text-gray-400">{safelyAccessNestedProperty(request, 'requesterName', '')}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="px-2 py-1 rounded-md bg-green-900/30 text-green-400 text-xs font-medium">
-                                      {formatCurrency(safelyAccessNestedProperty(request, 'amount', 0))}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-8">
-                              <p className="text-gray-400">No song requests yet</p>
-                              <button 
-                                onClick={() => setIsCreateEventModalOpen(true)}
-                                className="mt-2 text-sm text-blue-400 hover:text-blue-300"
-                              >
-                                Create your first event
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="mt-6 col-span-full">
-                        <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                          <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                            <h3 className="font-medium">Performance Analytics</h3>
-                            <div className="flex space-x-2">
-                              {['Week', 'Month', 'Year'].map((timeframe) => (
-                                <button
-                                  key={timeframe}
-                                  onClick={() => setSelectedTimeframe(timeframe.toLowerCase())}
-                                  className={`px-3 py-1 rounded-md text-sm ${
-                                    selectedTimeframe === timeframe.toLowerCase()
-                                      ? 'bg-blue-900/30 text-blue-400'
-                                      : 'text-gray-400 hover:bg-gray-700/30'
-                                  }`}
-                                >
-                                  {timeframe}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="p-6">
-                            {isLoading ? (
-                              <div className="animate-pulse">
-                                <div className="h-[200px] bg-gray-700/50 rounded-lg" />
-                              </div>
-                            ) : safelyAccessNestedProperty(analytics, `${selectedTimeframe}lyData.length`, 0) > 0 ? (
-                              <div className="h-[200px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <AreaChart
-                                    data={safelyAccessNestedProperty(analytics, `${selectedTimeframe}lyData`, [])}
-                                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                                  >
-                                    <defs>
-                                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                                      </linearGradient>
-                                    </defs>
-                                    <XAxis 
-                                      dataKey="date" 
-                                      stroke="#6B7280"
-                                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
-                                    />
-                                    <YAxis stroke="#6B7280" />
-                                    <Tooltip
-                                      contentStyle={{
-                                        backgroundColor: '#1F2937',
-                                        border: '1px solid #374151',
-                                        borderRadius: '0.5rem'
-                                      }}
-                                    />
-                                    <Area
-                                      type="monotone"
-                                      dataKey="amount"
-                                      stroke="#3B82F6"
-                                      fillOpacity={1}
-                                      fill="url(#colorRevenue)"
-                                    />
-                                  </AreaChart>
-                                </ResponsiveContainer>
-                              </div>
-                            ) : (
-                              <div className="text-center py-8">
-                                <p className="text-gray-400">No analytics data available</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <div className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                        <div className="p-4 border-b border-gray-700/50">
-                          <h3 className="font-medium">Upcoming Events</h3>
-                        </div>
-                        <div className="p-4">
-                          {isEventsLoading ? (
-                            <div className="animate-pulse space-y-4">
-                              {[...Array(3)].map((_, i) => (
-                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
-                              ))}
-                            </div>
-                          ) : safelyAccessNestedProperty(stats, 'events.length', 0) > 0 ? (
-                            <div className="space-y-4">
-                              {safelyAccessNestedProperty(stats, 'events', []).map((event, i) => (
-                                <div key={i} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-700/30 transition-colors">
-                                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
-                                    <Calendar className="h-6 w-6 text-blue-400" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium">{safelyAccessNestedProperty(event, 'name', '')}</h4>
-                                    <p className="text-sm text-gray-400">
-                                      {new Date(safelyAccessNestedProperty(event, 'date', '')).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-6">
-                              <p className="text-gray-400">No upcoming events</p>
-                              <button 
-                                onClick={() => setIsCreateEventModalOpen(true)}
-                                className="mt-2 text-sm text-blue-400 hover:text-blue-300"
-                              >
-                                Schedule a new event
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-4 border-t border-gray-700/50">
-                          <button 
-                            onClick={() => setSelectedView("events")}
-                            className="text-sm text-blue-400 hover:text-blue-300"
-                          >
-                            View calendar
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                        <div className="p-4 border-b border-gray-700/50">
-                          <h3 className="font-medium">Top Genres</h3>
-                        </div>
-                        <div className="p-4">
-                          {isLoading ? (
-                            <div className="animate-pulse space-y-4">
-                              {[...Array(3)].map((_, i) => (
-                                <div key={i} className="h-16 bg-gray-700/50 rounded-lg" />
-                              ))}
-                            </div>
-                          ) : safelyAccessNestedProperty(genres, 'length', 0) > 0 ? (
-                            <div className="space-y-4">
-                              {genres.map((genre, i) => (
-                                <div key={i}>
-                                  <div className="flex justify-between text-sm mb-1">
-                                    <span>{safelyAccessNestedProperty(genre, 'name', '')}</span>
-                                    <span>{safelyAccessNestedProperty(genre, 'percentage', 0)}%</span>
-                                  </div>
-                                  <div className="h-2 bg-gray-700 rounded-full">
-                                    <div
-                                      className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600"
-                                      style={{ width: `${safelyAccessNestedProperty(genre, 'percentage', 0)}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-6">
-                              <p className="text-gray-400">No genre data available</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Active Requests Section */}
-                  {isActiveRequestsLoading ? (
-                    <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                      <div className="p-4 border-b border-gray-700/50">
-                        <h3 className="font-medium text-white">Active Requests</h3>
-                      </div>
-                      <div className="p-6 flex justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                      </div>
-                    </div>
-                  ) : safelyAccessNestedProperty(activeRequests, 'length', 0) > 0 ? (
-                    <div className="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
-                      <div className="p-4 border-b border-gray-700/50">
-                        <h3 className="font-medium text-white">Active Requests <span className="text-blue-400 ml-2">{safelyAccessNestedProperty(activeRequests, 'length', 0)}</span></h3>
-                      </div>
-                      <div className="divide-y divide-gray-700/50">
-                        {safelyAccessNestedProperty(activeRequests, 'slice', [])(0, 3).map((request) => (
-                          <div key={safelyAccessNestedProperty(request, '_id', '')} className="p-4 flex justify-between items-center">
-                            <div>
-                              <p className="font-medium text-white">{safelyAccessNestedProperty(request, 'songTitle', '')}</p>
-                              <p className="text-sm text-gray-400">From: {safelyAccessNestedProperty(request, 'requesterName', '')}</p>
-                            </div>
-                            <div className="flex space-x-2">
-                              <button 
-                                onClick={() => handleAcceptRequest(safelyAccessNestedProperty(request, '_id', ''))}
-                                className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs"
-                              >
-                                Accept
-                              </button>
-                              <button 
-                                onClick={() => handleRejectRequest(safelyAccessNestedProperty(request, '_id', ''))}
-                                className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs"
-                              >
-                                Decline
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        {safelyAccessNestedProperty(activeRequests, 'length', 0) > 3 && (
-                          <div className="p-4 text-center">
-                            <button 
-                              onClick={() => setSelectedView("requests")}
-                              className="text-sm text-blue-400 hover:text-blue-300"
-                            >
-                              View all {safelyAccessNestedProperty(activeRequests, 'length', 0)} requests
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+              {selectedView === "venues" && (
+                <VenuesPanel />
+              )}
+            </div>
           </div>
-        </div>
+        </main>
       </div>
+      
       <CreateEventModal 
-        isOpen={isCreateEventModalOpen} 
-        onClose={() => setIsCreateEventModalOpen(false)} 
+        isOpen={isCreateEventModalOpen}
+        onClose={() => setIsCreateEventModalOpen(false)}
+        onCreate={handleCreateEvent}
       />
     </div>
   );

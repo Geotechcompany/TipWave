@@ -7,19 +7,15 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import {
-
   TrendingUp,
- 
   Shield,
-  
-
   Database,
-
 } from "lucide-react";
 
 // Import admin components
 import AdminHeader from "./admin/AdminHeader";
 import AdminSidebar from "./admin/AdminSidebar";
+import { MobileAdminSidebar } from "./admin/MobileAdminSidebar";
 import AdminStats from "./admin/AdminStats";
 import AdminRevenueChart from "./admin/AdminRevenueChart";
 import AdminUsersList from "./admin/AdminUsersList";
@@ -34,6 +30,8 @@ import DJApplicationsReview from "./admin/DJApplicationsReview";
 import UserManagement from "./admin/UserManagement";
 import EmailManagement from "./admin/EmailManagement";
 import PaymentMethodManagement from "./admin/PaymentMethodManagement";
+import WithdrawalMethodsManagement from "./admin/WithdrawalMethodsManagement";
+import WithdrawalManagement from "./admin/WithdrawalManagement";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -277,12 +275,22 @@ export default function AdminDashboard() {
       />
 
       <div className="flex pt-16 min-h-screen">
-        <AdminSidebar 
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <AdminSidebar 
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
+        </div>
+
+        {/* Mobile Sidebar */}
+        <MobileAdminSidebar 
           activeTab={activeTab}
           setActiveTab={setActiveTab}
         />
 
-        <div className="flex-1 p-6 ml-16 md:ml-56">
+        {/* Main Content */}
+        <div className="flex-1 p-6 lg:ml-56">
           {activeTab === "dashboard" && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -305,20 +313,9 @@ export default function AdminDashboard() {
               />
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <AdminUsersList 
-                  stats={stats}
-                  isLoading={isLoading}
-                />
-                
-                <AdminSongsList 
-                  stats={stats}
-                  isLoading={isLoading}
-                />
-                
-                <AdminBidStatus 
-                  stats={stats}
-                  isLoading={isLoading}
-                />
+                <AdminUsersList stats={stats} isLoading={isLoading} />
+                <AdminSongsList stats={stats} isLoading={isLoading} />
+                <AdminBidStatus stats={stats} isLoading={isLoading} />
               </div>
             </motion.div>
           )}
@@ -364,6 +361,8 @@ export default function AdminDashboard() {
             </motion.div>
           )}
           {activeTab === "payment-methods" && <PaymentMethodManagement defaultCurrency={defaultCurrency} />}
+          {activeTab === "withdrawal-methods" && <WithdrawalMethodsManagement defaultCurrency={defaultCurrency} />}
+          {activeTab === "withdrawals" && <WithdrawalManagement defaultCurrency={defaultCurrency} />}
         </div>
       </div>
     </div>
