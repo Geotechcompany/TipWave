@@ -503,11 +503,32 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
     }
   };
 
-  const handleSettingsSave = () => {
-    if (emailProvider === 'smtp') {
-      saveSmtpSettings();
-    } else {
-      saveResendSettings();
+  const handleSettingsSave = async () => {
+    try {
+      setIsLoading(true);
+      if (emailProvider === 'smtp') {
+        const response = await fetch('/api/admin/emails/smtp-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(smtpSettings)
+        });
+        
+        if (!response.ok) throw new Error('Failed to save SMTP settings');
+        showBannerToast('SMTP settings saved successfully');
+      } else {
+        const response = await fetch('/api/admin/emails/resend-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resendSettings)
+        });
+        
+        if (!response.ok) throw new Error('Failed to save Resend settings');
+        showBannerToast('Resend settings saved successfully');
+      }
+    } catch (error) {
+      showBannerToast(error.message, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -541,7 +562,7 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
         </Button>
       </div>
       
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Sent Emails</CardTitle>
@@ -594,12 +615,17 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
         </Card>
       </div>
       
-      <Tabs defaultValue="test-emails" value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="mb-4">
+      <Tabs 
+        defaultValue="test-emails" 
+        value={selectedTab} 
+        onValueChange={setSelectedTab} 
+        className="w-full space-y-6"
+      >
+        <TabsList className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 w-full">
           <TabsTrigger value="test-emails">Send Test Email</TabsTrigger>
           <TabsTrigger value="schedule">Schedule Emails</TabsTrigger>
           <TabsTrigger value="logs">Email Logs</TabsTrigger>
-          <TabsTrigger value="smtp">Email Provider Configuration</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         
         <TabsContent value="test-emails">
@@ -878,23 +904,18 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
           </Card>
         </TabsContent>
         
-        <TabsContent value="smtp">
+        <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Server className="h-5 w-5" />
-                Email Provider Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure your email service provider settings
-              </CardDescription>
+              <CardTitle className="text-base">Email Provider Configuration</CardTitle>
+              <CardDescription>Configure your email service provider</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 {/* Provider Selection */}
                 <div className="space-y-4">
                   <Label>Email Provider</Label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {EMAIL_PROVIDERS.map(provider => (
                       <Button
                         key={provider.id}
@@ -916,7 +937,7 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                 {/* SMTP Settings */}
                 {emailProvider === 'smtp' && (
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="space-y-0.5">
                         <Label>Enable SMTP</Label>
                         <p className="text-sm text-gray-500">
@@ -934,10 +955,9 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                       />
                     </div>
 
-                    {/* Your existing SMTP fields */}
                     <div className="space-y-4">
-                      <div className="grid gap-4">
-                        <div className="grid gap-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
                           <Label htmlFor="smtp-host">SMTP Host</Label>
                           <Input
                             id="smtp-host"
@@ -949,7 +969,7 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                           />
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="space-y-2">
                           <Label htmlFor="smtp-port">Port</Label>
                           <Input
                             id="smtp-port"
@@ -1017,7 +1037,7 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                 {/* Resend Settings */}
                 {emailProvider === 'resend' && (
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="space-y-0.5">
                         <Label>Enable Resend</Label>
                         <p className="text-sm text-gray-500">
@@ -1035,8 +1055,8 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                       />
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="grid gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
                         <Label htmlFor="resend-api-key">API Key</Label>
                         <Input
                           id="resend-api-key"
@@ -1049,7 +1069,7 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                         />
                       </div>
 
-                      <div className="grid gap-2">
+                      <div className="space-y-2">
                         <Label htmlFor="resend-from">From Email</Label>
                         <Input
                           id="resend-from"
@@ -1075,8 +1095,19 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
               </Button>
               <Button 
                 onClick={handleSettingsSave}
+                disabled={isLoading}
               >
-                Save Settings
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Settings
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>
@@ -1089,16 +1120,18 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
                 Verify your email provider settings by sending a test email
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="test-email">Test Email Address</Label>
-                <Input
-                  id="test-email"
-                  type="email"
-                  placeholder="Enter email to receive test"
-                  value={testEmail.to}
-                  onChange={(e) => setTestEmail(prev => ({ ...prev, to: e.target.value }))}
-                />
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="test-email">Test Email Address</Label>
+                  <Input
+                    id="test-email"
+                    type="email"
+                    placeholder="Enter email to receive test"
+                    value={testEmail.to}
+                    onChange={(e) => setTestEmail(prev => ({ ...prev, to: e.target.value }))}
+                  />
+                </div>
               </div>
             </CardContent>
             <CardFooter>
@@ -1127,11 +1160,10 @@ export default function EmailManagement({ stats: initialStats, refreshData }) {
       {/* Banner Toast */}
       {bannerToast.show && (
         <div 
-          className={`fixed top-16 right-4 left-4 md:left-auto md:w-96 p-4 rounded-lg shadow-lg z-50 
+          className={`fixed bottom-4 right-4 left-4 md:top-16 md:left-auto md:bottom-auto md:w-96 p-4 rounded-lg shadow-lg z-50 
             ${bannerToast.type === 'success' 
               ? 'bg-emerald-600 dark:bg-emerald-800' 
-              : 'bg-destructive dark:bg-destructive'} 
-            transform transition-all duration-300 ease-in-out`}
+              : 'bg-destructive dark:bg-destructive'}`}
           style={{ animation: 'slide-in-right 0.5s ease-out' }}
         >
           <div className="flex items-center justify-between">
