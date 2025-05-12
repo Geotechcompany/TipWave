@@ -250,6 +250,7 @@ export default function DJDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
+      {/* Mobile sidebar */}
       <MobileSidebar 
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -257,31 +258,7 @@ export default function DJDashboard() {
         onViewChange={setSelectedView}
       />
 
-      {/* Mobile menu button */}
-      <button 
-        onClick={() => setIsOpen(true)} 
-        className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
-      >
-        <Menu size={20} />
-      </button>
-
-      {/* Notifications button with panel */}
-      <div className="relative">
-        <button
-          onClick={() => setShowNotifications(!showNotifications)}
-          className="p-2 text-gray-400 hover:text-white rounded-lg"
-        >
-          <Bell size={20} />
-          {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-        <NotificationsDropdown />
-      </div>
-      
-      {/* Main layout with desktop navigation */}
+      {/* Main layout */}
       <div className="flex">
         {/* Desktop Navigation - hidden on mobile */}
         <aside className="hidden lg:flex flex-col w-64 h-screen bg-gray-900 border-r border-gray-800 sticky top-0">
@@ -357,36 +334,29 @@ export default function DJDashboard() {
         
         {/* Main content area */}
         <main className="flex-1">
-          {/* Top Navigation Bar - Mobile optimized */}
-          <div className="sticky top-0 z-30 bg-gray-900 border-b border-gray-800">
-            <div className="container mx-auto px-4 py-2">
-              <div className="flex items-center justify-between">
-                {/* Left side - Mobile menu trigger and hidden title */}
-                <div className="flex items-center">
-                  {/* Mobile menu button visible on mobile only */}
-                  <button 
-                    onClick={() => setIsOpen(true)} 
-                    className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
-                    aria-label="Open Menu"
-                  >
-                    <Menu size={20} />
-                  </button>
-                  
-           
-                </div>
+          {/* Header */}
+          <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-800 sticky top-0 z-40">
+            <div className="px-4 sm:px-6 lg:px-8">
+              <div className="flex h-16 items-center justify-between">
+                {/* Mobile menu button - only show on mobile */}
+                <button 
+                  onClick={() => setIsOpen(true)} 
+                  className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
+                >
+                  <Menu size={20} />
+                </button>
 
-                {/* Right side actions - Mobile optimized */}
-                <div className="flex items-center space-x-2 md:space-x-3">
-                  {/* Create Event button - Full text on desktop, icon only on mobile */}
+                {/* Right side header items */}
+                <div className="flex items-center gap-4 ml-auto">
+                  {/* Create Event button */}
                   <button
                     onClick={() => setIsCreateEventModalOpen(true)}
                     className="inline-flex items-center md:px-4 px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    aria-label="Create Event"
                   >
                     <PlusCircle size={18} className="md:mr-2" />
                     <span className="hidden md:inline">Create Event</span>
                   </button>
-                  
+
                   {/* Notifications */}
                   <div className="relative">
                     <button
@@ -401,14 +371,14 @@ export default function DJDashboard() {
                         </span>
                       )}
                     </button>
+                    <NotificationsDropdown />
                   </div>
-                  
-                  {/* Profile - Always visible */}
+
+                  {/* Profile Menu */}
                   <div className="relative">
                     <button
                       onClick={() => setShowProfileMenu(!showProfileMenu)}
-                      className="flex items-center"
-                      aria-label="User menu"
+                      className="flex items-center gap-2"
                     >
                       <div className="relative w-8 h-8 rounded-full overflow-hidden">
                         <Image
@@ -450,9 +420,9 @@ export default function DJDashboard() {
                 </div>
               </div>
             </div>
-          </div>
+          </header>
           
-          {/* Main dashboard content */}
+          {/* Main content */}
           <div className="container mx-auto px-4 py-8">
             {/* Dashboard content - render based on selected view */}
             <div className="mt-4">

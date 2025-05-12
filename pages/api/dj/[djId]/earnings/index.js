@@ -24,34 +24,26 @@ export default async function handler(req, res) {
     const client = await clientPromise;
     const db = client.db();
     
-    // Determine date range based on timeframe
+    // Get current date and start of month/week
     const now = new Date();
-    let startDate;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+
+    // Define the months array for monthly data
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      return date.toLocaleString('default', { month: 'short' });
+    }).reverse();
     
-    switch (timeframe) {
-      case 'week':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        startDate = new Date(now);
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case 'year':
-        startDate = new Date(now);
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        startDate = new Date(now);
-        startDate.setMonth(now.getMonth() - 1);
-    }
-    
-    // Get transactions for the DJ
+    // Get transactions for the DJ - use timeframe to filter
     const transactions = await db.collection('transactions')
       .find({
         userId: new ObjectId(djId),
         type: { $in: ['income', 'payment'] },
-        createdAt: { $gte: startDate }
+        createdAt: { 
+          $gte: timeframe === 'week' ? startOfWeek : startOfMonth 
+        }
       })
       .sort({ createdAt: -1 })
       .toArray();
@@ -85,7 +77,9 @@ export default async function handler(req, res) {
           $match: {
             djId: djId,
             status: 'completed',
-            createdAt: { $gte: startDate }
+            createdAt: { 
+              $gte: timeframe === 'week' ? startOfWeek : startOfMonth 
+            }
           }
         },
         {
