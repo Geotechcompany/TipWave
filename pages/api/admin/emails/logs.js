@@ -9,48 +9,42 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Connect to MongoDB
     const client = await clientPromise;
     const db = client.db();
     
-    // Get query parameters for pagination and filtering
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
-    const status = req.query.status || null;
-    
-    // Build query object
-    const query = {};
-    if (status) {
-      query.status = status;
-    }
-    
-    // Fetch email logs from database with pagination
+    // Get all logs sorted by date
     const logs = await db.collection('email_logs')
-      .find(query)
-      .sort({ sentAt: -1 }) // Sort by newest first
-      .skip(skip)
-      .limit(limit)
+      .find({})
+      .sort({ sentAt: -1 })
       .toArray();
-    
-    // Get total count for pagination
-    const totalCount = await db.collection('email_logs').countDocuments(query);
-    
-    return res.status(200).json({ 
+
+    // Get scheduled emails count
+    const scheduledCount = await db.collection('scheduled_emails')
+      .countDocuments({}) || 0;
+
+    // Calculate counts
+    const counts = {
+      sent: logs.filter(log => log.status === 'sent').length || 0,
+      failed: logs.filter(log => log.status === 'failed').length || 0,
+      scheduled: scheduledCount
+    };
+
+    console.log('Email stats:', counts); // Add this for debugging
+
+    return res.status(200).json({
       logs,
-      pagination: {
-        total: totalCount,
-        page,
-        limit,
-        pages: Math.ceil(totalCount / limit)
-      }
+      counts,
+      success: true
     });
   } catch (error) {
     console.error('Error fetching email logs:', error);
-    return res.status(500).json({ message: 'Failed to fetch email logs', error: error.message });
+    return res.status(500).json({ 
+      error: 'Failed to fetch email logs',
+      details: error.message 
+    });
   }
 } 
