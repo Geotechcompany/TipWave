@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { motion,  AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
@@ -63,21 +63,28 @@ const LandingPage = () => {
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { data: session, status } = useSession();
+  const router = useRouter();
   
-  // Add a useEffect to log the session status for debugging
-  useEffect(() => {
-    console.log("Session status:", status);
-    console.log("Session data:", session);
-  }, [session, status]);
+  const handleDashboardClick = () => {
+    if (session) {
+      // Redirect based on user role
+      if (session.user.role === 'DJ') {
+        router.push('/dashboard/dj');
+      } else {
+        router.push('/dashboard/user');
+      }
+      setIsMenuOpen(false); // Close mobile menu after navigation
+    }
+  };
   
   const handleSignIn = () => {
-    signIn();
+    signIn(undefined, { callbackUrl: '/onboarding' });
   };
   
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
+    await signOut({ redirect: true, callbackUrl: '/' });
   };
-  
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-lg border-b border-white/10">
       <nav className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -85,8 +92,8 @@ const Header = () => {
           <span className="text-2xl font-bold">TipWave</span>
         </Link>
 
+        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-4">
-          {/* Desktop Navigation Links */}
           <div className="flex items-center space-x-6 mr-4">
             <a href="#features" className="text-white/80 hover:text-white transition-colors duration-300">Features</a>
             <a href="#how-it-works" className="text-white/80 hover:text-white transition-colors duration-300">How It Works</a>
@@ -96,15 +103,14 @@ const Header = () => {
           {/* Authentication Buttons */}
           {status === "authenticated" ? (
             <div className="flex items-center space-x-4">
-              <Link href="/dashboard/user">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
-                >
-                  Dashboard
-                </motion.button>
-              </Link>
+              <motion.button
+                onClick={handleDashboardClick}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
+              >
+                Dashboard
+              </motion.button>
               <motion.button
                 onClick={handleSignOut}
                 whileHover={{ scale: 1.05 }}
@@ -155,20 +161,15 @@ const Header = () => {
               <div className="pt-4">
                 {status === "authenticated" ? (
                   <div className="flex flex-col space-y-3">
-                    <Link href="/dashboard/user">
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Dashboard
-                      </motion.button>
-                    </Link>
                     <motion.button
-                      onClick={() => {
-                        handleSignOut();
-                        setIsMenuOpen(false);
-                      }}
+                      onClick={handleDashboardClick}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
+                    >
+                      Dashboard
+                    </motion.button>
+                    <motion.button
+                      onClick={handleSignOut}
                       whileTap={{ scale: 0.95 }}
                       className="w-full px-4 py-2 rounded-full border border-purple-500/50 text-white/90 font-medium"
                     >
@@ -177,10 +178,7 @@ const Header = () => {
                   </div>
                 ) : (
                   <motion.button
-                    onClick={() => {
-                      handleSignIn();
-                      setIsMenuOpen(false);
-                    }}
+                    onClick={handleSignIn}
                     whileTap={{ scale: 0.95 }}
                     className="w-full px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium"
                   >
@@ -198,201 +196,87 @@ const Header = () => {
 
 const Hero = () => {
   const { data: session } = useSession();
-  const videoRef = useRef(null);
-  const { scrollYProgress } = useScroll();
-  const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
-  const scale = useTransform(scrollYProgress, [0, 0.3], [1, 1.1]);
-  
+  const router = useRouter();
+
+  const handleDashboardClick = () => {
+    if (session) {
+      // Redirect based on user role
+      if (session.user.role === 'DJ') {
+        router.push('/dashboard/dj');
+      } else {
+        router.push('/dashboard/user');
+      }
+    } else {
+      signIn(undefined, { callbackUrl: '/onboarding' });
+    }
+  };
+
   return (
-    <motion.section
-      style={{ opacity }}
-      className="relative min-h-screen flex flex-col justify-center items-center text-center px-4 py-16 overflow-hidden"
-      id="hero"
-    >
-      {/* Background video with overlay */}
-      <motion.div style={{ scale }} className="absolute inset-0 z-0">
-        <video
-          ref={videoRef}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
+    <section className="relative min-h-screen flex items-center justify-center py-20 px-4">
+      <div className="text-center max-w-3xl mx-auto">
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-4xl md:text-6xl font-bold mb-6"
         >
-          <source src="/banner.mp4" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/90"></div>
-      </motion.div>
-      
-      {/* SVG Decorative Elements */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        {/* Circular audio wave SVG */}
-        <svg className="absolute -left-20 top-1/4 w-64 h-64 text-blue-500/10" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="5,5" />
-          <circle cx="100" cy="100" r="60" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3,3" />
-          <circle cx="100" cy="100" r="40" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="2,2" />
-        </svg>
-        
-        {/* Sound wave SVG */}
-        <svg className="absolute right-10 bottom-1/4 w-96 h-32 text-purple-500/10" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
-          {[...Array(20)].map((_, i) => (
-            <motion.rect 
-              key={i} 
-              x={i * 10} 
-              y="25" 
-              width="4" 
-              height="0"
-              fill="currentColor"
-              animate={{ 
-                height: [10, Math.random() * 30 + 10, 10],
-                y: [25, 25 - (Math.random() * 15 + 5), 25]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                delay: i * 0.1,
-                ease: "easeInOut"
-              }}
-            />
-          ))}
-        </svg>
-        
-        {/* Geometric dots pattern */}
-        <svg className="absolute left-1/2 bottom-32 w-80 h-80 text-blue-500/5" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          {[...Array(10)].map((_, row) => (
-            [...Array(10)].map((_, col) => (
-              <circle 
-                key={`${row}-${col}`} 
-                cx={row * 10 + 5} 
-                cy={col * 10 + 5} 
-                r="1.5" 
-                fill="currentColor" 
-              />
-            ))
-          ))}
-        </svg>
-      </div>
-      
-      {/* Hero content */}
-      <div className="relative z-10 max-w-5xl mx-auto">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+            Shape the Night
+          </span>
+          <br />
+          with TipWave
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto"
+        >
+          Elevate your nightlife experience with AI-powered song bidding. Influence the DJ&apos;s playlist in real-time.
+        </motion.p>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="flex flex-col items-center"
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="flex flex-col sm:flex-row gap-4 justify-center"
         >
-          {/* Main heading with proper spacing */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
-            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600 pb-2">
-              Shape the Night
-            </span>
-            <span className="block text-white pb-4">
-              with TipWave
-            </span>
-          </h1>
-          
-          {/* Subtitle with proper spacing */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="text-xl md:text-2xl text-white/80 max-w-2xl pb-3 leading-relaxed"
+          <button
+            onClick={handleDashboardClick}
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full text-white font-medium text-lg hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900"
           >
-            Elevate your nightlife experience with AI-powered song bidding.
-            Influence the DJ&apos;s playlist in real-time.
-          </motion.p>
-          
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.5 }}
-            className="flex flex-col sm:flex-row gap-4 mt-8 w-full sm:w-auto justify-center"
-          >
-            {session ? (
-              <Link href="/dashboard/user">
-                <motion.button
-                  whileHover={{ 
-                    scale: 1.05, 
-                    boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)"
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
-                >
-                  <span className="relative flex items-center justify-center z-10">
-                    Go to Dashboard
-                    <ChevronRight className="ml-2 h-5 w-5" />
-                  </span>
-                </motion.button>
-              </Link>
-            ) : (
-              <motion.button
-                onClick={() => signIn()}
-                whileHover={{ 
-                  scale: 1.05, 
-                  boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)"
-                }}
-                whileTap={{ scale: 0.98 }}
-                className="relative group px-10 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-full text-white font-bold text-lg overflow-hidden w-full sm:w-auto"
-              >
-                <span className="relative flex items-center justify-center z-10">
-                  Start Bidding Now
-                  <ChevronRight className="ml-2 h-5 w-5" />
-                </span>
-              </motion.button>
-            )}
-            
-            <motion.button
-              whileHover={{ 
-                scale: 1.05,
-                backgroundColor: "rgba(255, 255, 255, 0.1)"
-              }}
-              whileTap={{ scale: 0.98 }}
-              className="px-10 py-4 bg-white/5 border border-white/10 rounded-full text-white/90 font-medium text-lg transition-all duration-300 w-full sm:w-auto"
-              onClick={() => {
-                document.getElementById('features')?.scrollIntoView({behavior: 'smooth'});
-              }}
-            >
+            Go to Dashboard
+          </button>
+          <Link href="#features">
+            <button className="w-full sm:w-auto px-8 py-4 bg-gray-800/50 border border-gray-700/50 rounded-full text-white font-medium text-lg hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900">
               Explore Features
-            </motion.button>
-          </motion.div>
-          
-          {/* Stats section */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.5 }}
-            className="pt-16 md:pt-20 flex flex-wrap justify-center gap-8 sm:gap-12 md:gap-20 text-center"
-          >
-            {[
-              { value: '12,500+', label: 'ACTIVE USERS', color: 'from-blue-400 to-blue-600' },
-              { value: '74,600+', label: 'SONGS PLAYED', color: 'from-purple-400 to-purple-600' },
-              { value: '850+', label: 'PARTNER DJS', color: 'from-pink-400 to-pink-600' }
-            ].map((stat, index) => (
-              <motion.div 
-                key={index}
-                whileHover={{ y: -5, scale: 1.05 }}
-                className="flex flex-col items-center group"
-              >
-                <motion.span 
-                  className={`text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${stat.color}`}
-                  initial={{ scale: 0.9 }}
-                  whileInView={{ scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ type: "spring", stiffness: 200, delay: index * 0.1 }}
-                >
-                  {stat.value}
-                </motion.span>
-                <span className="text-white/60 text-xs uppercase tracking-widest mt-2 group-hover:text-white/90 transition-all duration-300">
-                  {stat.label}
-                </span>
-              </motion.div>
-            ))}
-          </motion.div>
+            </button>
+          </Link>
+        </motion.div>
+
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="grid grid-cols-3 gap-4 md:gap-8 mt-16 text-center"
+        >
+          <div>
+            <div className="text-2xl md:text-4xl font-bold text-blue-400">12,500+</div>
+            <div className="text-sm md:text-base text-gray-400 mt-1">ACTIVE USERS</div>
+          </div>
+          <div>
+            <div className="text-2xl md:text-4xl font-bold text-purple-400">74,600+</div>
+            <div className="text-sm md:text-base text-gray-400 mt-1">SONGS PLAYED</div>
+          </div>
+          <div>
+            <div className="text-2xl md:text-4xl font-bold text-pink-400">850+</div>
+            <div className="text-sm md:text-base text-gray-400 mt-1">PARTNER DJS</div>
+          </div>
         </motion.div>
       </div>
-    </motion.section>
+    </section>
   );
 };
 
@@ -728,7 +612,12 @@ const CallToAction = () => {
 
   const handleGetStarted = () => {
     if (session) {
-      router.push('/dashboard');
+      // Redirect based on user role
+      if (session.user.role === 'DJ') {
+        router.push('/dashboard/dj');
+      } else {
+        router.push('/dashboard/user');
+      }
     } else {
       signIn(undefined, { callbackUrl: '/onboarding' });
     }
@@ -744,8 +633,6 @@ const CallToAction = () => {
 
   return (
     <section className="relative py-16 md:py-24 overflow-hidden">
-      {/* Background elements remain the same */}
-      
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center">
         <motion.div className="space-y-6 md:space-y-8">
           <motion.h2 
@@ -809,25 +696,25 @@ const CallToAction = () => {
           >
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <span>No credit card required</span>
             </div>
             
-            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40"></div>
+            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40" />
             
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <span>Free tier available</span>
             </div>
             
-            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40"></div>
+            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40" />
             
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
               <span>Cancel anytime</span>
             </div>
@@ -1005,7 +892,7 @@ const Footer = () => {
             <div className="flex space-x-4 pt-2">
               <a href="#" className="text-white/60 hover:text-white transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334 0-.14 0-.282-.006-.422A6.685 6.685 0 0 0 16 3.542a6.658 6.658 0 0 1-1.889.518 3.301 3.301 0 0 0 1.447-1.817 6.533 6.533 0 0 1-2.087.793A3.286 3.286 0 0 0 7.875 6.03a9.325 9.325 0 0 1-6.767-3.429 3.289 3.289 0 0 0 1.018 4.382A3.323 3.323 0 0 1 .64 6.575v.045a3.288 3.288 0 0 0 2.632 3.218 3.203 3.203 0 0 1-.865.115 3.23 3.23 0 0 1-.614-.057 3.283 3.283 0 0 0 3.067 2.277A6.588 6.588 0 0 1 .78 13.58a6.32 6.32 0 0 1-.78-.045A9.344 9.344 0 0 0 5.026 15z" />
+                  <path d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334 0-.14 0-.282-.006-.422A6.685 6.685 0 0 0 16 3.542a6.658 6.658 0 0 1-1.889.518 3.301 3.301 0 0 0 1.447-1.817 6.533 6.533 0 0 1-2.087.793A3.286 3.286 0 0 0 7.875 6.03a9.325 9.325 0 0 1-6.767-3.429 3.289 3.289 0 0 0 1.018 4.382A3.323 3.323 0 0 1 .64 6.575v.045a3.288 3.288 0 0 0 2.632 3.218 3.203 3.203 0 0 1-.865.115 3.23 3.23 0 0 1-.614-.057 3.283 3.283 0 0 1 3.067 2.277A6.588 6.588 0 0 1 .78 13.58a6.32 6.32 0 0 1-.78-.045A9.344 9.344 0 0 0 5.026 15z" />
                 </svg>
               </a>
               <a href="#" className="text-white/60 hover:text-white transition-colors">
