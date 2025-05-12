@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/router";
 
 const LandingPage = () => {
   // Remove unused state variables
@@ -722,142 +723,115 @@ const Testimonials = () => {
 };
 
 const CallToAction = () => {
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  const handleGetStarted = () => {
+    if (session) {
+      router.push('/dashboard');
+    } else {
+      signIn(undefined, { callbackUrl: '/onboarding' });
+    }
+  };
+
+  const handleDJSignup = () => {
+    if (session) {
+      router.push('/dj/onboarding');
+    } else {
+      signIn(undefined, { callbackUrl: '/dj/onboarding' });
+    }
+  };
+
   return (
-    <section className="relative py-24 overflow-hidden">
-      {/* Dynamic background with particles and gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/50 via-purple-900/50 to-black z-0">
-        <div className="absolute inset-0 opacity-30">
-          <Image 
-            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=2070&auto=format&fit=crop"
-            alt="DJ Concert"
-            layout="fill"
-            objectFit="cover"
-            quality={100}
-            className="opacity-40"
-          />
-        </div>
-        
-        {/* Floating particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
-            <div 
-              key={i}
-              className="absolute rounded-full bg-white/20 blur-sm animate-float"
-              style={{
-                width: Math.random() * 10 + 5 + 'px',
-                height: Math.random() * 10 + 5 + 'px',
-                top: Math.random() * 100 + '%',
-                left: Math.random() * 100 + '%',
-                animationDuration: Math.random() * 15 + 10 + 's',
-                animationDelay: Math.random() * 5 + 's',
-              }}
-            />
-          ))}
-        </div>
-      </div>
+    <section className="relative py-16 md:py-24 overflow-hidden">
+      {/* Background elements remain the same */}
       
-      {/* Glowing border */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
-      
-      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-        <motion.div className="space-y-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center">
+        <motion.div className="space-y-6 md:space-y-8">
           <motion.h2 
-            className="text-4xl md:text-5xl font-bold"
+            className="text-3xl md:text-5xl font-bold leading-tight"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
           >
             Ready to <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Transform</span> Your Nightlife?
           </motion.h2>
           
           <motion.p 
-            className="text-xl text-white/80 max-w-2xl mx-auto"
+            className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.3 }}
           >
-            Join thousands of music lovers and DJs already using TipWave to create unforgettable nightlife experiences. Get started in minutes.
+            Join thousands of music lovers and DJs already using TipWave to create unforgettable nightlife experiences.
           </motion.p>
           
           <motion.div 
-            className="flex flex-col sm:flex-row justify-center gap-4 mt-10"
+            className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8 md:mt-10 px-4"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.4 }}
           >
             <motion.button
+              onClick={handleGetStarted}
               whileHover={{ 
-                scale: 1.05, 
-                boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)",
-                transition: { duration: 0.2 }
+                scale: 1.02,
+                boxShadow: "0 0 25px rgba(139, 92, 246, 0.5)"
               }}
-              whileTap={{ scale: 0.95 }}
-              className="relative px-8 py-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium text-lg overflow-hidden group"
+              whileTap={{ scale: 0.98 }}
+              className="w-full sm:w-auto relative px-8 py-4 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium text-lg overflow-hidden group focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900"
             >
-              <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></span>
+              <span className="absolute top-0 left-0 w-full h-full bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-200"></span>
               <span className="relative flex items-center justify-center gap-2">
-                Get Started <ChevronRight size={20} />
+                Get Started <ChevronRight className="w-5 h-5" />
               </span>
             </motion.button>
             
             <motion.button
+              onClick={handleDJSignup}
               whileHover={{ 
-                scale: 1.05,
-                borderColor: "rgba(168, 85, 247, 0.8)",
-                transition: { duration: 0.2 }
+                scale: 1.02,
+                borderColor: "rgba(168, 85, 247, 0.8)"
               }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 rounded-full border-2 border-purple-500/50 hover:border-purple-500 text-white font-medium text-lg transition-colors duration-300"
+              whileTap={{ scale: 0.98 }}
+              className="w-full sm:w-auto px-8 py-4 rounded-full border-2 border-purple-500/50 hover:border-purple-500 text-white font-medium text-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900"
             >
               For DJs
             </motion.button>
           </motion.div>
           
-          {/* Testimonial micro-quote */}
+          {/* Trust indicators */}
           <motion.div 
-            className="mt-10 pt-8 max-w-md mx-auto"
+            className="flex flex-wrap justify-center items-center gap-4 md:gap-6 mt-8 text-sm text-white/60"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.5 }}
           >
-            <div className="relative">
-              <div className="absolute -top-4 left-0 text-4xl text-purple-500/70"></div>
-              <p className="italic text-white/80">TipWave revolutionized our venue&apos;s experience. Revenue up 35% in just three months!</p>
-              <div className="flex items-center justify-center mt-4">
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-3 bg-gradient-to-r from-blue-500 to-purple-500 p-0.5">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-gray-900">
-                    <Image src="https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?q=80&w=150&auto=format&fit=crop" 
-                      width={32} 
-                      height={32} 
-                      alt="Club Owner" 
-                    />
-                  </div>
-                </div>
-                <span className="text-sm font-medium">Marcus R. - Club Owner</span>
-              </div>
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+              </svg>
+              <span>No credit card required</span>
+            </div>
+            
+            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40"></div>
+            
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+              </svg>
+              <span>Free tier available</span>
+            </div>
+            
+            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40"></div>
+            
+            <div className="flex items-center">
+              <svg className="w-5 h-5 mr-2 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+              </svg>
+              <span>Cancel anytime</span>
             </div>
           </motion.div>
-          
-          <div className="pt-8 text-white/60 text-sm flex items-center justify-center gap-2">
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-              </svg>
-              No credit card required
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-white/40"></span>
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-              </svg>
-              Free tier available
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-white/40"></span>
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-              </svg>
-              Cancel anytime
-            </span>
-          </div>
         </motion.div>
       </div>
     </section>

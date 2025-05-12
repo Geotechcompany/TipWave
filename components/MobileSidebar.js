@@ -1,38 +1,26 @@
-import { useState, useEffect } from 'react';
+import {  useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import { signOut } from 'next-auth/react';
 import { 
   X, 
-  Menu, 
-  Home, 
-  Calendar, 
-  Music, 
-  DollarSign, 
-  BarChart2, 
-  Settings, 
-  MessageSquare,
-  UserCircle,
   LogOut,
- 
-  ListMusic,
   Zap,
   CheckCircle,
-  Wallet
+
 } from 'lucide-react';
 
-export function MobileSidebar({ activeView, onViewChange }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function MobileSidebar({ activeView, onViewChange, navigationItems = [], isOpen, onClose }) {
   const router = useRouter();
 
   // Close sidebar on route change
   useEffect(() => {
-    const handleRouteChange = () => setIsOpen(false);
+    const handleRouteChange = () => onClose();
     router.events.on('routeChangeComplete', handleRouteChange);
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
-  }, [router]);
+  }, [router, onClose]);
 
   // Lock body scroll when sidebar is open
   useEffect(() => {
@@ -46,22 +34,9 @@ export function MobileSidebar({ activeView, onViewChange }) {
     };
   }, [isOpen]);
 
-  const menuItems = [
-    { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'requests', label: 'Song Requests', icon: Music },
-    { id: 'library', label: 'Music Library', icon: ListMusic },
-    { id: 'earnings', label: 'Earnings', icon: DollarSign },
-    { id: 'analytics', label: 'Analytics', icon: BarChart2 },
-    { id: 'events', label: 'Events', icon: Calendar },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'profile', label: 'Profile', icon: UserCircle },
-    { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'withdrawals', label: 'Withdrawals', icon: Wallet }
-  ];
-
   const handleViewSelect = (view) => {
     onViewChange(view);
-    setIsOpen(false);
+    onClose();
   };
 
   const handleLogout = async () => {
@@ -70,15 +45,6 @@ export function MobileSidebar({ activeView, onViewChange }) {
 
   return (
     <>
-      {/* Toggle Button - Moved to left side */}
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-full bg-blue-600 text-white shadow-lg"
-        aria-label="Open Menu"
-      >
-        <Menu size={24} />
-      </button>
-
       {/* Overlay */}
       <AnimatePresence>
         {isOpen && (
@@ -86,7 +52,7 @@ export function MobileSidebar({ activeView, onViewChange }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsOpen(false)}
+            onClick={() => onClose()}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           />
         )}
@@ -106,7 +72,7 @@ export function MobileSidebar({ activeView, onViewChange }) {
             <div className="p-4 border-b border-gray-800 flex items-center justify-between">
               <h2 className="font-bold text-xl">Menu</h2>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => onClose()}
                 className="p-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white"
               >
                 <X size={20} />
@@ -117,7 +83,7 @@ export function MobileSidebar({ activeView, onViewChange }) {
             <div className="flex flex-col flex-1 overflow-y-auto">
               <div className="flex-1">
                 <nav className="p-4">
-                  {menuItems.map(item => {
+                  {navigationItems.map(item => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
                     
@@ -145,7 +111,7 @@ export function MobileSidebar({ activeView, onViewChange }) {
                 </nav>
               </div>
 
-              {/* Upgrade Banner - Add this section */}
+              {/* Upgrade Banner */}
               <div className="p-4 border-t border-gray-800">
                 <div className="rounded-xl overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4">
@@ -176,7 +142,7 @@ export function MobileSidebar({ activeView, onViewChange }) {
                     <button 
                       onClick={() => {
                         router.push('/pricing');
-                        setIsOpen(false);
+                        onClose();
                       }}
                       className="w-full bg-white text-blue-600 font-medium py-2 px-4 rounded-lg hover:bg-blue-50 transition-colors text-sm"
                     >

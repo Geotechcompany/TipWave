@@ -65,7 +65,7 @@ export default function DJDashboard() {
     symbol: '$',
     rate: 1
   });
-  const [isOpen, setIsOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // Memoize all the fetch functions to use in dependency arrays
   const fetchDJStats = useCallback(async () => {
@@ -252,10 +252,11 @@ export default function DJDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white">
       {/* Mobile sidebar */}
       <MobileSidebar 
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
         activeView={selectedView} 
         onViewChange={setSelectedView}
+        navigationItems={navItems}
       />
 
       {/* Main layout */}
@@ -340,7 +341,7 @@ export default function DJDashboard() {
               <div className="flex h-16 items-center justify-between">
                 {/* Mobile menu button - only show on mobile */}
                 <button 
-                  onClick={() => setIsOpen(true)} 
+                  onClick={() => setIsMobileSidebarOpen(true)} 
                   className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg"
                 >
                   <Menu size={20} />
@@ -470,7 +471,9 @@ export default function DJDashboard() {
               )}
               
               {selectedView === "fans" && (
-                <FanManagementPanel />
+                <FanManagementPanel 
+                  defaultCurrency={defaultCurrency}
+                />
               )}
               
               {selectedView === "settings" && (

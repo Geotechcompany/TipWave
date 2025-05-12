@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Calendar, TrendingUp, Loader2, Music } from "lucide-react";
+import { DollarSign, Calendar, TrendingUp, Loader2, Music, ChevronRight, Wallet } from "lucide-react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { WithdrawalModal } from "./WithdrawalModal";
@@ -17,7 +17,9 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
   });
   const [isLoading, setIsLoading] = useState(true);
   const [timeframe, setTimeframe] = useState("month");
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [pendingEarnings, setPendingEarnings] = useState(0);
 
   // Format currency with the correct symbol
   const formatCurrency = (amount) => {
@@ -93,11 +95,27 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
     }
   }, [session?.user?.id, fetchEarnings]);
 
+  // Fetch wallet balance separately to ensure consistency with the modal
+  const fetchWalletBalance = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const response = await fetch(`/api/dj/${session.user.id}/wallet`);
+      if (!response.ok) throw new Error("Failed to fetch wallet");
+      const data = await response.json();
+      setWalletBalance(data.wallet.balance);
+      setPendingEarnings(data.wallet.pendingEarnings || 0);
+    } catch (error) {
+      console.error("Error fetching wallet:", error);
+    }
+  }, [session?.user?.id]);
+
   useEffect(() => {
     if (session?.user?.id) {
       fetchEarnings();
+      fetchWalletBalance();
     }
-  }, [fetchEarnings, session?.user?.id]);
+  }, [fetchEarnings, fetchWalletBalance, session?.user?.id]);
 
   // Update the handleRequestAccepted function in the useEffect at around line 76
   useEffect(() => {
@@ -149,19 +167,6 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
     }
   };
 
-  // Function to handle opening the withdrawal modal
-  const openWithdrawalModal = () => {
-    setIsWithdrawing(true);
-  };
-
-  // Function to handle the completion of a withdrawal
-  const handleWithdrawalComplete = () => {
-    // Refresh earnings data after a successful withdrawal
-    fetchEarnings();
-    toast.success("Withdrawal request submitted successfully");
-    setIsWithdrawing(false);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -169,9 +174,9 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
       transition={{ duration: 0.4 }}
       className="bg-gray-900 rounded-xl p-6 shadow-lg overflow-hidden"
     >
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h2 className="text-xl font-semibold text-white">Your Earnings</h2>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
           <select
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
@@ -183,22 +188,12 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
             <option value="all">All Time</option>
           </select>
           
-          {/* Add Export button */}
           <button
             onClick={handleExport}
             className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-lg text-sm transition-colors"
             disabled={isLoading || !earnings?.recentTransactions?.length}
           >
             Export CSV
-          </button>
-          
-          <button
-            onClick={openWithdrawalModal}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm transition-colors"
-            disabled={isLoading || !earnings?.total || earnings.total <= 0}
-          >
-            <DollarSign className="h-4 w-4" />
-            Withdraw Earnings
           </button>
         </div>
       </div>
@@ -209,8 +204,7 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
         </div>
       ) : (
         <>
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             <StatCard
               title="Total Earnings"
               value={formatCurrency(earnings.total)}
@@ -231,10 +225,41 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
             />
           </div>
 
-          {/* Recent Transactions */}
-          <div className="bg-gray-800/50 rounded-xl p-6">
+          <div className="mt-6 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-xl p-5 border border-blue-500/20">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-medium text-white mb-1">Ready to withdraw your earnings?</h3>
+                <div className="flex items-center gap-2 text-sm text-blue-200/70">
+                  <Wallet className="h-4 w-4 text-blue-400" />
+                  <span>Available balance: <span className="font-semibold text-white">{formatCurrency(walletBalance)}</span></span>
+                  {pendingEarnings > 0 && (
+                    <span className="text-green-400 text-xs ml-2">
+                      (+{formatCurrency(pendingEarnings)} pending)
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWithdrawalModal(true)}
+                disabled={isLoading || walletBalance <= 0}
+                className="relative overflow-hidden group flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 
+                         hover:from-blue-500 hover:to-indigo-500 disabled:from-blue-800/50 disabled:to-indigo-800/50
+                         disabled:text-blue-100/50 text-white px-6 py-3 rounded-lg font-medium 
+                         transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:hover:scale-100
+                         shadow-lg hover:shadow-blue-500/25"
+              >
+                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-400/20 to-indigo-400/20 
+                               transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></span>
+                <DollarSign className="h-5 w-5 relative z-10" />
+                <span className="relative z-10">Withdraw Funds</span>
+                <ChevronRight className="h-5 w-5 relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-gray-800/50 rounded-xl p-4 md:p-6 mt-6">
             <h3 className="text-lg font-medium mb-4">Recent Transactions</h3>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
               {earnings.recentTransactions && earnings.recentTransactions.length > 0 ? (
                 earnings.recentTransactions.map((transaction) => (
                   <TransactionRow 
@@ -250,85 +275,73 @@ export function EarningsPanel({ defaultCurrency = { code: 'USD', symbol: '$', ra
               )}
             </div>
           </div>
-
-        
         </>
       )}
-
-      {/* Include the WithdrawalModal component */}
+      
       <WithdrawalModal
-        isOpen={isWithdrawing}
-        onClose={() => setIsWithdrawing(false)}
-        availableBalance={earnings.total || 0}
+        isOpen={showWithdrawalModal}
+        onClose={() => setShowWithdrawalModal(false)}
         defaultCurrency={defaultCurrency}
-        onWithdrawalComplete={handleWithdrawalComplete}
+        onWithdrawalComplete={() => {
+          fetchEarnings();
+          fetchWalletBalance();
+          setShowWithdrawalModal(false);
+          toast.success("Withdrawal request submitted successfully");
+        }}
       />
     </motion.div>
   );
 }
 
+// StatCard component with improved mobile responsiveness
 function StatCard({ title, value, icon: Icon, trend, subtitle }) {
   return (
-    <div className="bg-gray-800/50 rounded-xl p-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-gray-400">{title}</p>
-          <h4 className="text-2xl font-bold mt-2">{value}</h4>
-          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
-        </div>
-        <div className="p-3 bg-gray-700/50 rounded-lg">
-          <Icon className="h-6 w-6 text-blue-400" />
+    <div className="bg-gray-800/50 rounded-xl p-4 md:p-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-gray-400">{title}</h3>
+        <div className="bg-gray-700/50 p-2 rounded-lg">
+          <Icon className="h-4 w-4 text-blue-400" />
         </div>
       </div>
+      <p className="text-xl md:text-2xl font-semibold text-white mb-1">{value}</p>
+      {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
       {trend !== undefined && (
-        <div className="mt-4 flex items-center text-sm">
-          <TrendingUp className={`h-4 w-4 mr-1 ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-          <span className={trend >= 0 ? 'text-green-500' : 'text-red-500'}>
-            {trend}% from last period
-          </span>
+        <div className="flex items-center mt-2">
+          <div className={`flex items-center ${trend >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <TrendingUp className="h-3 w-3 mr-1" />
+            <span className="text-xs font-medium">{trend >= 0 ? '+' : ''}{trend}%</span>
+          </div>
+          <span className="text-xs text-gray-400 ml-2">vs previous period</span>
         </div>
       )}
     </div>
   );
 }
 
-function TransactionRow({ date, amount, songTitle, requesterName, description, createdAt, type, currencySymbol = '$' }) {
-  // Handle different transaction data structures
-  const displayTitle = songTitle || (description && description.includes("Accepted song request:") 
-    ? description.replace("Accepted song request:", "").trim() 
-    : description) || "Payment";
-    
-  const displayDate = date || createdAt || new Date();
-  const transactionType = type || (description && description.includes("Accepted song request:") ? "request" : "payment");
+// TransactionRow component with improved mobile responsiveness
+function TransactionRow({ description, amount, createdAt, date, songTitle, requesterName, currencySymbol = '$' }) {
   const displayAmount = parseFloat(amount || 0);
+  const displayDate = date || createdAt;
+  const displayTitle = songTitle || description?.replace('Accepted song request: ', '') || 'Transaction';
   
-  // Icon based on transaction type
-  const getIcon = () => {
-    if (transactionType === "request" || description?.includes("song request")) {
-      return <Music className="h-5 w-5 text-blue-400" />;
-    }
-    return <DollarSign className="h-5 w-5 text-blue-400" />;
-  };
-
   return (
-    <div className="flex items-center justify-between py-3 border-b border-gray-700/50 last:border-0">
-      <div className="flex items-center space-x-4">
-        <div className="p-2 bg-blue-500/10 rounded-lg">
-          {getIcon()}
+    <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+      <div className="flex items-center">
+        <div className={`p-2 rounded-lg ${displayAmount >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} mr-3`}>
+          <DollarSign className={`h-4 w-4 ${displayAmount >= 0 ? 'text-green-500' : 'text-red-500'}`} />
         </div>
         <div>
-          <p className="font-medium">{displayTitle}</p>
-          {requesterName && <p className="text-sm text-gray-400">from {requesterName}</p>}
-          {description && !displayTitle.includes(description) && (
-            <p className="text-xs text-gray-500">{description}</p>
-          )}
+          <p className="font-medium text-sm md:text-base text-white">{displayTitle}</p>
+          <p className="text-xs text-gray-400">
+            {requesterName ? `From ${requesterName}` : 'System transaction'}
+          </p>
         </div>
       </div>
       <div className="text-right">
         <p className={`font-medium ${displayAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
           {displayAmount >= 0 ? '' : '-'}{currencySymbol}{Math.abs(displayAmount).toFixed(2)}
         </p>
-        <p className="text-sm text-gray-400">
+        <p className="text-xs text-gray-400">
           {new Date(displayDate).toLocaleDateString()}
         </p>
       </div>
