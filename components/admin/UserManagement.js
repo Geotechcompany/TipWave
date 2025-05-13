@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
-  User, Search, MoreVertical, Edit, Trash2, CheckCircle, XCircle,
-  ChevronDown, RefreshCw, Loader2, AlertTriangle
+  User, Search, Edit, Trash2, CheckCircle, XCircle,
+  ChevronDown, RefreshCw, Loader2, AlertTriangle, 
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Badge } from "../ui/badge";
@@ -26,20 +26,42 @@ export default function UserManagement() {
     name: "",
     email: "",
     role: "USER",
-    status: "active"
+    status: "active",
+    balance: 0,
+    currency: "USD"
   });
-  const [dropdownOpen, setDropdownOpen] = useState(null);
-  const dropdownRef = useRef(null);
   const bulkActionRef = useRef(null);
 
   // Memoize the fetchUsers function with useCallback
   const fetchUsers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/users?limit=100'); // Increase limit to get more users
+      const response = await fetch('/api/admin/users?limit=100');
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
-      setUsers(data.users);
+      
+      // Fetch all wallets in one request
+      const walletsResponse = await fetch('/api/admin/users/wallets');
+      if (!walletsResponse.ok) throw new Error("Failed to fetch wallets");
+      const walletsData = await walletsResponse.json();
+      
+      // Create a map of wallet data by userId
+      const walletData = walletsData.wallets.reduce((acc, wallet) => {
+        acc[wallet.userId] = {
+          balance: wallet.balance || 0,
+          currency: wallet.currency || 'USD'
+        };
+        return acc;
+      }, {});
+      
+      // Combine user data with wallet data
+      const usersWithWallets = data.users.map(user => ({
+        ...user,
+        balance: walletData[user._id]?.balance || 0,
+        currency: walletData[user._id]?.currency || 'USD'
+      }));
+      
+      setUsers(usersWithWallets);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast.error("Failed to load users");
@@ -53,9 +75,6 @@ export default function UserManagement() {
     
     // Close dropdowns when clicking outside
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setDropdownOpen(null);
-      }
       if (bulkActionRef.current && !bulkActionRef.current.contains(event.target)) {
         setBulkActionOpen(false);
       }
@@ -191,6 +210,7 @@ export default function UserManagement() {
     try {
       setIsUpdating(true);
       
+      // Update user details
       const response = await fetch(`/api/admin/users/${selectedUser._id}`, {
         method: 'PUT',
         headers: {
@@ -207,6 +227,23 @@ export default function UserManagement() {
       if (!response.ok) {
         throw new Error('Failed to update user');
       }
+
+      // Update wallet balance if changed
+      if (editForm.balance !== selectedUser.balance) {
+        const walletResponse = await fetch(`/api/admin/users/${selectedUser._id}/wallet/topup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: editForm.balance - (selectedUser.balance || 0)
+          }),
+        });
+
+        if (!walletResponse.ok) {
+          throw new Error('Failed to update wallet balance');
+        }
+      }
       
       // Update local state
       setUsers(prevUsers => 
@@ -218,7 +255,8 @@ export default function UserManagement() {
                 email: editForm.email,
                 role: editForm.role,
                 status: editForm.status,
-                isActive: editForm.status === 'active'
+                isActive: editForm.status === 'active',
+                balance: editForm.balance
               } 
             : user
         )
@@ -276,7 +314,7 @@ export default function UserManagement() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:space-x-4">
         <h2 className="text-2xl font-bold">User Management</h2>
         <div className="flex space-x-2">
           <Button 
@@ -293,71 +331,73 @@ export default function UserManagement() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search users..."
-                className="pl-8 pr-4 py-2 w-full rounded-md bg-gray-700 border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            <div className="flex space-x-2">
-              <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-auto">
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
-                </TabsList>
-              </Tabs>
+          <div className="flex flex-col space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="pl-8 pr-4 py-2 w-full rounded-md bg-gray-700 border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
               
-              {selectedUsers.length > 0 && (
-                <div className="relative" ref={bulkActionRef}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setBulkActionOpen(!bulkActionOpen)}
-                    disabled={isUpdating}
-                  >
-                    Bulk Actions ({selectedUsers.length})
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                  
-                  {bulkActionOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600">
-                      <div className="py-1">
-                        <button
-                          className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                          onClick={() => handleBulkAction('activate')}
-                          disabled={isUpdating}
-                        >
-                          <CheckCircle className="mr-2 h-4 w-4 text-green-400" />
-                          Activate Selected
-                        </button>
-                        <button
-                          className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
-                          onClick={() => handleBulkAction('deactivate')}
-                          disabled={isUpdating}
-                        >
-                          <XCircle className="mr-2 h-4 w-4 text-red-400" />
-                          Deactivate Selected
-                        </button>
-                        <button
-                          className="flex items-center w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
-                          onClick={() => handleBulkAction('delete')}
-                          disabled={isUpdating}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Selected
-                        </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full sm:w-auto">
+                  <TabsList className="w-full sm:w-auto">
+                    <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
+                    <TabsTrigger value="active" className="flex-1 sm:flex-none">Active</TabsTrigger>
+                    <TabsTrigger value="inactive" className="flex-1 sm:flex-none">Inactive</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                
+                {selectedUsers.length > 0 && (
+                  <div className="relative" ref={bulkActionRef}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setBulkActionOpen(!bulkActionOpen)}
+                      disabled={isUpdating}
+                    >
+                      Bulk Actions ({selectedUsers.length})
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                    
+                    {bulkActionOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10 border border-gray-600">
+                        <div className="py-1">
+                          <button
+                            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            onClick={() => handleBulkAction('activate')}
+                            disabled={isUpdating}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4 text-green-400" />
+                            Activate Selected
+                          </button>
+                          <button
+                            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-600"
+                            onClick={() => handleBulkAction('deactivate')}
+                            disabled={isUpdating}
+                          >
+                            <XCircle className="mr-2 h-4 w-4 text-red-400" />
+                            Deactivate Selected
+                          </button>
+                          <button
+                            className="flex items-center w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-600"
+                            onClick={() => handleBulkAction('delete')}
+                            disabled={isUpdating}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Selected
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -373,75 +413,150 @@ export default function UserManagement() {
               <p className="text-gray-400 mt-1">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="pb-3 pl-4">
-                      <input
-                        type="checkbox"
-                        checked={selectAll}
-                        onChange={handleSelectAll}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                      />
-                    </th>
-                    <th className="pb-3 text-left">User</th>
-                    <th className="pb-3 text-left">Role</th>
-                    <th className="pb-3 text-left">Status</th>
-                    <th className="pb-3 text-left">Joined</th>
-                    <th className="pb-3 text-right pr-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                {/* Mobile View */}
+                <div className="block sm:hidden">
                   {filteredUsers.map(user => (
-                    <tr key={user._id} className="hover:bg-gray-700/30">
-                      <td className="py-3 pl-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user._id)}
-                          onChange={() => handleSelectUser(user._id)}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="py-3">
+                    <div key={user._id} className="bg-gray-800 border-b border-gray-700 p-4">
+                      <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user._id)}
+                            onChange={() => handleSelectUser(user._id)}
+                            className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                          />
                           <div className="w-8 h-8 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center">
                             {user.name?.[0]?.toUpperCase() || <User size={14} />}
                           </div>
-                          <div>
-                            <div className="font-medium">{user.name || 'Unnamed User'}</div>
-                            <div className="text-xs text-gray-400">{user.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3">{getRoleBadge(user.role)}</td>
-                      <td className="py-3 px-4">
-                        <Badge className={
-                          (user.status === 'active' || user.isActive === true) 
-                          ? 'bg-green-500/20 text-green-500' 
-                          : 'bg-red-500/20 text-red-500'
-                        }>
-                          {(user.status === 'active' || user.isActive === true) ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </td>
-                      <td className="py-3 text-sm text-gray-400">
-                        {new Date(user.createdAt || Date.now()).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4 relative">
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => setDropdownOpen(dropdownOpen === user._id ? null : user._id)}
-                            className="text-gray-400 hover:text-white focus:outline-none"
-                          >
-                            <MoreVertical className="h-5 w-5" />
-                          </button>
                         </div>
                         
-                        {dropdownOpen === user._id && (
-                          <div 
-                            ref={dropdownRef}
-                            className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg z-50 py-1 border border-gray-700"
+                        {/* New Action Buttons */}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setEditForm({
+                                name: user.name || "",
+                                email: user.email || "",
+                                role: user.role || "USER",
+                                status: user.status || "active",
+                                balance: user.balance || 0,
+                                currency: user.currency || "USD"
+                              });
+                              setIsEditModalOpen(true);
+                            }}
+                            className="p-2 rounded-full hover:bg-gray-700 transition-colors"
                           >
+                            <Edit className="h-4 w-4 text-blue-400" />
+                          </button>
+
+                          {user.status === 'active' ? (
+                            <button
+                              onClick={() => handleUserAction(user._id, 'deactivate')}
+                              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+                            >
+                              <XCircle className="h-4 w-4 text-red-400" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleUserAction(user._id, 'activate')}
+                              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-400" />
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-2 rounded-full hover:bg-gray-700 transition-colors group"
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-400 group-hover:text-red-400 transition-colors" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="ml-11">
+                        <div className="font-medium">{user.name || 'Unnamed User'}</div>
+                        <div className="text-sm text-gray-400">{user.email}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {getRoleBadge(user.role)}
+                          <Badge className={
+                            (user.status === 'active' || user.isActive === true) 
+                            ? 'bg-green-500/20 text-green-500' 
+                            : 'bg-red-500/20 text-red-500'
+                          }>
+                            {(user.status === 'active' || user.isActive === true) ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-gray-400 mt-2">
+                          Joined: {new Date(user.createdAt || Date.now()).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop View */}
+                <table className="hidden sm:table w-full">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="pb-3 pl-4">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                      </th>
+                      <th className="pb-3 text-left">User</th>
+                      <th className="pb-3 text-left">Role</th>
+                      <th className="pb-3 text-left">Status</th>
+                      <th className="pb-3 text-left">Joined</th>
+                      <th className="pb-3 text-right pr-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {filteredUsers.map(user => (
+                      <tr key={user._id} className="hover:bg-gray-700/30">
+                        <td className="py-3 pl-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(user._id)}
+                            onChange={() => handleSelectUser(user._id)}
+                            className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center">
+                              {user.name?.[0]?.toUpperCase() || <User size={14} />}
+                            </div>
+                            <div>
+                              <div className="font-medium">{user.name || 'Unnamed User'}</div>
+                              <div className="text-xs text-gray-400">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3">{getRoleBadge(user.role)}</td>
+                        <td className="py-3 px-4">
+                          <Badge className={
+                            (user.status === 'active' || user.isActive === true) 
+                            ? 'bg-green-500/20 text-green-500' 
+                            : 'bg-red-500/20 text-red-500'
+                          }>
+                            {(user.status === 'active' || user.isActive === true) ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-sm text-gray-400">
+                          {new Date(user.createdAt || Date.now()).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-end space-x-2">
                             <button
                               onClick={() => {
                                 setSelectedUser(user);
@@ -449,59 +564,49 @@ export default function UserManagement() {
                                   name: user.name || "",
                                   email: user.email || "",
                                   role: user.role || "USER",
-                                  status: user.status || "active"
+                                  status: user.status || "active",
+                                  balance: user.balance || 0,
+                                  currency: user.currency || "USD"
                                 });
                                 setIsEditModalOpen(true);
-                                setDropdownOpen(null);
                               }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
+                              className="p-2 rounded-full hover:bg-gray-700 transition-colors"
                             >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit User
+                              <Edit className="h-4 w-4 text-blue-400" />
                             </button>
-                            
+
                             {user.status === 'active' ? (
                               <button
-                                onClick={() => {
-                                  handleUserAction(user._id, 'deactivate');
-                                  setDropdownOpen(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
+                                onClick={() => handleUserAction(user._id, 'deactivate')}
+                                className="p-2 rounded-full hover:bg-gray-700 transition-colors"
                               >
-                                <XCircle className="h-4 w-4 mr-2 text-red-400" />
-                                Deactivate
+                                <XCircle className="h-4 w-4 text-red-400" />
                               </button>
                             ) : (
                               <button
-                                onClick={() => {
-                                  handleUserAction(user._id, 'activate'); 
-                                  setDropdownOpen(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
+                                onClick={() => handleUserAction(user._id, 'activate')}
+                                className="p-2 rounded-full hover:bg-gray-700 transition-colors"
                               >
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-400" />
-                                Activate
+                                <CheckCircle className="h-4 w-4 text-green-400" />
                               </button>
                             )}
-                            
+
                             <button
                               onClick={() => {
                                 setSelectedUser(user);
                                 setIsDeleteModalOpen(true);
-                                setDropdownOpen(null);
                               }}
-                              className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center"
+                              className="p-2 rounded-full hover:bg-gray-700 transition-colors group"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete User
+                              <Trash2 className="h-4 w-4 text-gray-400 group-hover:text-red-400 transition-colors" />
                             </button>
                           </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </CardContent>
@@ -509,8 +614,8 @@ export default function UserManagement() {
 
       {/* Edit User Modal */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4 text-white">Edit User</h2>
             
             <form onSubmit={handleUpdateUser}>
@@ -561,6 +666,29 @@ export default function UserManagement() {
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Wallet Balance
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-2.5 text-gray-400">
+                      {editForm.currency === 'USD' ? '$' : editForm.currency}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editForm.balance}
+                      onChange={(e) => setEditForm({...editForm, balance: parseFloat(e.target.value) || 0})}
+                      className="w-full pl-10 pr-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                    />
+                  </div>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Current balance: {selectedUser?.currency === 'USD' ? '$' : selectedUser?.currency}
+                    {selectedUser?.balance || 0}
+                  </p>
+                </div>
               </div>
               
               <div className="mt-6 flex justify-end space-x-3">
@@ -593,9 +721,9 @@ export default function UserManagement() {
 
       {/* Delete User Confirmation Modal */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <motion.div 
-            className="bg-gray-800 rounded-lg w-full max-w-md p-6 shadow-lg"
+            className="bg-gray-800 rounded-lg w-full max-w-md p-4 sm:p-6 shadow-lg"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.2 }}
