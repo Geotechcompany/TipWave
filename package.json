@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "init-db": "node -r dotenv/config scripts/init-db.js",
-    "migrate-wallets": "node -r dotenv/config scripts/migrate-wallet-balances.js",
+    "migrate-wallets": "node n-r dotenv/config scripts/migrate-wallet-balances.js",
     "tunnel": "node scripts/tunnel.js",
     "setup-mpesa": "node -r dotenv/config scripts/add-mpesa-payment-method.js"
   },

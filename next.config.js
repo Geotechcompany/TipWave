@@ -20,6 +20,8 @@ const nextConfig = {
       'placehold.co',
       'ui-avatars.com',
       'avatars.githubusercontent.com',
+      'cdn.pixabay.com',
+      'randomuser.me',
     ],
     remotePatterns: [
       {
